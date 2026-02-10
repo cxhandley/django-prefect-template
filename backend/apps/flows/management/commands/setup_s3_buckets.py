@@ -1,5 +1,5 @@
 """
-Management command to setup S3/RustyFS buckets.
+Management command to setup S3/RustFS buckets.
 """
 from django.core.management.base import BaseCommand
 from django.conf import settings
@@ -8,7 +8,7 @@ from botocore.exceptions import ClientError
 
 
 class Command(BaseCommand):
-    help = 'Setup S3/RustyFS buckets for data lake'
+    help = 'Setup S3/RustFS buckets for data lake'
     
     def handle(self, *args, **options):
         s3_client = boto3.client(

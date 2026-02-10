@@ -12,7 +12,7 @@ setup:
     just docker-up
     @echo "Waiting for services to be ready..."
     sleep 10
-    just setup-rustyfs
+    just setup-rustfs
     just migrate
     @echo "✅ Setup complete!"
 
@@ -76,10 +76,10 @@ docker-logs service="":
         docker compose logs -f {{service}}; \
     fi
 
-# Setup RustyFS buckets
-setup-rustyfs:
-    @echo "🗄️  Setting up RustyFS buckets..."
-    cd backend && uv run python manage.py setup_s3_buckets
+# Setup RustS buckets
+setup-rustfs:
+    @echo "🗄️  Setting up RustFS buckets..."
+    cd backend && uv run --no-project python manage.py setup_s3_buckets
 
 # Format code
 format:

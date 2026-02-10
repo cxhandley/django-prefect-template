@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:18-alpine
+    container_name: django-prefect-db
     environment:
       POSTGRES_DB: django_prefect
       POSTGRES_USER: django
@@ -14,9 +15,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - django-prefect-network
   
   redis:
     image: redis:7.4-alpine
+    container_name: django-prefect-redis
     ports:
       - "6379:6379"
     healthcheck:
@@ -24,26 +28,32 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    networks:
+      - django-prefect-network
   
-  rustyfs:
-    image: ghcr.io/pleshevskiy/rustyfs:latest
-    command: server --address 0.0.0.0:9000 --data /data
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: django-prefect-rustfs
+    command: --address 0.0.0.0:9000 /data
     environment:
-      RUSTYFS_ACCESS_KEY: rustyfs
-      RUSTYFS_SECRET_KEY: rustyfs_secret
+      RUSTFS_ACCESS_KEY: rustfs
+      RUSTFS_SECRET_KEY: rustfs_secret
     ports:
       - "9000:9000"
     volumes:
-      - rustyfs_data:/data
+      - rustfs_data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 10s
+    networks:
+      - django-prefect-network
   
   prefect-server:
     image: prefecthq/prefect:3-latest
+    container_name: django-prefect-server
     command: prefect server start --host 0.0.0.0
     ports:
       - "4200:4200"
@@ -52,7 +62,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - django-prefect-network
 
 volumes:
   postgres_data:
-  rustyfs_data:
+  rustfs_data:
+
+networks:
+  django-prefect-network:
+    driver: bridge
