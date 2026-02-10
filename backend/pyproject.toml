@@ -41,3 +41,8 @@ test = [
 
 [tool.setuptools.packages.find]
 include = ["apps", "config", "flows_library"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+testpaths = ["apps"] 
+pythonpath = ["."]

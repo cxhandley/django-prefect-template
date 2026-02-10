@@ -1,4 +1,4 @@
-# justfile - Task runner for django-prefect-kit
+# justfile - Task runner for django-prefect-template
 
 set dotenv-load
 
@@ -7,7 +7,7 @@ default:
 
 # Complete project setup
 setup:
-    @echo "🚀 Setting up django-prefect-kit..."
+    @echo "🚀 Setting up django-prefect-template..."
     just install
     just docker-up
     @echo "Waiting for services to be ready..."
@@ -66,9 +66,22 @@ makemigrations app="":
 createsuperuser:
     cd backend && uv run --extra dev python manage.py createsuperuser
 
-# Run all tests
 test:
-    uv run pytest
+    @echo "🧪 Running all tests..."
+    @just test-backend
+    @just test-gateway
+    @just test-worker
+    @echo "✅ All tests passed!"
+
+# Each package runs from its own directory
+test-backend:
+    cd backend && uv run --extra test pytest apps/ -v
+
+test-gateway:
+    cd gateway && uv run --extra test pytest tests/ -v
+
+test-worker:
+    cd worker && uv run --extra test pytest tests/ -v
 
 # Run tests with coverage
 test-cov:
@@ -93,7 +106,7 @@ docker-logs service="":
 # Setup RustS buckets
 setup-rustfs:
     @echo "🗄️  Setting up RustFS buckets..."
-    cd backend && uv run --no-project python manage.py setup_s3_buckets
+    cd backend && uv run python manage.py setup_s3_buckets
 
 # Format code
 format:
@@ -126,3 +139,69 @@ status:
     @just --version
     @echo ""
     @docker compose ps
+
+
+reset-db:
+    @echo "⚠️  This will delete all data. Are you sure? (y/N)"
+    @read -p "" confirm && [ "$$confirm" = "y" ] || exit 1
+    docker-compose down -v
+    docker-compose up -d db
+    sleep 3
+    just migrate
+
+# ============================================================================
+# Prefect
+# ============================================================================
+
+# Deploy Prefect flows
+deploy-flows:
+    cd gateway && uv run python -m scripts.deploy_flows
+
+# Start Prefect worker
+worker:
+    cd worker && uv run prefect worker start --pool default-pool
+
+# Open Prefect UI
+prefect-ui:
+    @echo "Opening Prefect UI at http://localhost:4200"
+    open http://localhost:4200 || xdg-open http://localhost:4200
+
+# ============================================================================
+# Django Management
+# ============================================================================
+
+# Collect static files
+collectstatic:
+    cd backend && uv run --extra dev python manage.py collectstatic --noinput
+
+# Create Django app
+startapp name:
+    cd backend/apps && uv run --extra dev python ../manage.py startapp {{name}}
+
+# ============================================================================
+# Deployment
+# ============================================================================
+
+# Deploy to staging
+deploy-staging:
+    @echo "🚀 Deploying to staging..."
+    cd terraform && terraform workspace select staging
+    terraform apply -var-file=staging.tfvars -auto-approve
+
+# Deploy to production
+deploy-prod:
+    @echo "🚀 Deploying to production..."
+    @echo "⚠️  Are you sure? This will deploy to PRODUCTION. (yes/N)"
+    @read -p "" confirm && [ "$$confirm" = "yes" ] || exit 1
+    cd terraform && terraform workspace select production
+    terraform apply -var-file=production.tfvars
+
+# Build Docker images for production
+build-prod:
+    docker build -t django-prefect-template/web:latest ./backend
+    docker build -t django-prefect-template/gateway:latest ./gateway
+    docker build -t django-prefect-template/worker:latest ./worker
+
+# Generate OpenAPI spec
+openapi:
+    cd gateway && uv run python -c "from main import app; import json; print(json.dumps(app.openapi(), indent=2))" > docs/api-spec.json
