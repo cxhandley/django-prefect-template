@@ -16,17 +16,27 @@ setup:
     just migrate
     @echo "✅ Setup complete!"
 
-# Install all dependencies
+# Install all dependencies with dev extras
 install:
     @echo "📦 Installing dependencies..."
     uv venv --python 3.13
+    @echo "Installing backend (with dev and test)..."
     uv pip install -e "backend[dev,test]"
+    @echo "Installing gateway (with dev and test)..."
     uv pip install -e "gateway[dev,test]"
-    uv pip install -e "worker[dev,test]"
+    @echo "Installing worker (with test)..."
+    uv pip install -e "worker[test]"
+    @echo "✅ All dependencies installed"
+
+# Quick check to verify dev dependencies
+check-dev:
+    @echo "Checking dev dependencies..."
+    @uv pip list | grep -E "(debug-toolbar|django-extensions|ipython)" || echo "❌ Dev dependencies missing - run 'just install'"
+
 
 # Start Django dev server
 dev:
-    cd backend && uv run python manage.py runserver
+    cd backend && uv run --extra dev python manage.py runserver
 
 # Start FastAPI gateway
 dev-gateway:
@@ -34,23 +44,27 @@ dev-gateway:
 
 # Django shell
 shell:
-    cd backend && uv run python manage.py shell_plus
+    cd backend && uv run --extra dev python manage.py shell_plus
+
+    # Run migrations
+dbshell:
+    cd backend && uv run --extra dev python manage.py dbshell
 
 # Run migrations
 migrate:
-    cd backend && uv run python manage.py migrate
+    cd backend && uv run --extra dev python manage.py migrate
 
 # Create migrations
 makemigrations app="":
     @if [ -z "{{app}}" ]; then \
-        cd backend && uv run python manage.py makemigrations; \
+        cd backend && uv run --extra dev python manage.py makemigrations; \
     else \
-        cd backend && uv run python manage.py makemigrations {{app}}; \
+        cd backend && uv run --extra dev python manage.py makemigrations {{app}}; \
     fi
 
 # Create superuser
 createsuperuser:
-    cd backend && uv run python manage.py createsuperuser
+    cd backend && uv run --extra dev python manage.py createsuperuser
 
 # Run all tests
 test:
