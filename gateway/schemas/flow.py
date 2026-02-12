@@ -1,26 +1,36 @@
 """
 Flow-related schemas.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import Dict, Any, Optional, List
 
 
 class FlowExecuteRequest(BaseModel):
-    """Request schema for executing a flow."""
+    """Request schema for flow execution."""
     
     parameters: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Flow parameters",
-        examples=[{
-            "input_s3_path": "s3://bucket/input.parquet",
-            "user_id": 1
-        }]
+        ...,
+        description="Flow parameters"
     )
-    tags: Optional[List[str]] = Field(
+    tags: Optional[list[str]] = Field(
         default=None,
-        description="Optional tags for the flow run",
-        examples=[["user:john", "priority:high"]]
+        description="Additional tags for the flow run"
     )
+    
+    @validator('parameters')
+    def parameters_must_be_dict(cls, v):
+        if not isinstance(v, dict):
+            raise ValueError("parameters must be a dictionary")
+        return v
+    
+    @validator('tags')
+    def tags_must_be_strings(cls, v):
+        if v is not None:
+            if not isinstance(v, list):
+                raise ValueError("tags must be a list")
+            if not all(isinstance(tag, str) for tag in v):
+                raise ValueError("all tags must be strings")
+        return v
 
 
 class FlowExecuteResponse(BaseModel):

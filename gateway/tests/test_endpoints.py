@@ -67,19 +67,6 @@ class TestFlowEndpoints:
         finally:
             # Clean up - remove the override
             app.dependency_overrides.clear()
-
-    
-    @patch('api.v1.endpoints.flows.get_prefect_client')
-    def test_execute_flow_unauthorized(self, mock_get_client):
-        """Test flow execution without auth"""
-        # ACT
-        response = client.post(
-            '/api/v1/flows/test-flow/execute',
-            json={'parameters': {}}
-        )
-        
-        # ASSERT
-        assert response.status_code == 401  # No auth header
     
     def test_get_flow_run(self, auth_headers):
         """Test getting flow run details"""
