@@ -34,13 +34,13 @@ check-dev:
     @uv pip list | grep -E "(debug-toolbar|django-extensions|ipython)" || echo "❌ Dev dependencies missing - run 'just install'"
 
 
+# ============================================================================
+# Django Management
+# ============================================================================
+
 # Start Django dev server
 dev:
     cd backend && uv run --extra dev python manage.py runserver
-
-# Start FastAPI gateway
-dev-gateway:
-    cd gateway && uv run uvicorn main:app --reload --port 8001
 
 # Django shell
 shell:
@@ -54,6 +54,15 @@ dbshell:
 migrate:
     cd backend && uv run --extra dev python manage.py migrate
 
+
+# Collect static files
+collectstatic:
+    cd backend && uv run --extra dev python manage.py collectstatic --noinput
+
+# Create Django app
+startapp name:
+    cd backend/apps && uv run --extra dev python ../manage.py startapp {{name}}
+
 # Create migrations
 makemigrations app="":
     @if [ -z "{{app}}" ]; then \
@@ -66,6 +75,12 @@ makemigrations app="":
 createsuperuser:
     cd backend && uv run --extra dev python manage.py createsuperuser
 
+
+# Start FastAPI gateway
+dev-gateway:
+    cd gateway && uv run uvicorn main:app --reload --port 8001
+
+
 test:
     @echo "🧪 Running all tests..."
     @just test-backend
@@ -77,8 +92,14 @@ test:
 test-backend:
     cd backend && uv run --extra test pytest apps/ -v
 
-test-gateway:
-    cd gateway && uv run --extra test pytest tests/ -v
+test-gateway test="":
+    #!/bin/bash
+    cd gateway
+    if [ -z "{{test}}" ]; then
+        uv run --extra test pytest tests/ -v
+    else
+        uv run --extra test pytest tests/ -v "{{test}}"
+    fi
 
 test-worker:
     cd worker && uv run --extra test pytest tests/ -v
@@ -166,17 +187,6 @@ prefect-ui:
     @echo "Opening Prefect UI at http://localhost:4200"
     open http://localhost:4200 || xdg-open http://localhost:4200
 
-# ============================================================================
-# Django Management
-# ============================================================================
-
-# Collect static files
-collectstatic:
-    cd backend && uv run --extra dev python manage.py collectstatic --noinput
-
-# Create Django app
-startapp name:
-    cd backend/apps && uv run --extra dev python ../manage.py startapp {{name}}
 
 # ============================================================================
 # Deployment
@@ -205,3 +215,11 @@ build-prod:
 # Generate OpenAPI spec
 openapi:
     cd gateway && uv run python -c "from main import app; import json; print(json.dumps(app.openapi(), indent=2))" > docs/api-spec.json
+
+
+tree:
+    # Check directory tree
+    tree -I '__pycache__|*.pyc|staticfiles|__init__.py'
+
+tree-gateway:
+    cd gateway && tree -I '__pycache__|*.pyc|staticfiles|__init__.py'
