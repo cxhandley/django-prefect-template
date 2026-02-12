@@ -14,13 +14,12 @@ client = TestClient(app)
 class TestFlowExecution:
     """Test flow execution endpoints with proper async mocking."""
     
-    @patch('api.v1.endpoints.flows.get_prefect_client')
-    def test_execute_flow_with_parameters(self, mock_get_client, auth_headers):
+    def test_execute_flow_with_parameters(self, auth_headers):
         """Test executing a flow with custom parameters."""
         # Setup mock
         mock_client = AsyncMock()
-        mock_client.run_deployment.return_value = {
-            "id": "550e8400-e29b-41d4-a716-446655440000",
+        mock_client.run_deployment = AsyncMock(return_value={
+            "run_id":  "550e8400-e29b-41d4-a716-446655440000",
             "flow_name": "data-processing",
             "deployment_name": "data-processing/production",
             "state": "SCHEDULED",
@@ -28,31 +27,42 @@ class TestFlowExecution:
             "parameters": {"input_s3_path": "s3://test/data.parquet"},
             "tags": ["user:test-service"],
             "created": "2024-01-01T00:00:00Z",
-        }
-        mock_get_client.return_value = mock_client
+        })
+
+        async def mock_get_prefect_client():
+            return mock_client
         
-        # Execute
-        response = client.post(
-            "/api/v1/flows/data-processing/execute",
-            json={
-                "parameters": {"input_s3_path": "s3://test/data.parquet"},
-                "tags": ["priority:high"]
-            },
-            headers=auth_headers
-        )
+        from api.v1.endpoints.flows import get_prefect_client
+        app.dependency_overrides[get_prefect_client] = mock_get_prefect_client
         
-        # Verify
-        assert response.status_code == 202
-        data = response.json()
-        assert data["flow_name"] == "data-processing"
-        assert "user:test-service" in data["tags"]
+        try:
+        
+            # Execute
+            response = client.post(
+                "/api/v1/flows/data-processing/execute",
+                json={
+                    "parameters": {"input_s3_path": "s3://test/data.parquet"},
+                    "tags": ["priority:high"]
+                },
+                headers=auth_headers
+            )
+            
+            # Verify
+            assert response.status_code == 202
+            data = response.json()
+            assert data["flow_name"] == "data-processing"
+            assert "user:test-service" in data["tags"]
+        
+        finally:
+            # Clean up - remove the override
+            app.dependency_overrides.clear()
     
-    @patch('api.v1.endpoints.flows.get_prefect_client')
-    def test_execute_specific_deployment(self, mock_get_client, auth_headers):
+    def test_execute_specific_deployment(self, auth_headers):
         """Test executing a specific deployment."""
         mock_client = AsyncMock()
-        mock_client.run_deployment.return_value = {
-            "id": "550e8400-e29b-41d4-a716-446655440000",
+
+        mock_client.run_deployment = AsyncMock(return_value={
+            "run_id":  "550e8400-e29b-41d4-a716-446655440000",
             "flow_name": "test-flow",
             "deployment_name": "test-flow/staging",
             "state": "SCHEDULED",
@@ -60,17 +70,27 @@ class TestFlowExecution:
             "parameters": {},
             "tags": [],
             "created": "2024-01-01T00:00:00Z",
-        }
-        mock_get_client.return_value = mock_client
+        })
+
+        async def mock_get_prefect_client():
+            return mock_client
         
-        response = client.post(
-            "/api/v1/flows/test-flow/execute/staging",
-            json={"parameters": {}},
-            headers=auth_headers
-        )
+        from api.v1.endpoints.flows import get_prefect_client
+        app.dependency_overrides[get_prefect_client] = mock_get_prefect_client
         
-        assert response.status_code == 202
-        assert response.json()["deployment_name"] == "test-flow/staging"
+        try:
+            response = client.post(
+                "/api/v1/flows/test-flow/execute/staging",
+                json={"parameters": {}},
+                headers=auth_headers
+            )
+            
+            assert response.status_code == 202
+            assert response.json()["deployment_name"] == "test-flow/staging"
+
+        finally:
+            # Clean up - remove the override
+            app.dependency_overrides.clear()
     
     def test_execute_flow_no_auth(self):
         """Test that execution requires authentication."""
