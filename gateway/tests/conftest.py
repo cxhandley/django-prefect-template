@@ -7,10 +7,10 @@ from fastapi.testclient import TestClient
 from unittest.mock import AsyncMock
 
 from main import app
-from core.security import create_service_token
+from core.security import create_service_token, create_access_token
 
 
-@pytest.fixture
+@pytest.fixture(autouse = True)
 def client() -> Generator[TestClient, None, None]:
     """
     FastAPI test client.
@@ -18,8 +18,8 @@ def client() -> Generator[TestClient, None, None]:
     Yields:
         TestClient instance
     """
-    with TestClient(app) as test_client:
-        yield test_client
+    with TestClient(app) as client:
+        yield client
 
 
 @pytest.fixture
@@ -46,89 +46,38 @@ def invalid_auth_headers() -> Dict[str, str]:
 
 
 @pytest.fixture
+def service_token():
+    """Create a valid service token for testing."""
+    return create_service_token("test-service")
+
+
+@pytest.fixture
+def user_token():
+    """Create a valid user token for testing."""
+    return create_access_token(subject="test-user")
+
+
+@pytest.fixture
+def user_auth_headers(user_token):
+    """Create authorization headers with user token."""
+    return {"Authorization": f"Bearer {user_token}"}
+
+
+@pytest.fixture
 def mock_prefect_client():
-    """
-    Mock Prefect client for testing.
-    
-    Returns:
-        Mock PrefectClient instance
-    """
-    mock_client = AsyncMock()
-    
-    # Mock run_deployment
-    mock_client.run_deployment.return_value = {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "flow_name": "test-flow",
-        "deployment_name": "test-flow/production",
-        "state": "SCHEDULED",
-        "state_type": "SCHEDULED",
-        "parameters": {},
-        "tags": [],
-        "created": "2024-01-01T00:00:00Z",
-    }
-    
-    # Mock get_flow_run
-    mock_client.get_flow_run.return_value = {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "flow_name": "test-flow",
-        "state": "COMPLETED",
-        "state_type": "COMPLETED",
-        "start_time": "2024-01-01T00:00:00Z",
-        "end_time": "2024-01-01T00:01:00Z",
-        "total_run_time": 60.0,
-        "parameters": {},
-    }
-    
-    # Mock get_flow_run_result
-    mock_client.get_flow_run_result.return_value = {
-        "output_path": "s3://bucket/output.parquet",
-        "row_count": 1000,
-    }
-    
-    # Mock list_deployments
-    mock_client.list_deployments.return_value = [
-        {
-            "id": "deploy-123",
-            "name": "production",
-            "flow_name": "test-flow",
-            "description": "Test flow deployment",
-            "tags": ["test"],
-            "parameters": {},
-        }
-    ]
-    
-    # Mock cancel_flow_run
-    mock_client.cancel_flow_run.return_value = {
-        "id": "550e8400-e29b-41d4-a716-446655440000",
-        "flow_name": "test-flow",
-        "state": "CANCELLED",
-        "state_type": "CANCELLED",
-    }
-    
-    return mock_client
+    """Create a mock Prefect client."""
+    return AsyncMock()
 
 
 @pytest.fixture
-def sample_flow_parameters() -> Dict[str, Any]:
-    """
-    Sample flow parameters for testing.
+def setup_mock_client(mock_prefect_client):
+    """Setup and teardown for mocking the Prefect client dependency."""
+    async def mock_get_prefect_client():
+        return mock_prefect_client
     
-    Returns:
-        Dictionary of flow parameters
-    """
-    return {
-        "input_s3_path": "s3://bucket/input.parquet",
-        "run_id": "550e8400-e29b-41d4-a716-446655440000",
-        "user_id": 1,
-    }
-
-
-@pytest.fixture
-def sample_flow_run_id() -> str:
-    """
-    Sample flow run ID for testing.
+    from api.v1.endpoints.flows import get_prefect_client
+    app.dependency_overrides[get_prefect_client] = mock_get_prefect_client
     
-    Returns:
-        UUID string
-    """
-    return "550e8400-e29b-41d4-a716-446655440000"
+    yield mock_prefect_client
+    
+    app.dependency_overrides.clear()

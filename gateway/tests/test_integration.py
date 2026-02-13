@@ -7,64 +7,15 @@ authentication, and Prefect client interactions.
 import pytest
 from unittest.mock import AsyncMock, patch
 from datetime import datetime, timedelta, UTC
-from fastapi.testclient import TestClient
 
 from core.security import create_service_token, create_access_token
 from main import app  # Import your FastAPI app
 
 
-# Setup test client
-client = TestClient(app)
-
-
-@pytest.fixture
-def service_token():
-    """Create a valid service token for testing."""
-    return create_service_token("test-service")
-
-
-@pytest.fixture
-def user_token():
-    """Create a valid user token for testing."""
-    return create_access_token(subject="test-user")
-
-
-@pytest.fixture
-def auth_headers(service_token):
-    """Create authorization headers with service token."""
-    return {"Authorization": f"Bearer {service_token}"}
-
-
-@pytest.fixture
-def user_auth_headers(user_token):
-    """Create authorization headers with user token."""
-    return {"Authorization": f"Bearer {user_token}"}
-
-
-@pytest.fixture
-def mock_prefect_client():
-    """Create a mock Prefect client."""
-    return AsyncMock()
-
-
-@pytest.fixture
-def setup_mock_client(mock_prefect_client):
-    """Setup and teardown for mocking the Prefect client dependency."""
-    async def mock_get_prefect_client():
-        return mock_prefect_client
-    
-    from api.v1.endpoints.flows import get_prefect_client
-    app.dependency_overrides[get_prefect_client] = mock_get_prefect_client
-    
-    yield mock_prefect_client
-    
-    app.dependency_overrides.clear()
-
-
 class TestFlowExecutionIntegration:
     """Integration tests for flow execution endpoints."""
     
-    def test_execute_flow_end_to_end(self, setup_mock_client, auth_headers):
+    def test_execute_flow_end_to_end(self, client, setup_mock_client, auth_headers):
         """Test complete flow execution from request to response."""
         # Setup mock response
         run_id = "550e8400-e29b-41d4-a716-446655440000"
@@ -100,7 +51,7 @@ class TestFlowExecutionIntegration:
         call_kwargs = setup_mock_client.run_deployment.call_args[1]
         assert call_kwargs["deployment_name"] == "data-processing/production"
     
-    def test_execute_flow_with_no_parameters(self, setup_mock_client, auth_headers):
+    def test_execute_flow_with_no_parameters(self, client, setup_mock_client, auth_headers):
         """Test executing flow without parameters."""
         run_id = "550e8400-e29b-41d4-a716-446655440001"
         setup_mock_client.run_deployment = AsyncMock(return_value={
@@ -123,7 +74,7 @@ class TestFlowExecutionIntegration:
         assert response.status_code == 202
         assert response.json()["parameters"] == {}
     
-    def test_execute_flow_with_complex_parameters(self, setup_mock_client, auth_headers):
+    def test_execute_flow_with_complex_parameters(self, client, setup_mock_client, auth_headers):
         """Test executing flow with nested parameter structures."""
         params = {
             "config": {
@@ -158,7 +109,7 @@ class TestFlowExecutionIntegration:
         assert response.status_code == 202
         assert response.json()["parameters"] == params
     
-    def test_execute_flow_unauthorized(self):
+    def test_execute_flow_unauthorized(self, client):
         """Test flow execution without authorization fails."""
         response = client.post(
             "/api/v1/flows/data-processing/execute",
@@ -167,7 +118,7 @@ class TestFlowExecutionIntegration:
         
         assert response.status_code == 401
     
-    def test_execute_flow_invalid_token(self):
+    def test_execute_flow_invalid_token(self, client):
         """Test flow execution with invalid token fails."""
         headers = {"Authorization": "Bearer invalid-token"}
         
@@ -179,7 +130,7 @@ class TestFlowExecutionIntegration:
         
         assert response.status_code == 401
     
-    def test_execute_flow_expired_token(self):
+    def test_execute_flow_expired_token(self, client):
         """Test flow execution with expired token fails."""
         expired_delta = timedelta(minutes=-1)
         expired_token = create_access_token(
@@ -199,7 +150,7 @@ class TestFlowExecutionIntegration:
         # Should succeed if token not expired
         assert response.status_code in [202, 401]
     
-    def test_execute_flow_prefect_client_error(self, setup_mock_client, auth_headers):
+    def test_execute_flow_prefect_client_error(self, client, setup_mock_client, auth_headers):
         """Test handling of Prefect client errors."""
         setup_mock_client.run_deployment = AsyncMock(
             side_effect=Exception("Prefect API unavailable")
@@ -218,7 +169,7 @@ class TestFlowExecutionIntegration:
 class TestFlowRunIntegration:
     """Integration tests for flow run retrieval endpoints."""
     
-    def test_get_flow_run_end_to_end(self, setup_mock_client, auth_headers):
+    def test_get_flow_run_end_to_end(self, client, setup_mock_client, auth_headers):
         """Test complete flow run retrieval from request to response."""
         run_id = "550e8400-e29b-41d4-a716-446655440000"
         
@@ -249,7 +200,7 @@ class TestFlowRunIntegration:
         # Verify client was called correctly
         setup_mock_client.get_flow_run.assert_called_once_with(run_id)
     
-    def test_get_flow_run_in_progress(self, setup_mock_client, auth_headers):
+    def test_get_flow_run_in_progress(self, client, setup_mock_client, auth_headers):
         """Test retrieving a flow run that is still running."""
         run_id = "550e8400-e29b-41d4-a716-446655440001"
         
@@ -276,7 +227,7 @@ class TestFlowRunIntegration:
         assert data["end_time"] is None
         assert data["total_run_time"] is None
     
-    def test_get_flow_run_failed(self, setup_mock_client, auth_headers):
+    def test_get_flow_run_failed(self, client, setup_mock_client, auth_headers):
         """Test retrieving a failed flow run."""
         run_id = "550e8400-e29b-41d4-a716-446655440002"
         
@@ -299,7 +250,7 @@ class TestFlowRunIntegration:
         assert response.status_code == 200
         assert response.json()["state"] == "FAILED"
     
-    def test_get_flow_run_not_found(self, setup_mock_client, auth_headers):
+    def test_get_flow_run_not_found(self, client, setup_mock_client, auth_headers):
         """Test retrieving a non-existent flow run."""
         run_id = "non-existent-id"
         
@@ -315,7 +266,7 @@ class TestFlowRunIntegration:
         # Should return 404 or 500 depending on error handling
         assert response.status_code >= 400
     
-    def test_get_flow_run_unauthorized(self):
+    def test_get_flow_run_unauthorized(self, client):
         """Test flow run retrieval without authorization fails."""
         run_id = "550e8400-e29b-41d4-a716-446655440000"
         
@@ -327,7 +278,7 @@ class TestFlowRunIntegration:
 class TestMultipleFlowsIntegration:
     """Integration tests for multiple flow operations."""
     
-    def test_execute_multiple_flows_sequentially(self, setup_mock_client, auth_headers):
+    def test_execute_multiple_flows_sequentially(self, client, setup_mock_client, auth_headers):
         """Test executing multiple different flows."""
         flows = [
             ("flow-a", {"param_a": "value_a"}),
@@ -361,7 +312,7 @@ class TestMultipleFlowsIntegration:
             assert response.status_code == 202
             assert response.json()["run_id"] == run_id
     
-    def test_execute_and_retrieve_flow_run(self, setup_mock_client, auth_headers):
+    def test_execute_and_retrieve_flow_run(self, client, setup_mock_client, auth_headers):
         """Test executing a flow and then retrieving its status."""
         run_id = "550e8400-e29b-41d4-a716-446655440000"
         flow_name = "test-flow"
@@ -412,7 +363,7 @@ class TestMultipleFlowsIntegration:
 class TestAuthenticationIntegration:
     """Integration tests for authentication with different token types."""
     
-    def test_service_to_service_authentication(self, setup_mock_client, auth_headers):
+    def test_service_to_service_authentication(self, client, setup_mock_client, auth_headers):
         """Test service-to-service authentication flow."""
         setup_mock_client.run_deployment = AsyncMock(return_value={
             "run_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -433,7 +384,7 @@ class TestAuthenticationIntegration:
         
         assert response.status_code == 202
     
-    def test_user_authentication(self, setup_mock_client, user_auth_headers):
+    def test_user_authentication(self, client,setup_mock_client, user_auth_headers):
         """Test user authentication flow."""
         setup_mock_client.run_deployment = AsyncMock(return_value={
             "run_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -454,7 +405,7 @@ class TestAuthenticationIntegration:
         
         assert response.status_code == 202
     
-    def test_missing_authorization_header(self, setup_mock_client):
+    def test_missing_authorization_header(self, client,setup_mock_client):
         """Test request without authorization header."""
         response = client.post(
             "/api/v1/flows/test-flow/execute",
@@ -463,7 +414,7 @@ class TestAuthenticationIntegration:
         
         assert response.status_code == 401
     
-    def test_malformed_authorization_header(self, setup_mock_client):
+    def test_malformed_authorization_header(self, client,setup_mock_client):
         """Test request with malformed authorization header."""
         headers = {"Authorization": "InvalidScheme token"}
         
@@ -479,7 +430,7 @@ class TestAuthenticationIntegration:
 class TestErrorHandlingIntegration:
     """Integration tests for error handling."""
     
-    def test_invalid_request_payload(self, setup_mock_client, auth_headers):
+    def test_invalid_request_payload(self, client,setup_mock_client, auth_headers):
 
         setup_mock_client.run_deployment = AsyncMock(return_value={
             "run_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -502,7 +453,7 @@ class TestErrorHandlingIntegration:
         # Should return 422 for validation error
         assert response.status_code in [400, 422]
     
-    def test_missing_required_fields(self, setup_mock_client, auth_headers):
+    def test_missing_required_fields(self, client,setup_mock_client, auth_headers):
         """Test request missing required fields."""
         response = client.post(
             "/api/v1/flows/test-flow/execute",
@@ -512,7 +463,7 @@ class TestErrorHandlingIntegration:
         
         assert response.status_code in [400, 422]
     
-    def test_timeout_handling(self, setup_mock_client, auth_headers):
+    def test_timeout_handling(self, client,setup_mock_client, auth_headers):
         """Test handling of timeout errors from Prefect client."""
         setup_mock_client.run_deployment = AsyncMock(
             side_effect=TimeoutError("Request timed out")
