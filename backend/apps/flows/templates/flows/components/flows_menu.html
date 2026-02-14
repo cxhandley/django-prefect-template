@@ -1,26 +1,37 @@
-<div class="space-y-2"></div>
-    <div class="px-4 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+<!-- backend/apps/flows/templates/flows/components/flows_menu.html -->
+<div style="padding: 0.5rem;">
+    <!-- Header -->
+    <div style="padding: 0.5rem 1rem; font-size: 0.75rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em;">
         Your Flows
     </div>
     
+    <!-- Flow List -->
     {% for flow in flows %}
-    <a href="#" class="dropdown-item">
-        <div class="flex-1">
-            <div class="text-sm font-medium">{{ flow.name }}</div>
+    <a href="#" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; color: #cbd5e1; border-radius: 6px; margin: 2px; cursor: pointer; transition: all 0.15s ease; font-size: 0.875rem;" onmouseover="this.style.backgroundColor='rgba(99, 102, 241, 0.15)'; this.style.color='#6366f1'; this.style.paddingLeft='1.125rem';" onmouseout="this.style.backgroundColor=''; this.style.color='#cbd5e1'; this.style.paddingLeft='1rem';">
+        <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 500; color: #f1f5f9;">{{ flow.name }}</div>
         </div>
         <span class="flow-status-badge {{ flow.status }}">
             <span class="status-dot {{ flow.status }}"></span>
             {{ flow.status|title }}
         </span>
     </a>
+    {% empty %}
+    <div style="padding: 2rem 1rem; text-align: center;">
+        <p style="font-size: 0.875rem; color: #94a3b8;">No flows yet</p>
+    </div>
     {% endfor %}
     
-    <div class="border-t border-slate-700 my-2"></div>
+    <!-- Divider -->
+    {% if flows %}
+    <div style="margin: 0.5rem 0; border-top: 1px solid rgba(99, 102, 241, 0.1);"></div>
+    {% endif %}
     
-    <a href="#" class="dropdown-item">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- Create New Action -->
+    <a href="#" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; color: #cbd5e1; border-radius: 6px; margin: 2px; cursor: pointer; transition: all 0.15s ease; font-size: 0.875rem;" onmouseover="this.style.backgroundColor='rgba(99, 102, 241, 0.15)'; this.style.color='#6366f1'; this.style.paddingLeft='1.125rem';" onmouseout="this.style.backgroundColor=''; this.style.color='#cbd5e1'; this.style.paddingLeft='1rem';">
+        <svg style="width: 16px; height: 16px; flex-shrink: 0; color: #6366f1;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
         </svg>
-        Create New Flow
+        <span style="font-weight: 500;">New Flow</span>
     </a>
 </div>

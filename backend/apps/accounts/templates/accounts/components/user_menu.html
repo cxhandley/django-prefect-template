@@ -1,49 +1,58 @@
+<!-- backend/apps/accounts/templates/accounts/components/user_menu.html -->
 <div>
-    <div class="px-4 py-3 border-b border-slate-700">
-        <p class="text-sm font-medium text-white">{{ user.get_full_name|default:user.username }}</p>
-        <p class="text-xs text-slate-400">{{ user.email }}</p>
+    <!-- User Info Header -->
+    <div style="border-bottom: 1px solid rgba(99, 102, 241, 0.1); padding: 0.75rem 1rem;">
+        <p style="font-size: 0.875rem; font-weight: 600; color: #f1f5f9;">{{ user.get_full_name|default:user.username }}</p>
+        <p style="font-size: 0.75rem; color: #94a3b8;">{{ user.email }}</p>
     </div>
     
-    <div class="p-2 space-y-1">
-        <a href="{% url 'accounts:profile' %}" class="dropdown-item">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- Menu Items -->
+    <div style="padding: 0.5rem;">
+        <a href="{% url 'accounts:profile' %}" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; color: #cbd5e1; border-radius: 6px; margin: 2px; cursor: pointer; transition: all 0.15s ease; font-size: 0.875rem;" onmouseover="this.style.backgroundColor='rgba(99, 102, 241, 0.15)'; this.style.color='#6366f1'; this.style.paddingLeft='1.125rem';" onmouseout="this.style.backgroundColor=''; this.style.color='#cbd5e1'; this.style.paddingLeft='1rem';">
+            <svg style="width: 16px; height: 16px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
             </svg>
-            Profile
+            <span>Profile</span>
         </a>
         
-        <a href="{% url 'accounts:settings' %}" class="dropdown-item">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <a href="{% url 'accounts:settings' %}" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; color: #cbd5e1; border-radius: 6px; margin: 2px; cursor: pointer; transition: all 0.15s ease; font-size: 0.875rem;" onmouseover="this.style.backgroundColor='rgba(99, 102, 241, 0.15)'; this.style.color='#6366f1'; this.style.paddingLeft='1.125rem';" onmouseout="this.style.backgroundColor=''; this.style.color='#cbd5e1'; this.style.paddingLeft='1rem';">
+            <svg style="width: 16px; height: 16px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
             </svg>
-            Settings
+            <span>Settings</span>
         </a>
         
-        <a href="#" class="dropdown-item">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <a href="#" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; color: #cbd5e1; border-radius: 6px; margin: 2px; cursor: pointer; transition: all 0.15s ease; font-size: 0.875rem;" onmouseover="this.style.backgroundColor='rgba(99, 102, 241, 0.15)'; this.style.color='#6366f1'; this.style.paddingLeft='1.125rem';" onmouseout="this.style.backgroundColor=''; this.style.color='#cbd5e1'; this.style.paddingLeft='1rem';">
+            <svg style="width: 16px; height: 16px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"></path>
             </svg>
-            API Keys
+            <span>API Keys</span>
         </a>
         
-        <a href="#" class="dropdown-item">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        <a href="#" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1rem; color: #cbd5e1; border-radius: 6px; margin: 2px; cursor: pointer; transition: all 0.15s ease; font-size: 0.875rem;" onmouseover="this.style.backgroundColor='rgba(99, 102, 241, 0.15)'; this.style.color='#6366f1'; this.style.paddingLeft='1.125rem';" onmouseout="this.style.backgroundColor=''; this.style.color='#cbd5e1'; this.style.paddingLeft='1rem';">
+            <svg style="width: 16px; height: 16px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3v.217a7.001 7.001 0 006.293-3.95m2.207.84a15.998 15.998 0 01-2.207.84m-3.085-17.911a7 7 0 017 7m0 0a7 7 0 1-7 7"></path>
             </svg>
-            Help & Docs
+            <span>Help</span>
         </a>
     </div>
     
-    <div class="px-2 py-2 border-t border-slate-700">
-        <button class="dropdown-item danger w-full justify-center"
+    <!-- Divider -->
+    <div style="margin: 0.5rem 0; border-top: 1px solid rgba(99, 102, 241, 0.1);"></div>
+    
+    <!-- Logout Button -->
+    <div style="padding: 0.5rem;">
+        <button style="width: 100%; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 0.625rem 1rem; color: #cbd5e1; background: none; border: none; border-radius: 6px; margin: 2px; cursor: pointer; transition: all 0.15s ease; font-size: 0.875rem;" 
                 hx-post="{% url 'accounts:logout' %}"
                 hx-trigger="click"
-                hx-confirm="Are you sure you want to logout?">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                hx-confirm="Sign out of your account?"
+                onmouseover="this.style.backgroundColor='rgba(239, 68, 68, 0.15)'; this.style.color='#fca5a5';"
+                onmouseout="this.style.backgroundColor=''; this.style.color='#cbd5e1';">
+            <svg style="width: 16px; height: 16px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
             </svg>
-            Logout
+            <span>Logout</span>
         </button>
     </div>
 </div>
