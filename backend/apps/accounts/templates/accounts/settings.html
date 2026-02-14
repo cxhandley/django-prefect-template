@@ -1,0 +1,53 @@
+{% extends "core/base.html" %}
+
+{% block title %}Settings - Prefect{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl">
+    <h1 class="text-3xl font-bold mb-8">Settings</h1>
+    
+    <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6 backdrop-blur space-y-8">
+        
+        <!-- Profile Settings -->
+        <div>
+            <h2 class="text-xl font-semibold mb-4">Profile Settings</h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">
+                        First Name
+                    </label>
+                    <input type="text" value="{{ user.first_name }}" class="input input-bordered w-full max-w-xs bg-slate-700 border-slate-600">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">
+                        Last Name
+                    </label>
+                    <input type="text" value="{{ user.last_name }}" class="input input-bordered w-full max-w-xs bg-slate-700 border-slate-600">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Security Settings -->
+        <div class="border-t border-slate-700 pt-8">
+            <h2 class="text-xl font-semibold mb-4">Security</h2>
+            <div class="space-y-4">
+                <button class="btn btn-outline">Change Password</button>
+                <button class="btn btn-outline">Two-Factor Authentication</button>
+            </div>
+        </div>
+        
+        <!-- API Keys -->
+        <div class="border-t border-slate-700 pt-8">
+            <h2 class="text-xl font-semibold mb-4">API Keys</h2>
+            <p class="text-slate-400 text-sm mb-4">Manage your API keys for programmatic access</p>
+            <button class="btn btn-primary">Generate New Key</button>
+        </div>
+        
+        <!-- Danger Zone -->
+        <div class="border-t border-slate-700 pt-8 border-red-700">
+            <h2 class="text-xl font-semibold mb-4 text-red-400">Danger Zone</h2>
+            <button class="btn btn-error">Delete Account</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+            <h2 class="card-title">
+                Flow Execution Results
+                <div class="badge badge-{{ execution.status|lower }}">{{ execution.status }}</div>
+            </h2>
+            
+            <!-- Summary Stats -->
+            <div class="stats shadow">
+                <div class="stat">
+                    <div class="stat-title">Total Rows</div>
+                    <div class="stat-value">{{ stats.total_rows|default:0|intcomma }}</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-title">File Size</div>
+                    <div class="stat-value">{{ execution.file_size_mb|default:0|floatformat:2 }} MB</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-title">Total Revenue</div>
+                    <div class="stat-value">${{ stats.grand_total_revenue|default:0|floatformat:2|intcomma }}</div>
+                </div>
+            </div>
+            
+            <!-- Download Options -->
+            <div class="card-actions justify-end mt-4">
+                <a href="{% url 'flows:download_results' execution.flow_run_id 'parquet' %}" 
+                   class="btn btn-primary">
+                    Download Parquet
+                </a>
+                <a href="{% url 'flows:download_results' execution.flow_run_id 'csv' %}" 
+                   class="btn btn-secondary">
+                    Download CSV
+                </a>
+                <a href="{% url 'flows:download_results' execution.flow_run_id 'json' %}" 
+                   class="btn btn-accent">
+                    Download JSON
+                </a>
+            </div>
+            
+            <!-- Data Preview -->
+            <div class="mt-6">
+                <h3 class="text-lg font-semibold mb-2">Data Preview (First 100 Rows)</h3>
+                <div class="overflow-x-auto">
+                    <table class="table table-zebra table-xs">
+                        <thead>
+                            <tr>
+                                {% for column in preview_columns %}
+                                <th>{{ column }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in preview %}
+                            <tr>
+                                {% for column in preview_columns %}
+                                <td>{{ row|get_item:column }}</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- S3 Info -->
+            <div class="mt-4 text-sm opacity-70">
+                <p><strong>Input:</strong> {{ execution.s3_input_path }}</p>
+                <p><strong>Output:</strong> {{ execution.s3_output_path }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

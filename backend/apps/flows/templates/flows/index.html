@@ -1,0 +1,38 @@
+{% extends "core/base.html" %}
+
+{% block title %}Flows Dashboard - Prefect{% endblock %}
+
+{% block content %}
+<div class="grid md:grid-cols-3 gap-6 mb-8">
+    <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6 backdrop-blur">
+        <p class="text-slate-400 text-sm mb-2">Active Flows</p>
+        <p class="text-4xl font-bold text-indigo-400">{{ flows_count }}</p>
+    </div>
+    <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6 backdrop-blur">
+        <p class="text-slate-400 text-sm mb-2">Recent Runs</p>
+        <p class="text-4xl font-bold text-pink-400">{{ recent_runs }}</p>
+    </div>
+    <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6 backdrop-blur">
+        <p class="text-slate-400 text-sm mb-2">Deployments</p>
+        <p class="text-4xl font-bold text-emerald-400">5</p>
+    </div>
+</div>
+
+<div class="bg-slate-800/30 border border-slate-700 rounded-lg p-8 backdrop-blur">
+    <h1 class="text-2xl font-bold mb-4">Welcome to Flows Dashboard</h1>
+    <p class="text-slate-300 mb-6">
+        Manage your Prefect flows, deployments, and runs all in one place.
+    </p>
+    
+    <div class="grid md:grid-cols-2 gap-6">
+        <div class="bg-slate-700/30 rounded-lg p-4 border border-slate-600">
+            <h3 class="font-semibold mb-2">Quick Start</h3>
+            <p class="text-sm text-slate-400">Create and deploy your first flow</p>
+        </div>
+        <div class="bg-slate-700/30 rounded-lg p-4 border border-slate-600">
+            <h3 class="font-semibold mb-2">Documentation</h3>
+            <p class="text-sm text-slate-400">Learn more about Prefect flows</p>
+        </div>
+    </div>
+</div>
+{% endblock %}

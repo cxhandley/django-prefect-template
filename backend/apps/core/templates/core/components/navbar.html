@@ -1,0 +1,47 @@
+<nav class="navbar-container sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        
+        <!-- Logo & Brand -->
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-pink-500 rounded-lg flex items-center justify-center font-bold text-white">
+                P
+            </div>
+            <span class="text-lg font-bold text-white hidden sm:inline">Prefect Flows</span>
+        </div>
+        
+        <!-- Main Nav Items -->
+        <div class="hidden md:flex items-center gap-8">
+            <a href="{% url 'flows:index' %}" class="nav-item">Dashboard</a>
+            
+            <!-- Flows Dropdown -->
+            <div class="relative" data-dropdown-target="flows-dropdown">
+                <button class="nav-item py-2" type="button" 
+                        hx-trigger="click" 
+                        hx-get="{% url 'flows:flows_menu' %}"
+                        hx-target="#flows-dropdown"
+                        hx-swap="innerHTML swap:0.2s">
+                    Flows
+                    <svg class="w-4 h-4 inline-block ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path>
+                    </svg>
+                </button>
+                <div id="flows-dropdown" class="dropdown-menu hidden absolute top-full mt-2 left-0 w-72 p-3"></div>
+            </div>
+            
+            <a href="#" class="nav-item">Deployments</a>
+            <a href="#" class="nav-item">Runs</a>
+        </div>
+        
+        <!-- Right Side: User Menu -->
+        <div class="relative" data-dropdown-target="user-dropdown">
+            <button class="user-avatar" type="button"
+                    hx-trigger="click" 
+                    hx-get="{% url 'accounts:user_menu' %}"
+                    hx-target="#user-dropdown"
+                    hx-swap="innerHTML swap:0.2s">
+                {{ user.first_name|first|default:"U" }}
+            </button>
+            <div id="user-dropdown" class="dropdown-menu hidden absolute right-0 top-full mt-2 w-56 p-0"></div>
+        </div>
+    </div>
+</nav>

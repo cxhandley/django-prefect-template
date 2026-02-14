@@ -41,6 +41,7 @@ class FlowExecution(models.Model):
         indexes = [
             models.Index(fields=['triggered_by', '-created_at']),
             models.Index(fields=['flow_name', 'status']),
+            models.Index(fields=['-created_at']),
         ]
         ordering = ['-created_at']
     

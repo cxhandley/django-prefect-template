@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="card bg-base-100 shadow-xl max-w-2xl mx-auto">
+        <div class="card-body">
+            <h2 class="card-title">Upload Data for Processing</h2>
+            
+            <form hx-post="{% url 'flows:upload_and_process' %}"
+                  hx-encoding="multipart/form-data"
+                  hx-target="#upload-result"
+                  hx-indicator="#upload-spinner">
+                {% csrf_token %}
+                
+                <div class="form-control w-full">
+                    <label class="label">
+                        <span class="label-text">Select File</span>
+                        <span class="label-text-alt">CSV or Parquet</span>
+                    </label>
+                    <input type="file" 
+                           name="datafile" 
+                           accept=".csv,.parquet,.json"
+                           class="file-input file-input-bordered w-full" 
+                           required />
+                </div>
+                
+                <div class="card-actions justify-end mt-4">
+                    <button type="submit" class="btn btn-primary">
+                        <span id="upload-spinner" class="loading loading-spinner htmx-indicator"></span>
+                        Upload & Process
+                    </button>
+                </div>
+            </form>
+            
+            <div id="upload-result" class="mt-4"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
