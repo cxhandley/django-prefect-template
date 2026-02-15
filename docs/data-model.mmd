@@ -1,0 +1,208 @@
+erDiagram
+    %% ============================================
+    %% CORE USER & AUTHENTICATION
+    %% ============================================
+    USER {
+        uuid id PK
+        string email UK "unique, not null"
+        string password_hash "not null"
+        string username "display name"
+        timestamp created_at "default now()"
+        timestamp last_login
+        boolean is_active "default true"
+    }
+
+    USER_PROFILE {
+        uuid id PK
+        uuid user_id FK "not null, unique"
+        enum role "public|user|admin|superuser"
+        string full_name
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ============================================
+    %% ML MODEL MANAGEMENT
+    %% ============================================
+    ML_MODEL {
+        uuid id PK
+        string name "not null"
+        string description
+        enum status "draft|active|archived"
+        uuid created_by FK "references USER (admin)"
+        uuid active_version_id FK "points to MLModelVersion"
+        timestamp created_at
+        timestamp updated_at
+        timestamp promoted_at "when set to active status"
+    }
+
+    ML_MODEL_VERSION {
+        uuid id PK
+        uuid model_id FK "not null"
+        int version_number "auto-increment: 1, 2, 3..."
+        string file_path "S3 path to model file"
+        string file_hash "MD5 for integrity check"
+        int file_size_bytes
+        enum status "draft|active|archived"
+        uuid uploaded_by FK "references USER (admin)"
+        json metadata "model_type, framework, etc."
+        timestamp created_at
+        timestamp promoted_at "when promoted to active"
+    }
+
+    ML_INPUT_VARIABLE {
+        uuid id PK
+        uuid model_id FK "not null"
+        string variable_name "feature name, e.g., 'age'"
+        string description "e.g., 'Customer age in years'"
+        enum data_type "integer|float|string|boolean, not null"
+        boolean is_required "default: true"
+        float min_value "optional, for validation"
+        float max_value "optional, for validation"
+        json allowed_values "for enum/categorical inputs"
+        string default_value "optional default"
+        int display_order "order in UI form"
+        timestamp created_at
+    }
+
+    %% ============================================
+    %% MODEL EXECUTION & HISTORY
+    %% ============================================
+    MODEL_EXECUTION {
+        uuid id PK
+        uuid model_id FK "not null"
+        uuid model_version_id FK "tracks which version was used"
+        uuid user_id FK "who triggered execution"
+        enum status "pending|running|success|failed|cancelled"
+        json input_data "user-provided values for all variables"
+        json output_data "prediction result from model"
+        json error_details "if status=failed"
+        float execution_time_seconds
+        string prefect_flow_run_id "reference to Prefect run"
+        timestamp started_at
+        timestamp completed_at
+        timestamp created_at
+    }
+
+    EXECUTION_LOG {
+        uuid id PK
+        uuid execution_id FK "not null"
+        enum log_level "debug|info|warning|error"
+        string message
+        timestamp created_at
+    }
+
+    %% ============================================
+    %% USER PREFERENCES & HISTORY
+    %% ============================================
+    INPUT_PRESET {
+        uuid id PK
+        uuid user_id FK "not null"
+        uuid model_id FK "not null"
+        string preset_name "e.g., 'Young customer' or 'Conservative estimate'"
+        json input_values "saved input values"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    EXECUTION_COMPARISON {
+        uuid id PK
+        uuid user_id FK "not null"
+        string comparison_name "e.g., 'Scenario comparison'"
+        uuid execution_1_id FK "references MODEL_EXECUTION"
+        uuid execution_2_id FK "references MODEL_EXECUTION"
+        uuid execution_3_id FK "optional third execution"
+        timestamp created_at
+    }
+
+    %% ============================================
+    %% NOTIFICATIONS
+    %% ============================================
+    NOTIFICATION {
+        uuid id PK
+        uuid user_id FK "not null, recipient"
+        enum notification_type "model_deployed|execution_failed|execution_complete"
+        string title
+        string message
+        uuid related_model_id FK "which model/execution this is about"
+        uuid related_execution_id FK "if about specific execution"
+        boolean is_read "default: false"
+        timestamp created_at
+        timestamp read_at
+    }
+
+    NOTIFICATION_PREFERENCE {
+        uuid id PK
+        uuid user_id FK "not null, unique"
+        boolean model_deployment_enabled "default: true"
+        boolean execution_complete_enabled "default: true"
+        boolean execution_failed_enabled "default: true"
+        boolean email_enabled "default: true"
+        json quiet_hours "start and end time"
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    %% ============================================
+    %% SYSTEM & AUDIT
+    %% ============================================
+    MODEL_PROMOTION_LOG {
+        uuid id PK
+        uuid model_version_id FK "what was promoted"
+        uuid model_id FK "which model"
+        uuid promoted_by FK "references USER (admin)"
+        uuid previous_version_id FK "what was replaced, if any"
+        string promotion_notes "admin notes about promotion"
+        timestamp promoted_at
+    }
+
+    ADMIN_ACTION_LOG {
+        uuid id PK
+        uuid user_id FK "admin who performed action"
+        enum action_type "model_upload|model_promote|user_role_change|user_deactivate"
+        uuid target_model_id FK "if action affects model"
+        uuid target_user_id FK "if action affects user"
+        json action_details "what changed"
+        timestamp created_at
+    }
+
+    %% ============================================
+    %% RELATIONSHIPS
+    %% ============================================
+
+    %% User relationships
+    USER ||--|| USER_PROFILE : "has profile"
+    USER ||--o{ MODEL_EXECUTION : "triggers executions"
+    USER ||--o{ INPUT_PRESET : "creates presets"
+    USER ||--o{ EXECUTION_COMPARISON : "creates comparisons"
+    USER ||--o{ NOTIFICATION : "receives"
+    USER ||--|| NOTIFICATION_PREFERENCE : "configures"
+    USER ||--o{ ML_MODEL : "creates models (admin only)"
+    USER ||--o{ ML_MODEL_VERSION : "uploads versions (admin only)"
+    USER ||--o{ MODEL_PROMOTION_LOG : "promotes (admin only)"
+    USER ||--o{ ADMIN_ACTION_LOG : "performs admin actions"
+
+    %% Model relationships
+    ML_MODEL ||--o{ ML_MODEL_VERSION : "has versions"
+    ML_MODEL ||--o{ ML_INPUT_VARIABLE : "defines input variables"
+    ML_MODEL ||--o{ MODEL_EXECUTION : "executed"
+    ML_MODEL ||--o{ INPUT_PRESET : "for model"
+    ML_MODEL ||--o{ EXECUTION_COMPARISON : "compares executions of"
+    ML_MODEL }o--|| ML_MODEL_VERSION : "current active version"
+
+    %% Version relationships
+    ML_MODEL_VERSION ||--o{ MODEL_EXECUTION : "executed as"
+    ML_MODEL_VERSION ||--o{ MODEL_PROMOTION_LOG : "promotion history"
+
+    %% Execution relationships
+    MODEL_EXECUTION ||--o{ EXECUTION_LOG : "generates logs"
+    MODEL_EXECUTION ||--o{ NOTIFICATION : "triggers notification on failure/completion"
+
+    %% Preset relationships
+    INPUT_PRESET }o--|| USER : "created by"
+    INPUT_PRESET }o--|| ML_MODEL : "for model"
+
+    %% Comparison relationships
+    EXECUTION_COMPARISON }o--|| MODEL_EXECUTION : "execution 1"
+    EXECUTION_COMPARISON }o--|| MODEL_EXECUTION : "execution 2"
+    EXECUTION_COMPARISON }o--|| MODEL_EXECUTION : "execution 3"
