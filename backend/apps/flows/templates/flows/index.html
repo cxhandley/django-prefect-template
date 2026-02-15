@@ -1,37 +1,276 @@
 {% extends "core/base.html" %}
 
-{% block title %}Flows Dashboard - Prefect{% endblock %}
+{% block title %}Flows - Prefect Dashboard{% endblock %}
 
 {% block content %}
-<div class="grid md:grid-cols-3 gap-6 mb-8">
-    <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6 backdrop-blur">
-        <p class="text-slate-400 text-sm mb-2">Active Flows</p>
-        <p class="text-4xl font-bold text-indigo-400">{{ flows_count }}</p>
-    </div>
-    <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6 backdrop-blur">
-        <p class="text-slate-400 text-sm mb-2">Recent Runs</p>
-        <p class="text-4xl font-bold text-pink-400">{{ recent_runs }}</p>
-    </div>
-    <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6 backdrop-blur">
-        <p class="text-slate-400 text-sm mb-2">Deployments</p>
-        <p class="text-4xl font-bold text-emerald-400">5</p>
-    </div>
-</div>
-
-<div class="bg-slate-800/30 border border-slate-700 rounded-lg p-8 backdrop-blur">
-    <h1 class="text-2xl font-bold mb-4">Welcome to Flows Dashboard</h1>
-    <p class="text-slate-300 mb-6">
-        Manage your Prefect flows, deployments, and runs all in one place.
-    </p>
-    
-    <div class="grid md:grid-cols-2 gap-6">
-        <div class="bg-slate-700/30 rounded-lg p-4 border border-slate-600">
-            <h3 class="font-semibold mb-2">Quick Start</h3>
-            <p class="text-sm text-slate-400">Create and deploy your first flow</p>
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <h1 class="text-4xl font-bold">Flows</h1>
+            <p class="text-base-content/70 mt-1">Manage and monitor your workflow executions</p>
         </div>
-        <div class="bg-slate-700/30 rounded-lg p-4 border border-slate-600">
-            <h3 class="font-semibold mb-2">Documentation</h3>
-            <p class="text-sm text-slate-400">Learn more about Prefect flows</p>
+        <button class="btn btn-primary">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            New Flow
+        </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="card bg-base-200 border border-base-300">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-base-content/70 text-sm">Active Flows</p>
+                        <p class="text-3xl font-bold text-primary">8</p>
+                    </div>
+                    <div class="p-3 bg-primary/20 rounded-lg">
+                        <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-base-200 border border-base-300">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-base-content/70 text-sm">Successful Runs</p>
+                        <p class="text-3xl font-bold text-success">156</p>
+                    </div>
+                    <div class="p-3 bg-success/20 rounded-lg">
+                        <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-base-200 border border-base-300">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-base-content/70 text-sm">Failed Runs</p>
+                        <p class="text-3xl font-bold text-error">3</p>
+                    </div>
+                    <div class="p-3 bg-error/20 rounded-lg">
+                        <svg class="w-6 h-6 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4v2m0 4v2M8.228 4.228a8 8 0 1111.544 11.544M5.672 5.672a8 8 0 0111.544 0"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card bg-base-200 border border-base-300">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-base-content/70 text-sm">Avg Duration</p>
+                        <p class="text-3xl font-bold text-info">2.3s</p>
+                    </div>
+                    <div class="p-3 bg-info/20 rounded-lg">
+                        <svg class="w-6 h-6 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Flows Table -->
+    <div class="card bg-base-200 border border-base-300">
+        <div class="card-body">
+            <h2 class="card-title text-xl mb-4">Recent Flows</h2>
+            
+            <div class="overflow-x-auto">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Flow Name</th>
+                            <th>Status</th>
+                            <th>Last Run</th>
+                            <th>Next Run</th>
+                            <th>Duration</th>
+                            <th class="text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Row 1 -->
+                        <tr class="hover">
+                            <td>
+                                <div class="font-bold">Data Processing</div>
+                                <div class="text-xs opacity-50">ETL pipeline</div>
+                            </td>
+                            <td>
+                                <div class="badge badge-lg badge-success gap-2">
+                                    <span class="inline-block w-2 h-2 bg-success rounded-full animate-pulse"></span>
+                                    Active
+                                </div>
+                            </td>
+                            <td>2024-02-14 10:30 AM</td>
+                            <td>2024-02-14 11:00 AM</td>
+                            <td><span class="badge badge-outline">1.2s</span></td>
+                            <td class="text-right">
+                                <button class="btn btn-xs btn-ghost">View</button>
+                            </td>
+                        </tr>
+
+                        <!-- Row 2 -->
+                        <tr class="hover">
+                            <td>
+                                <div class="font-bold">Report Generation</div>
+                                <div class="text-xs opacity-50">Daily reports</div>
+                            </td>
+                            <td>
+                                <div class="badge badge-lg badge-warning gap-2">
+                                    <span class="inline-block w-2 h-2 bg-warning rounded-full animate-pulse"></span>
+                                    Paused
+                                </div>
+                            </td>
+                            <td>2024-02-13 08:00 PM</td>
+                            <td>2024-02-15 08:00 PM</td>
+                            <td><span class="badge badge-outline">3.5s</span></td>
+                            <td class="text-right">
+                                <button class="btn btn-xs btn-ghost">View</button>
+                            </td>
+                        </tr>
+
+                        <!-- Row 3 -->
+                        <tr class="hover">
+                            <td>
+                                <div class="font-bold">Analytics Pipeline</div>
+                                <div class="text-xs opacity-50">Real-time analytics</div>
+                            </td>
+                            <td>
+                                <div class="badge badge-lg badge-success gap-2">
+                                    <span class="inline-block w-2 h-2 bg-success rounded-full animate-pulse"></span>
+                                    Active
+                                </div>
+                            </td>
+                            <td>2024-02-14 10:45 AM</td>
+                            <td>2024-02-14 10:50 AM</td>
+                            <td><span class="badge badge-outline">0.8s</span></td>
+                            <td class="text-right">
+                                <button class="btn btn-xs btn-ghost">View</button>
+                            </td>
+                        </tr>
+
+                        <!-- Row 4 -->
+                        <tr class="hover">
+                            <td>
+                                <div class="font-bold">Backup Job</div>
+                                <div class="text-xs opacity-50">Database backups</div>
+                            </td>
+                            <td>
+                                <div class="badge badge-lg badge-error gap-2">
+                                    <span class="inline-block w-2 h-2 bg-error rounded-full animate-pulse"></span>
+                                    Failed
+                                </div>
+                            </td>
+                            <td>2024-02-14 09:00 AM</td>
+                            <td>2024-02-15 09:00 AM</td>
+                            <td><span class="badge badge-outline">2.1s</span></td>
+                            <td class="text-right">
+                                <button class="btn btn-xs btn-ghost">View</button>
+                            </td>
+                        </tr>
+
+                        <!-- Row 5 -->
+                        <tr class="hover">
+                            <td>
+                                <div class="font-bold">Data Cleanup</div>
+                                <div class="text-xs opacity-50">Maintenance task</div>
+                            </td>
+                            <td>
+                                <div class="badge badge-lg badge-success gap-2">
+                                    <span class="inline-block w-2 h-2 bg-success rounded-full animate-pulse"></span>
+                                    Active
+                                </div>
+                            </td>
+                            <td>2024-02-14 06:00 AM</td>
+                            <td>2024-02-15 06:00 AM</td>
+                            <td><span class="badge badge-outline">4.2s</span></td>
+                            <td class="text-right">
+                                <button class="btn btn-xs btn-ghost">View</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="join mt-6 flex justify-center">
+                <button class="join-item btn">«</button>
+                <button class="join-item btn btn-active">1</button>
+                <button class="join-item btn">2</button>
+                <button class="join-item btn">3</button>
+                <button class="join-item btn">»</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card bg-base-200 border border-base-300">
+        <div class="card-body">
+            <h2 class="card-title text-xl mb-4">Recent Activity</h2>
+            
+            <div class="space-y-4">
+                <div class="flex gap-4 items-start">
+                    <div class="p-2 bg-success/20 rounded-lg">
+                        <svg class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold">Data Processing flow completed</p>
+                        <p class="text-sm opacity-70">2 minutes ago</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 items-start">
+                    <div class="p-2 bg-error/20 rounded-lg">
+                        <svg class="w-5 h-5 text-error" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4v2m0 4v2M8.228 4.228a8 8 0 1111.544 11.544M5.672 5.672a8 8 0 0111.544 0"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold">Backup Job failed with error</p>
+                        <p class="text-sm opacity-70">1 hour ago</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 items-start">
+                    <div class="p-2 bg-info/20 rounded-lg">
+                        <svg class="w-5 h-5 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold">New deployment created</p>
+                        <p class="text-sm opacity-70">3 hours ago</p>
+                    </div>
+                </div>
+
+                <div class="flex gap-4 items-start">
+                    <div class="p-2 bg-warning/20 rounded-lg">
+                        <svg class="w-5 h-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4v2m0 4v2M8.228 4.228a8 8 0 1111.544 11.544M5.672 5.672a8 8 0 0111.544 0"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold">Report Generation paused</p>
+                        <p class="text-sm opacity-70">5 hours ago</p>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

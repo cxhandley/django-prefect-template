@@ -1,13 +1,14 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Prefect Flows Dashboard{% endblock %}</title>
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <!-- Daisy UI 5 with Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -15,127 +16,19 @@
     {% block extra_head %}{% endblock %}
     
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         html {
             scroll-behavior: smooth;
         }
         
         body {
-            background: linear-gradient(to bottom, #0f172a, #1a1f35);
-            color: #e2e8f0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            min-height: 100vh;
+            @apply bg-gradient-to-br from-base-900 to-base-950;
         }
         
         main {
-            max-width: 80rem;
-            margin: 0 auto;
-            padding: 2rem 1.5rem;
+            @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8;
         }
         
-        /* Dropdown Styles */
-        .dropdown-menu {
-            background: rgba(30, 41, 59, 0.98);
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            border-radius: 12px;
-            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.5);
-            animation: slideDown 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-8px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.625rem 1rem;
-            color: #cbd5e1;
-            text-decoration: none;
-            border-radius: 6px;
-            margin: 2px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            font-size: 0.875rem;
-        }
-        
-        .dropdown-item:hover {
-            background-color: rgba(99, 102, 241, 0.15);
-            color: #6366f1;
-            padding-left: 1.125rem;
-        }
-        
-        .dropdown-item.danger:hover {
-            background-color: rgba(239, 68, 68, 0.15);
-            color: #fca5a5;
-            padding-left: 1.125rem;
-        }
-        
-        .dropdown-item svg {
-            width: 16px;
-            height: 16px;
-            flex-shrink: 0;
-        }
-        
-        /* Status Badge */
-        .flow-status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            padding: 4px 10px;
-            border-radius: 6px;
-            background: rgba(99, 102, 241, 0.1);
-            color: #a5b4fc;
-        }
-        
-        .flow-status-badge.active {
-            background: rgba(34, 197, 94, 0.1);
-            color: #22c55e;
-        }
-        
-        .flow-status-badge.paused {
-            background: rgba(251, 146, 60, 0.1);
-            color: #fb923c;
-        }
-        
-        .flow-status-badge.failed {
-            background: rgba(239, 68, 68, 0.1);
-            color: #fca5a5;
-        }
-        
-        .status-dot {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        
-        .status-dot.active {
-            background: #22c55e;
-        }
-        
-        .status-dot.paused {
-            background: #fb923c;
-        }
-        
-        .status-dot.failed {
-            background: #ef4444;
-        }
-        
+        /* Status badge animations */
         @keyframes pulse {
             0%, 100% {
                 opacity: 1;
@@ -145,28 +38,19 @@
             }
         }
         
-        /* Cards */
-        .card {
-            background: rgba(30, 41, 59, 0.5);
-            border: 1px solid rgba(99, 102, 241, 0.1);
-            border-radius: 8px;
-            padding: 1.5rem;
-            backdrop-filter: blur(8px);
+        .animate-pulse-dot {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
         
-        /* HTMX Loading States */
-        .htmx-request .htmx-indicator {
-            display: inline-block;
-        }
-        
+        /* Smooth transitions for HTMX */
         .htmx-swapping {
             opacity: 0;
-            transition: opacity 0.15s ease-out;
+            transition: opacity 150ms ease-out;
         }
         
         .htmx-settling {
             opacity: 1;
-            transition: opacity 0.15s ease-in;
+            transition: opacity 150ms ease-in;
         }
     </style>
     
@@ -183,36 +67,9 @@
     
     <!-- Scripts -->
     <script>
-        // Dropdown toggle logic
-        document.querySelectorAll('[data-dropdown-target]').forEach(container => {
-            const btn = container.querySelector('button');
-            const dropdownId = container.getAttribute('data-dropdown-target');
-            const dropdown = document.getElementById(dropdownId);
-            
-            if (btn && dropdown) {
-                btn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
-                });
-            }
-        });
-        
-        // Close dropdowns when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('[data-dropdown-target]')) {
-                document.querySelectorAll('[id$="-dropdown"]').forEach(el => {
-                    el.style.display = 'none';
-                });
-            }
-        });
-        
-        // HTMX after swap: show dropdown
-        document.body.addEventListener('htmx:afterSwap', function(event) {
-            const dropdown = event.detail.target;
-            if (dropdown && dropdown.id.includes('dropdown')) {
-                dropdown.style.display = 'block';
-            }
-        });
+        // HTMX Configuration
+        htmx.config.timeout = 10000;
+        htmx.config.refreshOnHistoryMiss = true;
     </script>
     
     {% block extra_js %}{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "core/base.html" %}
+
+{% block title %}Home - Prefect Flows{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Hero Section -->
+    <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg">
+        <div class="hero-content text-center py-12">
+            <div class="max-w-md">
+                <h1 class="text-5xl font-bold mb-4">Prefect Flows</h1>
+                <p class="text-lg mb-6">Manage, monitor, and orchestrate your data workflows with ease</p>
+                <a href="{% url 'flows:index' %}" class="btn btn-outline btn-lg">
+                    Get Started
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="stat place-items-center bg-base-200 rounded-lg">
+            <div class="stat-title">Active Flows</div>
+            <div class="stat-value text-primary">12</div>
+            <div class="stat-desc">Flows currently running</div>
+        </div>
+        <div class="stat place-items-center bg-base-200 rounded-lg">
+            <div class="stat-title">Recent Runs</div>
+            <div class="stat-value text-secondary">24</div>
+            <div class="stat-desc">In the last 24 hours</div>
+        </div>
+        <div class="stat place-items-center bg-base-200 rounded-lg">
+            <div class="stat-title">Deployments</div>
+            <div class="stat-value text-accent">5</div>
+            <div class="stat-desc">Active deployments</div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Feature 1 -->
+        <div class="card bg-base-200 shadow-lg">
+            <div class="card-body">
+                <div class="flex items-start gap-4">
+                    <div class="p-3 bg-primary rounded-lg">
+                        <svg class="w-6 h-6 text-primary-content" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-lg">Reliable Execution</h3>
+                        <p class="text-sm opacity-70">Orchestrate workflows with automatic retries and error handling</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 2 -->
+        <div class="card bg-base-200 shadow-lg">
+            <div class="card-body">
+                <div class="flex items-start gap-4">
+                    <div class="p-3 bg-secondary rounded-lg">
+                        <svg class="w-6 h-6 text-secondary-content" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-lg">Real-time Monitoring</h3>
+                        <p class="text-sm opacity-70">Monitor flow execution with detailed logs and performance metrics</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 3 -->
+        <div class="card bg-base-200 shadow-lg">
+            <div class="card-body">
+                <div class="flex items-start gap-4">
+                    <div class="p-3 bg-success rounded-lg">
+                        <svg class="w-6 h-6 text-success-content" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-lg">Easy Configuration</h3>
+                        <p class="text-sm opacity-70">Simple YAML-based configuration for complex workflows</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature 4 -->
+        <div class="card bg-base-200 shadow-lg">
+            <div class="card-body">
+                <div class="flex items-start gap-4">
+                    <div class="p-3 bg-accent rounded-lg">
+                        <svg class="w-6 h-6 text-accent-content" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1">
+                        <h3 class="font-bold text-lg">Scale Efficiently</h3>
+                        <p class="text-sm opacity-70">Scale your workflows from thousands to millions of runs</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CTA Section -->
+    <div class="alert alert-info">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div>
+            <h3 class="font-bold">Ready to get started?</h3>
+            <div class="text-xs">Create your first flow and start orchestrating your workflows today.</div>
+        </div>
+        <a href="{% url 'flows:index' %}" class="btn btn-sm btn-primary">View Flows</a>
+    </div>
+</div>
+{% endblock %}
