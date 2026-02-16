@@ -111,7 +111,7 @@ This approach introduces a **FastAPI API Gateway** between Django and Prefect, w
 # Project Structure
 
 ```
-django-prefect-kit/
+django-prefect-template/
 ├── docker-compose.yml
 ├── docker-compose.prod.yml
 ├── terraform/
