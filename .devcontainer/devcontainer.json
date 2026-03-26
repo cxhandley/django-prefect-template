@@ -1,20 +1,24 @@
 {
   "name": "Django + doit + DuckDB",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": ".."
-  },
-  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+
+  // Attach to the 'devcontainer' service in docker-compose.yml so this
+  // container shares app-network with db, redis, and rustfs.
+  "dockerComposeFile": ["../docker-compose.yml"],
+  "service": "devcontainer",
   "workspaceFolder": "/workspace",
+
   "forwardPorts": [8000, 5432, 6379, 9000, 5555],
   "portsAttributes": {
-    "8000": {"label": "Django"},
-    "5432": {"label": "PostgreSQL"},
-    "6379": {"label": "Redis"},
-    "9000": {"label": "RustFS (S3)"},
-    "5555": {"label": "Flower (Celery)"}
+    "8000": { "label": "Django" },
+    "5432": { "label": "PostgreSQL" },
+    "6379": { "label": "Redis" },
+    "9000": { "label": "RustFS (S3)" },
+    "5555": { "label": "Flower (Celery)" }
   },
+
+  // Runs once after the container is created (dependencies, DB, S3 buckets).
   "postCreateCommand": "just install && just migrate && just setup-rustfs",
+
   "customizations": {
     "vscode": {
       "extensions": [
@@ -30,30 +34,20 @@
         "charliermarsh.ruff"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.defaultInterpreterPath": "/workspace/backend/.venv/bin/python",
         "python.testing.pytestEnabled": true,
         "python.testing.pytestArgs": ["backend/apps"],
         "editor.formatOnSave": true,
-        "editor.defaultFormatter": "charliermarsh.ruff",
         "[python]": {
           "editor.defaultFormatter": "charliermarsh.ruff"
         },
         "jupyter.notebookFileRoot": "${workspaceFolder}",
-        "jupyter.kernels.filter": [
-          {
-            "path": "/usr/local/bin/python",
-            "type": "pythonEnvironment"
-          }
-        ],
-        "djlint.useVenv": false,
         "files.associations": {
           "**/*.html": "django-html"
         }
       }
     }
   },
-  "mounts": [
-    "source=${localWorkspaceFolder}/data,target=/workspace/data,type=bind,consistency=cached"
-  ],
+
   "remoteUser": "vscode"
 }

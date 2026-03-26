@@ -1,11 +1,12 @@
 # justfile - Task runner for django-doit-template
+# Primary dev workflow: open in VS Code → "Reopen in Container" → run commands here
 
 set dotenv-load
 
 default:
     @just --list
 
-# Complete project setup
+# Complete project setup (run once inside devcontainer after postCreateCommand)
 setup:
     @echo "Setting up project..."
     just install
@@ -16,33 +17,29 @@ setup:
     just migrate
     @echo "Setup complete!"
 
-# Install all dependencies
+# Install all dependencies into the backend venv
 install:
     @echo "Installing dependencies..."
-    uv venv --python 3.13
-    uv pip install -e "backend[dev,test]"
+    uv venv --python 3.13 backend/.venv
+    uv pip install --python backend/.venv -e "backend[dev,test]"
     @echo "All dependencies installed"
 
-# Quick check to verify dev dependencies
-check-dev:
-    @uv pip list | grep -E "(debug-toolbar|django-extensions|ipython)" || echo "Dev dependencies missing - run 'just install'"
-
 
 # ============================================================================
-# Django Management
+# Django Management  (run inside devcontainer)
 # ============================================================================
 
-# Start Django dev server
+# Start Django dev server on 0.0.0.0:8000
 dev:
-    cd backend && uv run --extra dev python manage.py runserver
+    cd backend && uv run python manage.py runserver 0.0.0.0:8000
 
 # Django shell
 shell:
-    cd backend && uv run --extra dev python manage.py shell_plus
+    cd backend && uv run python manage.py shell_plus
 
 # Django db shell
 dbshell:
-    cd backend && uv run --extra dev python manage.py dbshell
+    cd backend && uv run python manage.py dbshell
 
 # Run migrations
 migrate:
@@ -70,37 +67,37 @@ createsuperuser:
 
 
 # ============================================================================
-# Celery
+# Celery  (run inside devcontainer)
 # ============================================================================
 
-# Start Celery worker
+# Start Celery worker (connects to redis://redis:6379/0 inside devcontainer)
 celery:
     cd backend && uv run celery -A config.celery worker -l info -Q default
 
-# Start Flower (Celery monitoring UI)
+# Start Flower monitoring UI at :5555
 flower:
     cd backend && uv run celery -A config.celery flower --port=5555
 
-# Open Flower UI
+# Open Flower UI in browser (host)
 flower-ui:
     @echo "Opening Flower at http://localhost:5555"
     open http://localhost:5555 || xdg-open http://localhost:5555
 
 
 # ============================================================================
-# doit / Notebooks
+# doit / Notebooks  (run inside devcontainer)
 # ============================================================================
 
 # List available doit pipeline tasks
 doit-list:
-    uv run doit -f dodo.py list
+    uv run --python backend/.venv doit -f dodo.py list
 
-# Run the full doit pipeline manually (pass RUN_ID and INPUT_S3_PATH)
+# Manually trigger the full pipeline (pass run_id and input_s3_path)
 run-pipeline run_id input_s3_path:
     PIPELINE_PARAMS='{"run_id":"{{run_id}}","input_s3_path":"{{input_s3_path}}","bucket":"${DATA_LAKE_BUCKET}","aws_access_key_id":"${AWS_ACCESS_KEY_ID}","aws_secret_access_key":"${AWS_SECRET_ACCESS_KEY}","aws_s3_region":"${AWS_S3_REGION}","s3_endpoint":"${AWS_S3_ENDPOINT_URL}","notebook_output_dir":"data/notebook_outputs"}' \
     NOTEBOOKS_DIR=notebooks \
     NOTEBOOK_OUTPUT_DIR=data/notebook_outputs \
-    uv run doit -f dodo.py run pipeline
+    uv run --python backend/.venv doit -f dodo.py run pipeline
 
 
 # ============================================================================
@@ -113,26 +110,26 @@ test:
     @echo "All tests passed!"
 
 test-backend:
-    cd backend && uv run --extra test pytest apps/ -v
+    cd backend && uv run pytest apps/ -v
 
-# Run tests with coverage
+# Run tests with coverage report
 test-cov:
-    cd backend && uv run --extra test pytest apps/ --cov=apps --cov-report=html --cov-report=term-missing -v
+    cd backend && uv run pytest apps/ --cov=apps --cov-report=html --cov-report=term-missing -v
 
 
 # ============================================================================
-# Docker
+# Docker Compose
 # ============================================================================
 
-# Start Docker services
+# Start all services (db, redis, rustfs, devcontainer, celery-worker, flower)
 docker-up:
     docker compose up -d
 
-# Stop Docker services
+# Stop all services
 docker-down:
     docker compose down
 
-# View Docker logs
+# View logs for all or a specific service
 docker-logs service="":
     @if [ -z "{{service}}" ]; then \
         docker compose logs -f; \
@@ -140,7 +137,11 @@ docker-logs service="":
         docker compose logs -f {{service}}; \
     fi
 
-# Setup RustFS buckets
+# Open a Django shell inside the running devcontainer (from host)
+docker-shell:
+    docker compose exec devcontainer bash -c "cd /workspace/backend && uv run python manage.py shell_plus"
+
+# Setup RustFS S3 buckets
 setup-rustfs:
     @echo "Setting up RustFS buckets..."
     cd backend && uv run python manage.py setup_s3_buckets
@@ -150,43 +151,41 @@ setup-rustfs:
 # Code Quality
 # ============================================================================
 
-# Format code
+# Format code with ruff
 format:
-    uv run ruff format .
+    uv run --python backend/.venv ruff format .
 
 # Lint code
 lint:
-    uv run ruff check .
-    uv run mypy backend/
+    uv run --python backend/.venv ruff check .
+    uv run --python backend/.venv mypy backend/
 
-# Fix linting issues
+# Fix linting issues automatically
 fix:
-    uv run ruff check --fix .
-    uv run ruff format .
+    uv run --python backend/.venv ruff check --fix .
+    uv run --python backend/.venv ruff format .
 
-# Run pre-commit on all files
+# Run all pre-commit hooks
 pre-commit:
-    uv run pre-commit run --all-files
+    uv run --python backend/.venv pre-commit run --all-files
 
-# Clean cache files
+# Clean cache / build artefacts
 clean:
     find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
     find . -type f -name "*.pyc" -delete
     find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
     find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
-    find . -type d -name ".doit.db" -exec rm -rf {} + 2>/dev/null || true
+    find . -name ".doit.db" -delete 2>/dev/null || true
     rm -rf htmlcov/ .coverage
 
 
 # ============================================================================
-# Status & Info
+# Status & Utilities
 # ============================================================================
 
-# Show project status
 status:
     @echo "Project Status"
     @echo "=============="
-    @python --version
     @uv --version
     @just --version
     @echo ""
@@ -201,4 +200,4 @@ reset-db:
     just migrate
 
 tree:
-    tree -I '__pycache__|*.pyc|staticfiles|__init__.py|.doit.db'
+    tree -I '__pycache__|*.pyc|staticfiles|__init__.py|.doit.db|.venv'
