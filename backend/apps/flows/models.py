@@ -17,11 +17,11 @@ class FlowExecution(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE
     )
-    
+
     # S3 paths - NOT the actual data
     s3_input_path = models.CharField(max_length=500, blank=True)
     s3_output_path = models.CharField(max_length=500, blank=True)
-    
+
     # Metadata for quick filtering
     row_count = models.BigIntegerField(null=True, blank=True)
     file_size_mb = models.DecimalField(
@@ -30,13 +30,17 @@ class FlowExecution(models.Model):
         null=True,
         blank=True
     )
-    
+
     status = models.CharField(max_length=50, default='PENDING')
     parameters = models.JSONField(default=dict)
-    
+
+    # Async execution tracking
+    celery_task_id = models.CharField(max_length=255, blank=True)
+    error_message = models.TextField(blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
-    
+
     class Meta:
         indexes = [
             models.Index(fields=['triggered_by', '-created_at']),
@@ -44,36 +48,36 @@ class FlowExecution(models.Model):
             models.Index(fields=['-created_at']),
         ]
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return f"{self.flow_name} - {self.flow_run_id}"
-    
+
     @property
     def s3_input_url(self):
         """Full S3 URL for input."""
         if self.s3_input_path:
             return f"s3://{settings.DATA_LAKE_BUCKET}/{self.s3_input_path}"
         return None
-    
+
     @property
     def s3_output_url(self):
         """Full S3 URL for output."""
         if self.s3_output_path:
             return f"s3://{settings.DATA_LAKE_BUCKET}/{self.s3_output_path}"
         return None
-    
+
     def generate_download_url(self, expires_in=3600):
         """Generate presigned S3 URL for direct download."""
         if not self.s3_output_path:
             return None
-        
+
         s3_client = boto3.client(
             's3',
             endpoint_url=settings.AWS_S3_ENDPOINT_URL,
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
         )
-        
+
         return s3_client.generate_presigned_url(
             'get_object',
             Params={

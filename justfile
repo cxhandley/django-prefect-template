@@ -1,4 +1,4 @@
-# justfile - Task runner for django-prefect-template
+# justfile - Task runner for django-doit-template
 
 set dotenv-load
 
@@ -7,31 +7,25 @@ default:
 
 # Complete project setup
 setup:
-    @echo "🚀 Setting up django-prefect-template..."
+    @echo "Setting up project..."
     just install
     just docker-up
     @echo "Waiting for services to be ready..."
     sleep 10
     just setup-rustfs
     just migrate
-    @echo "✅ Setup complete!"
+    @echo "Setup complete!"
 
-# Install all dependencies with dev extras
+# Install all dependencies
 install:
-    @echo "📦 Installing dependencies..."
+    @echo "Installing dependencies..."
     uv venv --python 3.13
-    @echo "Installing backend (with dev and test)..."
     uv pip install -e "backend[dev,test]"
-    @echo "Installing gateway (with dev and test)..."
-    uv pip install -e "gateway[dev,test]"
-    @echo "Installing worker (with test)..."
-    uv pip install -e "worker[test]"
-    @echo "✅ All dependencies installed"
+    @echo "All dependencies installed"
 
 # Quick check to verify dev dependencies
 check-dev:
-    @echo "Checking dev dependencies..."
-    @uv pip list | grep -E "(debug-toolbar|django-extensions|ipython)" || echo "❌ Dev dependencies missing - run 'just install'"
+    @uv pip list | grep -E "(debug-toolbar|django-extensions|ipython)" || echo "Dev dependencies missing - run 'just install'"
 
 
 # ============================================================================
@@ -46,67 +40,89 @@ dev:
 shell:
     cd backend && uv run --extra dev python manage.py shell_plus
 
-    # Run migrations
+# Django db shell
 dbshell:
     cd backend && uv run --extra dev python manage.py dbshell
 
 # Run migrations
 migrate:
-    cd backend && uv run --extra dev python manage.py migrate
-
+    cd backend && uv run python manage.py migrate
 
 # Collect static files
 collectstatic:
-    cd backend && uv run --extra dev python manage.py collectstatic --noinput
+    cd backend && uv run python manage.py collectstatic --noinput
 
 # Create Django app
 startapp name:
-    cd backend/apps && uv run --extra dev python ../manage.py startapp {{name}}
+    cd backend/apps && uv run python ../manage.py startapp {{name}}
 
 # Create migrations
 makemigrations app="":
     @if [ -z "{{app}}" ]; then \
-        cd backend && uv run --extra dev python manage.py makemigrations; \
+        cd backend && uv run python manage.py makemigrations; \
     else \
-        cd backend && uv run --extra dev python manage.py makemigrations {{app}}; \
+        cd backend && uv run python manage.py makemigrations {{app}}; \
     fi
 
 # Create superuser
 createsuperuser:
-    cd backend && uv run --extra dev python manage.py createsuperuser
+    cd backend && uv run python manage.py createsuperuser
 
 
-# Start FastAPI gateway
-dev-gateway:
-    cd gateway && uv run uvicorn main:app --reload --port 8001
+# ============================================================================
+# Celery
+# ============================================================================
 
+# Start Celery worker
+celery:
+    cd backend && uv run celery -A config.celery worker -l info -Q default
+
+# Start Flower (Celery monitoring UI)
+flower:
+    cd backend && uv run celery -A config.celery flower --port=5555
+
+# Open Flower UI
+flower-ui:
+    @echo "Opening Flower at http://localhost:5555"
+    open http://localhost:5555 || xdg-open http://localhost:5555
+
+
+# ============================================================================
+# doit / Notebooks
+# ============================================================================
+
+# List available doit pipeline tasks
+doit-list:
+    uv run doit -f dodo.py list
+
+# Run the full doit pipeline manually (pass RUN_ID and INPUT_S3_PATH)
+run-pipeline run_id input_s3_path:
+    PIPELINE_PARAMS='{"run_id":"{{run_id}}","input_s3_path":"{{input_s3_path}}","bucket":"${DATA_LAKE_BUCKET}","aws_access_key_id":"${AWS_ACCESS_KEY_ID}","aws_secret_access_key":"${AWS_SECRET_ACCESS_KEY}","aws_s3_region":"${AWS_S3_REGION}","s3_endpoint":"${AWS_S3_ENDPOINT_URL}","notebook_output_dir":"data/notebook_outputs"}' \
+    NOTEBOOKS_DIR=notebooks \
+    NOTEBOOK_OUTPUT_DIR=data/notebook_outputs \
+    uv run doit -f dodo.py run pipeline
+
+
+# ============================================================================
+# Testing
+# ============================================================================
 
 test:
-    @echo "🧪 Running all tests..."
-    @just test-backend
-    @just test-gateway
-    @just test-worker
-    @echo "✅ All tests passed!"
+    @echo "Running tests..."
+    just test-backend
+    @echo "All tests passed!"
 
-# Each package runs from its own directory
 test-backend:
     cd backend && uv run --extra test pytest apps/ -v
 
-test-gateway test="":
-    #!/bin/bash
-    cd gateway
-    if [ -z "{{test}}" ]; then
-        uv run --extra test pytest tests/ -v
-    else
-        uv run --extra test pytest tests/ -v "{{test}}"
-    fi
-
-test-worker:
-    cd worker && uv run --extra test pytest tests/ -v
-
 # Run tests with coverage
 test-cov:
-    uv run pytest --cov --cov-report=html
+    cd backend && uv run --extra test pytest apps/ --cov=apps --cov-report=html --cov-report=term-missing -v
+
+
+# ============================================================================
+# Docker
+# ============================================================================
 
 # Start Docker services
 docker-up:
@@ -124,10 +140,15 @@ docker-logs service="":
         docker compose logs -f {{service}}; \
     fi
 
-# Setup RustS buckets
+# Setup RustFS buckets
 setup-rustfs:
-    @echo "🗄️  Setting up RustFS buckets..."
+    @echo "Setting up RustFS buckets..."
     cd backend && uv run python manage.py setup_s3_buckets
+
+
+# ============================================================================
+# Code Quality
+# ============================================================================
 
 # Format code
 format:
@@ -136,12 +157,16 @@ format:
 # Lint code
 lint:
     uv run ruff check .
-    uv run mypy backend/ gateway/ worker/
+    uv run mypy backend/
 
 # Fix linting issues
 fix:
     uv run ruff check --fix .
     uv run ruff format .
+
+# Run pre-commit on all files
+pre-commit:
+    uv run pre-commit run --all-files
 
 # Clean cache files
 clean:
@@ -149,77 +174,31 @@ clean:
     find . -type f -name "*.pyc" -delete
     find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
     find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
+    find . -type d -name ".doit.db" -exec rm -rf {} + 2>/dev/null || true
     rm -rf htmlcov/ .coverage
 
-# Show status
+
+# ============================================================================
+# Status & Info
+# ============================================================================
+
+# Show project status
 status:
-    @echo "📊 Project Status"
-    @echo "================="
+    @echo "Project Status"
+    @echo "=============="
     @python --version
     @uv --version
     @just --version
     @echo ""
     @docker compose ps
 
-
 reset-db:
-    @echo "⚠️  This will delete all data. Are you sure? (y/N)"
+    @echo "This will delete all data. Are you sure? (y/N)"
     @read -p "" confirm && [ "$$confirm" = "y" ] || exit 1
-    docker-compose down -v
-    docker-compose up -d db
+    docker compose down -v
+    docker compose up -d db
     sleep 3
     just migrate
 
-# ============================================================================
-# Prefect
-# ============================================================================
-
-# Deploy Prefect flows
-deploy-flows:
-    cd gateway && uv run python -m scripts.deploy_flows
-
-# Start Prefect worker
-worker:
-    cd worker && uv run prefect worker start --pool default-pool
-
-# Open Prefect UI
-prefect-ui:
-    @echo "Opening Prefect UI at http://localhost:4200"
-    open http://localhost:4200 || xdg-open http://localhost:4200
-
-
-# ============================================================================
-# Deployment
-# ============================================================================
-
-# Deploy to staging
-deploy-staging:
-    @echo "🚀 Deploying to staging..."
-    cd terraform && terraform workspace select staging
-    terraform apply -var-file=staging.tfvars -auto-approve
-
-# Deploy to production
-deploy-prod:
-    @echo "🚀 Deploying to production..."
-    @echo "⚠️  Are you sure? This will deploy to PRODUCTION. (yes/N)"
-    @read -p "" confirm && [ "$$confirm" = "yes" ] || exit 1
-    cd terraform && terraform workspace select production
-    terraform apply -var-file=production.tfvars
-
-# Build Docker images for production
-build-prod:
-    docker build -t django-prefect-template/web:latest ./backend
-    docker build -t django-prefect-template/gateway:latest ./gateway
-    docker build -t django-prefect-template/worker:latest ./worker
-
-# Generate OpenAPI spec
-openapi:
-    cd gateway && uv run python -c "from main import app; import json; print(json.dumps(app.openapi(), indent=2))" > docs/api-spec.json
-
-
 tree:
-    # Check directory tree
-    tree -I '__pycache__|*.pyc|staticfiles|__init__.py'
-
-tree-gateway:
-    cd gateway && tree -I '__pycache__|*.pyc|staticfiles|__init__.py'
+    tree -I '__pycache__|*.pyc|staticfiles|__init__.py|.doit.db'

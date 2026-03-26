@@ -160,9 +160,17 @@ DATA_LAKE_BUCKET = env('DATA_LAKE_BUCKET')
 DUCKDB_THREADS = env.int('DUCKDB_THREADS', default=4)
 DUCKDB_MEMORY_LIMIT = env('DUCKDB_MEMORY_LIMIT', default='4GB')
 
-# FastAPI Gateway
-GATEWAY_API_URL = env('GATEWAY_API_URL')
-GATEWAY_SERVICE_TOKEN = env('GATEWAY_SERVICE_TOKEN', default='')
+# Celery
+CELERY_BROKER_URL = env('CELERY_BROKER_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0')
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TIMEZONE = 'UTC'
+
+# Notebooks / doit pipeline
+NOTEBOOKS_DIR = BASE_DIR.parent / env('NOTEBOOKS_DIR', default='notebooks')
+NOTEBOOK_OUTPUT_DIR = BASE_DIR.parent / env('NOTEBOOK_OUTPUT_DIR', default='data/notebook_outputs')
 
 # Redis
 REDIS_URL = env('REDIS_URL')

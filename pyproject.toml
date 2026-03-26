@@ -1,7 +1,7 @@
 [project]
-name = "django-prefect-template"
+name = "django-doit-template"
 version = "0.1.0"
-description = "Template for Django + Prefect integration with FastAPI gateway and S3 Data Lake"
+description = "Template for Django + doit + papermill + DuckDB data pipelines"
 readme = "README.md"
 requires-python = "==3.13.*"
 license = {text = "MIT"}
@@ -17,6 +17,7 @@ dev = [
     "ruff==0.15.0",
     "mypy==1.19.1",
     "pre-commit==4.5.1",
+    "djlint==1.36.4",
 ]
 
 [dependency-groups]
@@ -59,7 +60,7 @@ DJANGO_SETTINGS_MODULE = "config.settings.test"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-testpaths = ["backend/apps", "gateway/tests", "worker/tests"]
+testpaths = ["backend/apps"]
 markers = [
     "unit: Unit tests",
     "integration: Integration tests",
@@ -68,8 +69,12 @@ addopts = [
     "--verbose",
     "--strict-markers",
     "--cov=backend",
-    "--cov=gateway",
-    "--cov=worker",
     "--cov-report=html",
     "--cov-report=term-missing",
 ]
+
+[tool.djlint]
+profile = "django"
+indent = 2
+max_line_length = 120
+ignore = "H006,H031"
