@@ -3,34 +3,39 @@ from django.contrib.auth import get_user_model
 from apps.flows.models import FlowExecution
 import factory
 from factory.django import DjangoModelFactory
-from moto import mock_s3
+from moto import mock_aws
 import boto3
 
 User = get_user_model()
 
 # ============================================================================
-# Factories (using factory-boy)
+# Factories
 # ============================================================================
+
 
 class UserFactory(DjangoModelFactory):
     class Meta:
         model = User
-    
+
     username = factory.Sequence(lambda n: f"user{n}")
     email = factory.LazyAttribute(lambda obj: f"{obj.username}@example.com")
     first_name = factory.Faker('first_name')
     last_name = factory.Faker('last_name')
 
+
 class FlowExecutionFactory(DjangoModelFactory):
     class Meta:
         model = FlowExecution
-    
+
     flow_run_id = factory.Faker('uuid4')
     flow_name = factory.Sequence(lambda n: f"flow-{n}")
     triggered_by = factory.SubFactory(UserFactory)
     s3_input_path = factory.Faker('file_path', depth=3, extension='csv')
     s3_output_path = factory.Faker('file_path', depth=3, extension='parquet')
     status = "PENDING"
+    celery_task_id = ""
+    error_message = ""
+
 
 # ============================================================================
 # Fixtures
@@ -38,54 +43,56 @@ class FlowExecutionFactory(DjangoModelFactory):
 
 @pytest.fixture
 def user_factory():
-    """Factory for creating users"""
     return UserFactory
+
 
 @pytest.fixture
 def flow_execution_factory():
-    """Factory for creating flow executions"""
     return FlowExecutionFactory
+
 
 @pytest.fixture
 def user(db):
-    """Create a single user"""
     return UserFactory()
+
 
 @pytest.fixture
 def admin_user(db):
-    """Create an admin user"""
     return UserFactory(is_staff=True, is_superuser=True)
+
 
 @pytest.fixture
 def api_client():
-    """Django test client"""
     from django.test import Client
     return Client()
 
+
 @pytest.fixture
 def authenticated_client(user):
-    """Authenticated Django test client"""
     from django.test import Client
     client = Client()
     client.force_login(user)
     return client
 
+
 @pytest.fixture
-def mock_s3():
-    """Mock S3 for testing"""
-    with mock_s3():
-        # Create test bucket
+def mock_s3(settings):
+    """Mock AWS S3 / RustFS for testing via moto."""
+    settings.AWS_ACCESS_KEY_ID = 'testing'
+    settings.AWS_SECRET_ACCESS_KEY = 'testing'
+    settings.AWS_S3_REGION_NAME = 'us-east-1'
+    settings.AWS_S3_ENDPOINT_URL = None
+    settings.DATA_LAKE_BUCKET = 'test-bucket'
+
+    with mock_aws():
         s3 = boto3.client('s3', region_name='us-east-1')
         s3.create_bucket(Bucket='test-bucket')
         yield s3
 
+
 @pytest.fixture
-def mock_gateway_client(mocker):
-    """Mock FastAPI gateway client"""
-    mock = mocker.patch('apps.flows.api_client.GatewayClient')
-    mock.return_value.execute_flow.return_value = {
-        'run_id': '550e8400-e29b-41d4-a716-446655440000',
-        'flow_name': 'test-flow',
-        'state': 'SCHEDULED'
-    }
+def mock_pipeline_task(mocker):
+    """Mock the Celery run_pipeline_task so tests don't spawn workers."""
+    mock = mocker.patch('apps.flows.views.run_pipeline_task')
+    mock.delay.return_value.id = 'mock-celery-task-id-1234'
     return mock

@@ -16,8 +16,8 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - django-prefect-network
-  
+      - app-network
+
   redis:
     image: redis:7.4-alpine
     container_name: django-prefect-redis
@@ -29,8 +29,8 @@ services:
       timeout: 3s
       retries: 5
     networks:
-      - django-prefect-network
-  
+      - app-network
+
   rustfs:
     image: rustfs/rustfs:latest
     container_name: django-prefect-rustfs
@@ -49,26 +49,50 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - django-prefect-network
-  
-  prefect-server:
-    image: prefecthq/prefect:3-latest
-    container_name: django-prefect-server
-    command: prefect server start --host 0.0.0.0
-    ports:
-      - "4200:4200"
-    environment:
-      - PREFECT_API_DATABASE_CONNECTION_URL=postgresql+asyncpg://django:django_password@db:5432/prefect
+      - app-network
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: django-celery-worker
+    command: celery -A config.celery worker -l info -Q default
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - ./notebooks:/notebooks
+      - notebook_outputs:/app/data/notebook_outputs
     networks:
-      - django-prefect-network
+      - app-network
+
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: django-flower
+    command: celery -A config.celery flower --port=5555
+    ports:
+      - "5555:5555"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    networks:
+      - app-network
 
 volumes:
   postgres_data:
   rustfs_data:
+  notebook_outputs:
 
 networks:
-  django-prefect-network:
+  app-network:
     driver: bridge

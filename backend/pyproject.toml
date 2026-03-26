@@ -1,7 +1,7 @@
 [project]
-name = "django-prefect-backend"
+name = "django-doit-backend"
 version = "0.1.0"
-description = "Django backend for Prefect integration"
+description = "Django backend for doit + papermill + DuckDB pipelines"
 requires-python = "==3.13.*"
 
 dependencies = [
@@ -10,13 +10,19 @@ dependencies = [
     "django-environ==0.12.0",
     "django-storages==1.14.6",
     "boto3==1.41.1",
+    "s3fs==2026.2.0",
     "duckdb==1.4.4",
     "polars==1.38.1",
     "pyarrow==23.0.0",
     "redis==7.1.1",
     "django-redis==6.0.0",
-    "httpx==0.28.1",
-    "pyjwt==2.11.0",
+    "celery==5.5.3",
+    "flower==2.0.1",
+    "doit==0.36.0",
+    "papermill==2.6.0",
+    "nbformat==5.10.4",
+    "jupyter-client==8.6.3",
+    "ipykernel==6.29.5",
 ]
 
 [project.optional-dependencies]
@@ -37,10 +43,11 @@ test = [
     "faker==40.4.0",
     "moto[s3]==5.1.21",
     "freezegun==1.5.5",
+    "nbmake==1.5.4",
 ]
 
 [tool.setuptools.packages.find]
-include = ["apps", "config", "flows_library"]
+include = ["apps", "config"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
