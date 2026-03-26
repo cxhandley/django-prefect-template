@@ -51,6 +51,41 @@ services:
     networks:
       - app-network
 
+  # ─── Dev environment ────────────────────────────────────────────────────────
+  # The VS Code DevContainer attaches to this service so it shares the
+  # app-network and can reach db/redis/rustfs by service name.
+  devcontainer:
+    build:
+      context: .devcontainer
+      dockerfile: Dockerfile
+    container_name: django-devcontainer
+    command: sleep infinity
+    env_file:
+      - .env
+    # Override localhost values from .env with Docker service names
+    environment:
+      DATABASE_URL: postgresql://django:django_password@db:5432/django_prefect
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      AWS_S3_ENDPOINT_URL: http://rustfs:9000
+    volumes:
+      - .:/workspace:cached
+      - notebook_outputs:/workspace/data/notebook_outputs
+    ports:
+      - "8000:8000"
+      - "5555:5555"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rustfs:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # ─── Background workers (CI / production-like runs) ─────────────────────────
   celery-worker:
     build:
       context: ./backend
@@ -59,6 +94,12 @@ services:
     command: celery -A config.celery worker -l info -Q default
     env_file:
       - .env
+    environment:
+      DATABASE_URL: postgresql://django:django_password@db:5432/django_prefect
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      AWS_S3_ENDPOINT_URL: http://rustfs:9000
     depends_on:
       db:
         condition: service_healthy
@@ -78,11 +119,14 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: django-flower
-    command: celery -A config.celery flower --port=5555
+    command: celery -A config.celery flower --port=5555 --broker=redis://redis:6379/0
     ports:
       - "5555:5555"
     env_file:
       - .env
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
     depends_on:
       - redis
     networks:

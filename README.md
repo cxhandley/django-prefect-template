@@ -1,309 +1,230 @@
+# django-doit-template
 
-# Django + Prefect Integration Template - API Layer with Data Lake
+Django + doit + papermill + DuckDB data pipeline template. Upload a file, trigger a multi-step notebook pipeline asynchronously via Celery, and query the results with DuckDB — all inside a VS Code DevContainer.
 
-**Decoupled API Gateway with S3 Data Lake** - FastAPI middleware + DuckDB + Polars for efficient data processing and analytics
-
-## Architecture Overview
-
-This approach introduces a **FastAPI API Gateway** between Django and Prefect, with an **S3 Data Lake** for efficient data storage and analytics:
+## Architecture
 
 ```
-┌────────────────────────────────────────────────────┐
-│  Browser (DaisyUI + HTMX)                          │
-└──────────────────────┬─────────────────────────────┘
-                       │ HTTP
-┌──────────────────────▼─────────────────────────────┐
-│  Django Application                                │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ Views (HTMX endpoints)                       │  │
-│  └──────────────────┬───────────────────────────┘  │
-│  ┌──────────────────▼───────────────────────────┐  │
-│  │ DuckDB Analytics Layer                       │  │
-│  │ - Query S3 Parquet directly                  │  │
-│  │ - No data loading needed                     │  │
-│  │ - Fast analytical queries                    │  │
-│  └──────────────────┬───────────────────────────┘  │
-│  ┌──────────────────▼───────────────────────────┐  │
-│  │ Django Models (Metadata Only)                │  │
-│  │ - FlowExecution tracking                     │  │
-│  │ - S3 paths, not data                         │  │
-│  │ - User permissions                           │  │
-│  └──────────────────────────────────────────────┘  │
-└──────────────────────┬─────────────────────────────┘
-                       │ HTTP REST API
-┌──────────────────────▼─────────────────────────────┐
-│  FastAPI Gateway                                   │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ Endpoints:                                   │  │
-│  │ - POST /flows/{flow_name}/execute            │  │
-│  │ - GET /flows/runs/{run_id}                   │  │
-│  │ - GET /flows/runs/{run_id}/result            │  │
-│  │ - GET /flows/deployments                     │  │
-│  └──────────────────┬───────────────────────────┘  │
-│  ┌──────────────────▼───────────────────────────┐  │
-│  │ Middleware:                                  │  │
-│  │ - JWT token validation                       │  │
-│  │ - Rate limiting                              │  │
-│  │ - Request/response logging                   │  │
-│  └──────────────────┬───────────────────────────┘  │
-│  ┌──────────────────▼───────────────────────────┐  │
-│  │ Prefect Client SDK                           │  │
-│  └──────────────────┬───────────────────────────┘  │
-└──────────────────────┬─────────────────────────────┘
-                       │ HTTP API
-                       ▼
-┌────────────────────────────────────────────────────┐
-│  Prefect Server/Cloud                              │
-└──────────────────────┬─────────────────────────────┘
-                       │ Work Queue Polling
-                       ▼
-┌────────────────────────────────────────────────────┐
-│  Prefect Worker Pool                               │
-│  ┌──────────────────────────────────────────────┐  │
-│  │ Polars Processing Engine                     │  │
-│  │ - Read from S3 (lazy loading)                │  │
-│  │ - 15x faster than Pandas                     │  │
-│  │ - In-memory transformations                  │  │
-│  │ - Write Parquet to S3                        │  │
-│  └──────────────────────────────────────────────┘  │
-└──────────────────────┬─────────────────────────────┘
+┌────────────────────────────────────────────────┐
+│  Browser (DaisyUI + HTMX)                      │
+└──────────────────┬─────────────────────────────┘
+                   │ HTTP
+┌──────────────────▼─────────────────────────────┐
+│  Django Application  (:8000)                   │
+│  ┌──────────────────────────────────────────┐  │
+│  │ Views (upload, status polling, results)  │  │
+│  └──────────────────┬───────────────────────┘  │
+│  ┌──────────────────▼───────────────────────┐  │
+│  │ Celery task  →  enqueues to Redis        │  │
+│  └──────────────────────────────────────────┘  │
+│  ┌──────────────────────────────────────────┐  │
+│  │ DuckDB Analytics Layer                   │  │
+│  │ Queries S3 Parquet directly (no load)    │  │
+│  └──────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────┘
+                   │ Redis task queue
+┌──────────────────▼─────────────────────────────┐
+│  Celery Worker                                 │
+│  ┌──────────────────────────────────────────┐  │
+│  │ PipelineRunner → subprocess: doit        │  │
+│  └──────────────────┬───────────────────────┘  │
+└──────────────────────┼─────────────────────────┘
+                       │ doit task graph
+┌──────────────────────▼─────────────────────────┐
+│  papermill  (parameterised notebooks)          │
+│                                                │
+│  01_ingest → 02_validate → 03_transform        │
+│                                 ↓              │
+│                          04_aggregate          │
+└──────────────────────┬─────────────────────────┘
                        │ S3 API
-                       ▼
-┌────────────────────────────────────────────────────┐
-│  S3 Data Lake                                      │
-│  ├── raw/                  (User uploads)          │
-│  ├── processed/            (Flow outputs)          │
-│  └── results/              (Final deliverables)    │
-│                                                    │
-│  Format: Parquet (columnar, compressed)            │
-│  Cost: 97% cheaper than PostgreSQL                 │
-└────────────────────────────────────────────────────┘
+┌──────────────────────▼─────────────────────────┐
+│  RustFS  (S3-compatible, local dev)            │
+│  raw/uploads/…      → input files             │
+│  processed/flows/…  → intermediate Parquet    │
+│  processed/flows/…/output.parquet → results   │
+└────────────────────────────────────────────────┘
 ```
 
-### Key Decisions
+## Tech Stack
 
-1. **FastAPI as API Gateway** - Clean REST interface between Django and Prefect
-2. **S3 Data Lake** - Store flow results in S3, not PostgreSQL
-3. **DuckDB for Analytics** - Query S3 Parquet files directly from Django
-4. **Polars in Workers** - 15x faster data processing than Pandas
-5. **Parquet Format** - Columnar storage, excellent compression
-6. **JWT Authentication** - Stateless tokens for service-to-service auth
-7. **Django Models Store Metadata** - Paths and stats, not actual data
+| Component | Technology |
+|-----------|-----------|
+| Web framework | Django 5.2 + DaisyUI + HTMX |
+| Task queue | Celery 5.5 + Redis |
+| Pipeline orchestration | doit 0.36 |
+| Notebook execution | papermill 2.6 |
+| Data processing | Polars 1.38 (lazy, columnar) |
+| Analytics queries | DuckDB 1.4 (queries S3 Parquet directly) |
+| Object storage | RustFS (S3-compatible, local) / AWS S3 (prod) |
+| Database | PostgreSQL 18 (metadata only) |
+| Dev environment | VS Code DevContainers |
 
-### Advantages
-
-- ✅ **Better separation of concerns** - Django UI, FastAPI orchestration, S3 storage
-- ✅ **Independent scaling** - Scale each component separately
-- ✅ **Cost efficient** - S3 is 97% cheaper than PostgreSQL for large data
-- ✅ **Fast analytics** - DuckDB queries S3 without loading data
-- ✅ **Fast processing** - Polars is 15x faster than Pandas
-- ✅ **Unlimited storage** - S3 scales to petabytes
-- ✅ **Multiple frontends** - Mobile apps, CLIs can use same API
-- ✅ **Security isolation** - Prefect credentials never touch Django
-
-### Disadvantages
-
-- ⚠️ Additional services to maintain (FastAPI + S3)
-- ⚠️ More network hops (adds ~50ms latency)
-- ⚠️ Learning curve for DuckDB and Polars
-- ⚠️ S3 consistency model (though now strongly consistent)
-
-# Project Structure
+## Project Structure
 
 ```
-django-prefect-template/
-├── docker-compose.yml
-├── docker-compose.prod.yml
-├── terraform/
-│   ├── staging.tf
-│   ├── production.tf
-│   └── modules/
-│       ├── alb/
-│       ├── ecs/
-│       ├── rds/
-│       └── s3/                 # S3 bucket configuration
-├── backend/                    # Django application
+django-doit-template/
+├── .devcontainer/
+│   ├── Dockerfile          # Dev environment image
+│   └── devcontainer.json   # VS Code DevContainer config
+├── backend/                # Django application
 │   ├── Dockerfile
-│   ├── manage.py
-│   ├── requirements.txt
 │   ├── config/
 │   │   ├── settings/
-│   │   │   ├── base.py         # S3 and DuckDB config
+│   │   │   ├── base.py
 │   │   │   ├── development.py
-│   │   │   └── production.py
+│   │   │   └── test.py
+│   │   ├── celery.py       # Celery app init
 │   │   └── urls.py
-│   ├── apps/
-│   │   ├── flows/
-│   │   │   ├── models.py       # FlowExecution with S3 paths
-│   │   │   ├── views.py        # HTMX endpoints
-│   │   │   ├── api_client.py   # FastAPI client wrapper
-│   │   │   ├── services/
-│   │   │   │   ├── datalake.py       # DuckDB analytics
-│   │   │   │   └── s3_manager.py     # S3 operations
-│   │   │   ├── templates/
-│   │   │   └── static/
-│   │   └── accounts/
-│   └── flows_library/          # Prefect flow definitions (Polars)
-│       ├── data_processing.py
-│       ├── report_generation.py
-│       └── analytics_pipeline.py
-├── gateway/                    # FastAPI service
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── main.py
-│   ├── api/
-│   │   ├── v1/
-│   │   │   ├── endpoints/
-│   │   │   │   ├── flows.py
-│   │   │   │   ├── deployments.py
-│   │   │   │   └── runs.py
-│   │   │   └── router.py
-│   │   └── dependencies.py
-│   ├── core/
-│   │   ├── config.py
-│   │   ├── security.py         # JWT validation
-│   │   └── prefect_client.py
-│   ├── middleware/
-│   │   ├── rate_limit.py
-│   │   └── logging.py
-│   └── schemas/
-│       ├── flow.py
-│       └── execution.py
-├── worker/
-│   ├── Dockerfile
-│   ├── requirements.txt        # Includes polars, pyarrow
-│   └── start-worker.sh
-└── docs/
-    ├── api-spec.yaml
-    ├── datalake-schema.md      # S3 folder structure
-    └── architecture.md
+│   └── apps/
+│       ├── core/           # Home page
+│       ├── accounts/       # Auth & profiles
+│       └── flows/
+│           ├── models.py       # FlowExecution (metadata + S3 paths)
+│           ├── views.py        # Upload, status, results endpoints
+│           ├── tasks.py        # Celery task (run_pipeline_task)
+│           ├── runner.py       # PipelineRunner (invokes doit)
+│           └── services/
+│               └── datalake.py # DuckDB analytics service
+├── notebooks/
+│   └── steps/
+│       ├── 01_ingest.ipynb     # Read raw file → S3 staging Parquet
+│       ├── 02_validate.ipynb   # Clean + validate
+│       ├── 03_transform.ipynb  # Business transformations (Polars)
+│       └── 04_aggregate.ipynb  # Group-by aggregation → output.parquet
+├── dodo.py                 # doit task definitions (pipeline DAG)
+├── docker-compose.yml
+├── justfile
+└── .env.example
 ```
 
-## Technology Stack
+## Getting Started
 
-- **Web Framework**: Django 5.2
-- **API Gateway**: FastAPI 
-- **UI**: DaisyUI (Tailwind CSS) + HTMX
-- **Workflow Engine**: Prefect 3.x
-- **Database**: PostgreSQL 18 (metadata only)
-- **Data Lake**: AWS S3
-- **Analytics Engine**: DuckDB 
-- **Processing Engine**: Polars (in Prefect workers)
-- **File Format**: Apache Parquet
-- **Authentication**: JWT (PyJWT)
-- **Cache**: Redis
-- **Deployment**: Docker Compose (staging), Terraform + ECS (prod)
+### Prerequisites
 
-### Development Setup
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [VS Code](https://code.visualstudio.com/) + [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
 
-1. **Clone repository**
+### 1. Clone and open in devcontainer
 
 ```bash
-git clone https://github.com/cxhandley/django-prefect-template.git
-cd django-prefect-template
+git clone https://github.com/cxhandley/django-doit-template.git
+cd django-doit-template
+code .
 ```
 
-2. **Create environment file**
+VS Code will prompt **"Reopen in Container"** — click it. Docker Compose starts all services and the `postCreateCommand` runs automatically:
+
+```bash
+just install && just migrate && just setup-rustfs
+```
+
+### 2. Start the development server
+
+Open two terminals inside the devcontainer:
+
+```bash
+# Terminal 1 — Django
+just dev
+# → http://localhost:8000
+
+# Terminal 2 — Celery worker
+just celery
+```
+
+The Flower monitoring UI is also available at **http://localhost:5555** (started as a Docker service automatically).
+
+### 3. Env file
 
 ```bash
 cp .env.example .env
 ```
 
-Example `.env`:
-```env
-# Django
-DJANGO_SECRET_KEY=your-secret-key-here
-DJANGO_DEBUG=True
-DATABASE_URL=postgresql://django:password@db:5432/django_prefect
+The `.env` file uses `localhost` values which work for running outside Docker. Inside Docker / the devcontainer, `docker-compose.yml` overrides the host-specific URLs (`DATABASE_URL`, `REDIS_URL`, etc.) with Docker service names automatically.
 
-# FastAPI Gateway
-GATEWAY_JWT_SECRET=gateway-secret-key-here
-GATEWAY_API_URL=http://gateway:8001
-PREFECT_API_URL=http://prefect-server:4200/api
+## Running the Pipeline
 
-# Prefect
-PREFECT_API_KEY=your-prefect-api-key
+Upload a CSV file via the Django UI → a `FlowExecution` record is created with `status=RUNNING` → Celery dispatches `run_pipeline_task` → `PipelineRunner` calls `doit pipeline` → doit runs the four notebook steps in order → `FlowExecution` updated to `status=COMPLETED`.
 
-# Redis
-REDIS_URL=redis://redis:6379/0
+### Pipeline steps
 
-# AWS S3 Data Lake
-AWS_ACCESS_KEY_ID=your-aws-access-key
-AWS_SECRET_ACCESS_KEY=your-aws-secret-key
-AWS_S3_REGION=us-east-1
-DATA_LAKE_BUCKET=django-prefect-datalake-dev
-AWS_S3_ENDPOINT_URL=http://minio:9000  # Use MinIO for local dev
+| Step | Notebook | What it does |
+|------|----------|-------------|
+| 1 | `01_ingest.ipynb` | Reads raw CSV/Parquet from S3, writes `01_raw.parquet` |
+| 2 | `02_validate.ipynb` | Drops nulls, deduplicates, filters invalid dates/amounts |
+| 3 | `03_transform.ipynb` | Parses dates, computes totals/tax, categorises by amount |
+| 4 | `04_aggregate.ipynb` | Groups by year-month + category, writes `output.parquet` |
 
-# DuckDB Configuration
-DUCKDB_THREADS=4
-DUCKDB_MEMORY_LIMIT=4GB
+Each notebook receives parameters (S3 paths, credentials, run_id) via papermill. Intermediate Parquet files are written to `s3://<bucket>/processed/flows/data-processing/<run_id>/`.
+
+### Trigger from CLI
+
+```bash
+just run-pipeline <run_id> s3://bucket/raw/uploads/1/myfile.csv
 ```
 
-Services:
-- Django web: http://localhost:8000
-- FastAPI gateway: http://localhost:8001
-- FastAPI docs: http://localhost:8001/docs
-- Prefect UI: http://localhost:4200
-- Rustfs (S3 compatible): http://localhost:9000
-- PostgreSQL: localhost:5432
-- Redis: localhost:6379
+### Inspect available doit tasks
 
-
-# S3 Data Lake Structure
-
-The data lake is organized into three main zones:
-
-```
-s3://django-prefect-datalake/
-├── raw/                              # Raw, unprocessed data
-│   ├── uploads/
-│   │   └── {user_id}/
-│   │       └── {upload_id}/
-│   │           └── data.{csv,json,parquet}
-│   └── external/
-│       └── {source_name}/
-│           └── {date}/
-│               └── data.parquet
-│
-├── processed/                        # Cleaned, transformed data
-│   ├── flows/
-│   │   └── {flow_name}/
-│   │       └── {run_id}/
-│   │           ├── output.parquet    # Main results
-│   │           ├── metadata.json     # Schema, row count, etc.
-│   │           └── _SUCCESS          # Completion marker
-│   └── aggregates/
-│       └── {date}/
-│           └── summary.parquet
-│
-└── results/                          # User-facing outputs
-    ├── reports/
-    │   └── {report_id}/
-    │       ├── report.parquet
-    │       ├── report.pdf
-    │       └── metadata.json
-    └── exports/
-        └── {export_id}/
-            └── data.{csv,xlsx,json}
+```bash
+just doit-list
 ```
 
-## Configuration
+## Services
 
-### Environment Variables
+| Service | URL | Notes |
+|---------|-----|-------|
+| Django | http://localhost:8000 | Main web app |
+| Flower | http://localhost:5555 | Celery task monitoring |
+| RustFS (S3) | http://localhost:9000 | Local S3-compatible storage |
+| PostgreSQL | localhost:5432 | Metadata DB |
+| Redis | localhost:6379 | Celery broker + cache |
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `DJANGO_SECRET_KEY` | Django secret key | Yes | - |
-| `DATABASE_URL` | PostgreSQL connection string | Yes | - |
-| `GATEWAY_API_URL` | FastAPI gateway URL | Yes | - |
-| `GATEWAY_SERVICE_TOKEN` | JWT token for Django→FastAPI | Yes | - |
-| `PREFECT_API_URL` | Prefect server URL | Yes | - |
-| `PREFECT_API_KEY` | Prefect API token | Yes | - |
-| `REDIS_URL` | Redis connection string | Yes | - |
-| `AWS_ACCESS_KEY_ID` | AWS credentials | Yes | - |
-| `AWS_SECRET_ACCESS_KEY` | AWS credentials | Yes | - |
-| `AWS_S3_REGION` | S3 region | Yes | us-east-1 |
-| `DATA_LAKE_BUCKET` | S3 bucket name | Yes | - |
-| `AWS_S3_ENDPOINT_URL` | S3 endpoint (MinIO for dev) | Dev only | - |
-| `DUCKDB_THREADS` | DuckDB parallel threads | No | 4 |
-| `DUCKDB_MEMORY_LIMIT` | DuckDB memory limit | No | 4GB |
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DJANGO_SECRET_KEY` | Django secret key | — |
+| `DATABASE_URL` | PostgreSQL connection | `postgresql://django:…@localhost:5432/django_prefect` |
+| `REDIS_URL` | Redis connection | `redis://localhost:6379/0` |
+| `CELERY_BROKER_URL` | Celery broker | `redis://localhost:6379/0` |
+| `CELERY_RESULT_BACKEND` | Celery result store | `redis://localhost:6379/0` |
+| `AWS_ACCESS_KEY_ID` | S3 / RustFS key | `rustfs` |
+| `AWS_SECRET_ACCESS_KEY` | S3 / RustFS secret | `rustfs_secret` |
+| `AWS_S3_REGION` | S3 region | `us-east-1` |
+| `DATA_LAKE_BUCKET` | S3 bucket name | `django-prefect-datalake-dev` |
+| `AWS_S3_ENDPOINT_URL` | S3 endpoint (RustFS) | `http://localhost:9000` |
+| `DUCKDB_THREADS` | DuckDB parallel threads | `4` |
+| `DUCKDB_MEMORY_LIMIT` | DuckDB memory cap | `4GB` |
+| `NOTEBOOKS_DIR` | Path to notebook steps | `notebooks` |
+| `NOTEBOOK_OUTPUT_DIR` | Executed notebook outputs | `data/notebook_outputs` |
+
+## Development Workflow
+
+```bash
+just test          # Run all tests (pytest)
+just lint          # Ruff + mypy
+just fix           # Auto-fix lint issues
+just pre-commit    # Run all pre-commit hooks (includes nbstripout, djlint, rustywind)
+just migrate       # Apply DB migrations
+just makemigrations # Create new migrations
+just shell         # Django shell_plus
+just docker-shell  # Django shell inside running container (from host)
+just docker-logs   # Tail all service logs
+just status        # Show container statuses
+```
+
+## Pre-commit Hooks
+
+| Hook | Purpose |
+|------|---------|
+| `nbstripout` | Strips notebook outputs before commit (keeps diffs small) |
+| `ruff` | Python lint + format |
+| `djlint` | Django HTML template lint + reformat |
+| `rustywind` | Sorts Tailwind/DaisyUI class order |
+| Standard hooks | Trailing whitespace, YAML/JSON checks, large file guard |
+
+Install hooks:
+
+```bash
+uv run pre-commit install
+```
