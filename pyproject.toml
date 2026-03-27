@@ -12,16 +12,12 @@ authors = [
 
 dependencies = []
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "ruff==0.15.0",
     "mypy==1.19.1",
     "pre-commit==4.5.1",
     "djlint==1.36.4",
-]
-
-[dependency-groups]
-dev = [
     "pytest==8.4.2",
     "pytest-cov==6.3.0",
     "pytest-django==4.11.1",

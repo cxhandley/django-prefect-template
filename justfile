@@ -31,23 +31,23 @@ install:
 
 # Start Django dev server on 0.0.0.0:8000
 dev:
-    cd backend && uv run python manage.py runserver 0.0.0.0:8000
+    uv run --python backend/.venv python manage.py runserver 0.0.0.0:8000
 
 # Django shell
 shell:
-    cd backend && uv run python manage.py shell_plus
+    uv run --python backend/.venv python manage.py shell_plus
 
 # Django db shell
 dbshell:
-    cd backend && uv run python manage.py dbshell
+    uv run --python backend/.venv python manage.py dbshell
 
 # Run migrations
 migrate:
-    cd backend && uv run python manage.py migrate
+    uv run --python backend/.venv python manage.py migrate
 
 # Collect static files
 collectstatic:
-    cd backend && uv run python manage.py collectstatic --noinput
+    uv run --python backend/.venv python manage.py collectstatic --noinput
 
 # Create Django app
 startapp name:
@@ -56,14 +56,14 @@ startapp name:
 # Create migrations
 makemigrations app="":
     @if [ -z "{{app}}" ]; then \
-        cd backend && uv run python manage.py makemigrations; \
+        uv run --python backend/.venv python manage.py makemigrations; \
     else \
-        cd backend && uv run python manage.py makemigrations {{app}}; \
+        uv run --python backend/.venv python manage.py makemigrations {{app}}; \
     fi
 
 # Create superuser
 createsuperuser:
-    cd backend && uv run python manage.py createsuperuser
+    uv run --python backend/.venv python manage.py createsuperuser
 
 
 # ============================================================================
@@ -72,11 +72,11 @@ createsuperuser:
 
 # Start Celery worker (connects to redis://redis:6379/0 inside devcontainer)
 celery:
-    cd backend && uv run celery -A config.celery worker -l info -Q default
+    uv run --python backend/.venv celery -A config.celery worker -l info -Q default
 
 # Start Flower monitoring UI at :5555
 flower:
-    cd backend && uv run celery -A config.celery flower --port=5555
+    uv run --python backend/.venv celery -A config.celery flower --port=5555
 
 # Open Flower UI in browser (host)
 flower-ui:
@@ -110,11 +110,11 @@ test:
     @echo "All tests passed!"
 
 test-backend:
-    cd backend && uv run pytest apps/ -v
+    uv run --python backend/.venv pytest apps/ -v
 
 # Run tests with coverage report
 test-cov:
-    cd backend && uv run pytest apps/ --cov=apps --cov-report=html --cov-report=term-missing -v
+    uv run --python backend/.venv pytest apps/ --cov=apps --cov-report=html --cov-report=term-missing -v
 
 
 # ============================================================================
@@ -139,12 +139,12 @@ docker-logs service="":
 
 # Open a Django shell inside the running devcontainer (from host)
 docker-shell:
-    docker compose exec devcontainer bash -c "cd /workspace/backend && uv run python manage.py shell_plus"
+    docker compose exec devcontainer bash -c "uv run --python backend/.venv python backend/manage.py shell_plus"
 
 # Setup RustFS S3 buckets
 setup-rustfs:
     @echo "Setting up RustFS buckets..."
-    cd backend && uv run python manage.py setup_s3_buckets
+    uv run --python backend/.venv python backend/manage.py setup_s3_buckets
 
 
 # ============================================================================
@@ -167,7 +167,7 @@ fix:
 
 # Run all pre-commit hooks
 pre-commit:
-    uv run --python backend/.venv pre-commit run --all-files
+    uv run --python pre-commit run --all-files
 
 # Clean cache / build artefacts
 clean:

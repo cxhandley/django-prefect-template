@@ -31,8 +31,11 @@
       "label": "Flower (Celery)"
     }
   },
-  // Runs once after the container is created (dependencies, DB, S3 buckets).
-  "postCreateCommand": "just install && just migrate && just setup-rustfs",
+  "mounts": [
+    // Persist Claude Code config across rebuilds
+    "source=claude-code-config,target=/home/vscode/.claude,type=volume",
+    "source=${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,readonly"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
@@ -64,5 +67,6 @@
       }
     }
   },
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
 }
