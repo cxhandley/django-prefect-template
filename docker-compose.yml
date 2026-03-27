@@ -56,8 +56,8 @@ services:
   # app-network and can reach db/redis/rustfs by service name.
   devcontainer:
     build:
-      context: .devcontainer
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: .devcontainer/Dockerfile
     container_name: django-devcontainer
     command: sleep infinity
     env_file:
@@ -74,7 +74,6 @@ services:
       - notebook_outputs:/workspace/data/notebook_outputs
     ports:
       - "8000:8000"
-      - "5555:5555"
     depends_on:
       db:
         condition: service_healthy
