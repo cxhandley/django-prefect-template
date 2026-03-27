@@ -45,4 +45,12 @@ WORKDIR /workspace
 COPY backend/pyproject.toml backend/
 RUN uv pip install --system -e "backend[dev,test]"
 
+# Install root-level dev tools (code quality, hooks) — pinned to match pyproject.toml
+RUN uv pip install --system \
+    ruff==0.15.0 \
+    mypy==1.19.1 \
+    pre-commit==4.5.1 \
+    djlint==1.36.4 \
+    nbstripout
+
 USER $USERNAME
