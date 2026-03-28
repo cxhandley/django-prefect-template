@@ -1,0 +1,25 @@
+<!-- Form Input component
+     Parameters: name, label, type (text/email/password/number), placeholder, required (bool), value, error, help_text -->
+<div class="form-control w-full">
+    {% if label %}
+    <label class="label" for="id_{{ name }}">
+        <span class="label-text">{{ label }}</span>
+    </label>
+    {% endif %}
+    <input type="{{ type|default:'text' }}"
+           id="id_{{ name }}"
+           name="{{ name }}"
+           placeholder="{{ placeholder }}"
+           value="{{ value }}"
+           class="input input-bordered w-full {% if error %}input-error{% endif %}"
+           {% if required %}required{% endif %} />
+    {% if error %}
+    <label class="label">
+        <span class="label-text-alt text-error">{{ error }}</span>
+    </label>
+    {% elif help_text %}
+    <label class="label">
+        <span class="label-text-alt">{{ help_text }}</span>
+    </label>
+    {% endif %}
+</div>

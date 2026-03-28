@@ -1,58 +1,36 @@
 <!-- backend/apps/core/templates/core/components/navbar.html -->
-<div class="navbar bg-base-100 shadow-lg sticky top-0 z-40">
+<div class="navbar bg-base-100 shadow-sm sticky top-0 z-40 border-b border-base-200">
     <!-- Navbar start: Logo & mobile menu -->
     <div class="navbar-start">
-        <!-- Mobile menu dropdown -->
-        <div class="dropdown z-50">
-            <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
-                </svg>
-            </div>
-            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-52 p-2 shadow">
-                <li><a href="{% url 'flows:index' %}">Dashboard</a></li>
-                <li>
-                    <details>
-                        <summary>Flows</summary>
-                        <ul class="p-2 bg-base-100 z-50">
-                            <li><a hx-get="{% url 'flows:flows_menu' %}" hx-target="this" hx-swap="outerHTML">Flows List</a></li>
-                            <li><a href="#">Create Flow</a></li>
-                        </ul>
-                    </details>
-                </li>
-                <li><a href="#">Deployments</a></li>
-                <li><a href="#">Runs</a></li>
-            </ul>
-        </div>
-        
+        {% if user.is_authenticated %}
+        <!-- Dashboard drawer toggle (mobile) -->
+        <label for="dashboard-drawer" class="btn btn-ghost btn-square lg:hidden">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
+            </svg>
+        </label>
+        {% endif %}
+
         <!-- Logo -->
-        <a href="{% url 'flows:index' %}" class="btn btn-ghost text-xl font-bold">
+        <a href="{% url 'core:index' %}" class="btn btn-ghost text-xl font-bold">
             <svg class="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L9 4.414V16a1 1 0 102 0V4.414l5.293 5.293a1 1 0 001.414-1.414l-7-7z" />
             </svg>
-            Prefect
+            Django Prefect ML
         </a>
     </div>
-    
-    <!-- Navbar center: Desktop menu -->
+
+    {% if user.is_authenticated %}
+    <!-- Navbar center: Authenticated desktop menu -->
     <div class="navbar-center hidden lg:flex">
         <ul class="menu menu-horizontal px-1 z-40">
-            <li><a href="{% url 'flows:index' %}">Dashboard</a></li>
-            <li>
-                <details>
-                    <summary>Flows</summary>
-                    <ul class="p-2 bg-base-100 w-48 z-50">
-                        <li><a hx-get="{% url 'flows:flows_menu' %}" hx-target="this" hx-swap="outerHTML">Flows List</a></li>
-                        <li><a href="#">Create Flow</a></li>
-                    </ul>
-                </details>
-            </li>
-            <li><a href="#">Deployments</a></li>
-            <li><a href="#">Runs</a></li>
+            <li><a href="{% url 'flows:dashboard' %}">Dashboard</a></li>
+            <li><a href="{% url 'flows:dashboard' %}">Predictions</a></li>
+            <li><a href="{% url 'flows:history' %}">History</a></li>
         </ul>
     </div>
-    
-    <!-- Navbar end: User menu & icons -->
+
+    <!-- Navbar end: User menu & notifications -->
     <div class="navbar-end gap-2">
         <!-- Notifications dropdown -->
         <div class="dropdown dropdown-end z-50">
@@ -62,7 +40,7 @@
                 </svg>
                 <span class="indicator-item badge badge-sm badge-primary">2</span>
             </div>
-            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-64 p-2 shadow">
+            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-64 p-2 shadow-lg border border-base-200">
                 <li class="menu-title">
                     <span>Notifications</span>
                 </li>
@@ -70,7 +48,7 @@
                 <li><a>Flow run failed <span class="badge badge-xs">1 hour ago</span></a></li>
             </ul>
         </div>
-        
+
         <!-- User menu dropdown -->
         <div class="dropdown dropdown-end z-50">
             <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
@@ -78,7 +56,7 @@
                     {{ user.first_name|first|default:"U" }}
                 </div>
             </div>
-            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-52 p-2 shadow">
+            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-52 p-2 shadow-lg border border-base-200">
                 <li class="menu-title">
                     <span>{{ user.get_full_name|default:user.username }}</span>
                 </li>
@@ -87,8 +65,8 @@
                 <li><a href="#">API Keys</a></li>
                 <li><a href="#">Help & Docs</a></li>
                 <li>
-                    <a hx-post="{% url 'accounts:logout' %}" 
-                       hx-trigger="click" 
+                    <a hx-post="{% url 'accounts:logout' %}"
+                       hx-trigger="click"
                        hx-confirm="Sign out of your account?"
                        class="text-error">
                         Logout
@@ -97,4 +75,12 @@
             </ul>
         </div>
     </div>
+
+    {% else %}
+    <!-- Navbar end: Public nav (Login / Sign Up) -->
+    <div class="navbar-end gap-2">
+        <a href="{% url 'accounts:login' %}" class="btn btn-ghost btn-sm">Login</a>
+        <a href="{% url 'accounts:signup' %}" class="btn btn-primary btn-sm">Sign Up</a>
+    </div>
+    {% endif %}
 </div>

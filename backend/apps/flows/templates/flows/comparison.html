@@ -1,0 +1,142 @@
+{% extends "core/base_dashboard.html" %}
+
+{% block title %}Compare Predictions - Django Prefect ML{% endblock %}
+
+{% block breadcrumbs %}
+{% include "core/components/ui/breadcrumbs.html" with items=breadcrumbs %}
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold">Compare Predictions</h1>
+            <p class="text-base-content/60 text-sm mt-1">Side-by-side comparison of {{ comparison_data|length }} execution{{ comparison_data|length|pluralize }}.</p>
+        </div>
+        <div class="flex gap-2">
+            <button class="btn btn-outline btn-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                Chart View
+            </button>
+            <button class="btn btn-outline btn-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export Comparison
+            </button>
+            <a href="{% url 'flows:history' %}" class="btn btn-ghost btn-sm">Back</a>
+        </div>
+    </div>
+
+    {% if comparison_data %}
+    <!-- Side-by-side Comparison Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for item in comparison_data %}
+        <div class="card bg-base-100 border border-base-200 shadow-sm">
+            <div class="card-body">
+                <!-- Execution Header -->
+                <div class="flex items-center justify-between">
+                    <h3 class="card-title text-base">Execution #{{ forloop.counter }}</h3>
+                    {% include "core/components/ui/badge.html" with status=item.execution.status %}
+                </div>
+                <p class="text-xs text-base-content/50">{{ item.execution.flow_run_id|truncatechars:20 }}</p>
+                <p class="text-xs text-base-content/50">{{ item.execution.created_at|date:"M d, Y H:i" }}</p>
+
+                <div class="divider my-2"></div>
+
+                <!-- Input Values -->
+                <h4 class="text-sm font-semibold text-base-content/70">Inputs</h4>
+                <div class="space-y-1 mt-1">
+                    {% for key, val in item.inputs.items %}
+                    <div class="flex justify-between text-sm">
+                        <span class="text-base-content/60">{{ key }}</span>
+                        <span class="font-medium">{{ val }}</span>
+                    </div>
+                    {% empty %}
+                    <p class="text-xs text-base-content/40">No input data</p>
+                    {% endfor %}
+                </div>
+
+                <div class="divider my-2"></div>
+
+                <!-- Prediction Result -->
+                <h4 class="text-sm font-semibold text-base-content/70">Result</h4>
+                <div class="space-y-2 mt-1">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-base-content/60">Prediction</span>
+                        <span class="font-bold text-primary">{{ item.prediction.value }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-base-content/60">Classification</span>
+                        <span class="badge badge-success badge-sm">{{ item.prediction.classification }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-base-content/60">Confidence</span>
+                        <span class="font-semibold">{{ item.prediction.confidence }}%</span>
+                    </div>
+                    <progress class="progress progress-primary w-full" value="{{ item.prediction.confidence }}" max="100"></progress>
+                </div>
+
+                {% if item.duration %}
+                <div class="divider my-2"></div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-base-content/60">Duration</span>
+                    <span>{{ item.duration }}s</span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Insights Section -->
+    <div class="card bg-base-100 border border-base-200 shadow-sm">
+        <div class="card-body">
+            <h2 class="card-title text-lg">Comparison Insights</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-base-content/70">Key Findings</h3>
+                    <ul class="space-y-2">
+                        <li class="flex items-start gap-2 text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-info shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="text-base-content/70">Compare input parameters across executions to identify which factors most influence predictions.</span>
+                        </li>
+                        <li class="flex items-start gap-2 text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-success shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="text-base-content/70">Higher income and longer employment history tend to correlate with higher approval probability.</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="space-y-3">
+                    <h3 class="text-sm font-semibold text-base-content/70">Recommendations</h3>
+                    <ul class="space-y-2">
+                        <li class="flex items-start gap-2 text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                            <span class="text-base-content/70">Credit score appears less impactful than employment history for this model.</span>
+                        </li>
+                        <li class="flex items-start gap-2 text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                            </svg>
+                            <span class="text-base-content/70">Run additional predictions with varied income levels to better understand the decision boundary.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% else %}
+    {% include "core/components/ui/empty_state.html" with title="No executions to compare" message="Select executions from the history page to compare them." action_url="/flows/history/" action_text="Go to History" %}
+    {% endif %}
+</div>
+{% endblock %}

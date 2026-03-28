@@ -1,52 +1,44 @@
-{% extends "core/base.html" %}
+{% extends "core/base_dashboard.html" %}
 
-{% block title %}Settings - Prefect{% endblock %}
+{% block title %}Settings - Django Prefect ML{% endblock %}
 
-{% block content %}
+{% block dashboard_content %}
 <div class="max-w-2xl">
-    <h1 class="text-3xl font-bold mb-8">Settings</h1>
-    
-    <div class="bg-slate-800/50 border border-slate-700 rounded-lg p-6 backdrop-blur space-y-8">
-        
-        <!-- Profile Settings -->
-        <div>
-            <h2 class="text-xl font-semibold mb-4">Profile Settings</h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-2">
-                        First Name
-                    </label>
-                    <input type="text" value="{{ user.first_name }}" class="input input-bordered w-full max-w-xs bg-slate-700 border-slate-600">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-300 mb-2">
-                        Last Name
-                    </label>
-                    <input type="text" value="{{ user.last_name }}" class="input input-bordered w-full max-w-xs bg-slate-700 border-slate-600">
+    <h1 class="text-2xl font-bold mb-6">Settings</h1>
+
+    <div class="card bg-base-100 border border-base-200 shadow-sm">
+        <div class="card-body space-y-8">
+
+            <!-- Profile Settings -->
+            <div>
+                <h2 class="text-lg font-semibold mb-4">Profile Settings</h2>
+                <div class="space-y-4">
+                    {% include "core/components/ui/form_input.html" with name="first_name" label="First Name" type="text" value=user.first_name %}
+                    {% include "core/components/ui/form_input.html" with name="last_name" label="Last Name" type="text" value=user.last_name %}
                 </div>
             </div>
-        </div>
-        
-        <!-- Security Settings -->
-        <div class="border-t border-slate-700 pt-8">
-            <h2 class="text-xl font-semibold mb-4">Security</h2>
-            <div class="space-y-4">
-                <button class="btn btn-outline">Change Password</button>
-                <button class="btn btn-outline">Two-Factor Authentication</button>
+
+            <!-- Security Settings -->
+            <div class="border-t border-base-200 pt-8">
+                <h2 class="text-lg font-semibold mb-4">Security</h2>
+                <div class="flex gap-3">
+                    <button class="btn btn-outline btn-sm">Change Password</button>
+                    <button class="btn btn-outline btn-sm">Two-Factor Authentication</button>
+                </div>
             </div>
-        </div>
-        
-        <!-- API Keys -->
-        <div class="border-t border-slate-700 pt-8">
-            <h2 class="text-xl font-semibold mb-4">API Keys</h2>
-            <p class="text-slate-400 text-sm mb-4">Manage your API keys for programmatic access</p>
-            <button class="btn btn-primary">Generate New Key</button>
-        </div>
-        
-        <!-- Danger Zone -->
-        <div class="border-t border-slate-700 pt-8 border-red-700">
-            <h2 class="text-xl font-semibold mb-4 text-red-400">Danger Zone</h2>
-            <button class="btn btn-error">Delete Account</button>
+
+            <!-- API Keys -->
+            <div class="border-t border-base-200 pt-8">
+                <h2 class="text-lg font-semibold mb-4">API Keys</h2>
+                <p class="text-sm text-base-content/60 mb-4">Manage your API keys for programmatic access.</p>
+                <button class="btn btn-primary btn-sm">Generate New Key</button>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="border-t border-error/30 pt-8">
+                <h2 class="text-lg font-semibold mb-4 text-error">Danger Zone</h2>
+                <button class="btn btn-error btn-sm">Delete Account</button>
+            </div>
         </div>
     </div>
 </div>

@@ -1,0 +1,13 @@
+{% extends "core/base_public.html" %}
+
+{% block title %}Sign Up - Django Prefect ML{% endblock %}
+
+{% block public_content %}
+<div class="flex items-center justify-center min-h-[70vh] py-8">
+    <div class="card bg-base-100 shadow-xl border border-base-200 w-full max-w-md">
+        <div class="card-body">
+            {% include "accounts/partials/signup_form.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

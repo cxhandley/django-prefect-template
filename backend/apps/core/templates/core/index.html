@@ -1,109 +1,161 @@
-{% extends "core/base.html" %}
+{% extends "core/base_public.html" %}
 
-{% block title %}Home - Prefect Flows{% endblock %}
+{% block title %}Django Prefect ML Prediction System{% endblock %}
 
-{% block content %}
-<div class="space-y-8">
+{% block public_content %}
+<div class="space-y-16">
+
     <!-- Hero Section -->
-    <div class="hero bg-gradient-to-r from-primary to-secondary text-primary-content rounded-lg">
-        <div class="hero-content text-center py-12">
-            <div class="max-w-md">
-                <h1 class="text-5xl font-bold mb-4">Prefect Flows</h1>
-                <p class="text-lg mb-6">Manage, monitor, and orchestrate your data workflows with ease</p>
-                <a href="{% url 'flows:index' %}" class="btn btn-outline btn-lg">
-                    Get Started
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
-                    </svg>
-                </a>
+    <div class="hero py-20">
+        <div class="hero-content text-center">
+            <div class="max-w-2xl">
+                <h1 class="text-5xl font-bold tracking-tight">Django Prefect ML Prediction System</h1>
+                <p class="text-lg text-base-content/60 mt-6">Make Data-Driven Predictions with ML Models</p>
+                <div class="flex gap-3 justify-center mt-8">
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'flows:dashboard' %}" class="btn btn-primary btn-lg">Go to Dashboard</a>
+                    {% else %}
+                    <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg">Login to Get Started</a>
+                    <a href="{% url 'accounts:signup' %}" class="btn btn-outline btn-lg">Sign Up</a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Stats Section -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="stat place-items-center bg-base-200 rounded-lg">
-            <div class="stat-title">Active Flows</div>
-            <div class="stat-value text-primary">12</div>
-            <div class="stat-desc">Flows currently running</div>
-        </div>
-        <div class="stat place-items-center bg-base-200 rounded-lg">
-            <div class="stat-title">Recent Runs</div>
-            <div class="stat-value text-secondary">24</div>
-            <div class="stat-desc">In the last 24 hours</div>
-        </div>
-        <div class="stat place-items-center bg-base-200 rounded-lg">
-            <div class="stat-title">Deployments</div>
-            <div class="stat-value text-accent">5</div>
-            <div class="stat-desc">Active deployments</div>
+    <!-- How it Works Section -->
+    <div>
+        <h2 class="text-3xl font-bold text-center mb-10">How it Works</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Step 1 -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body items-center text-center">
+                    <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center text-xl font-bold">1</div>
+                    <h3 class="card-title mt-4">Configure Models</h3>
+                    <p class="text-base-content/60 text-sm">Admins upload and train ML models for your specific prediction needs.</p>
+                </div>
+            </div>
+            <!-- Step 2 -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body items-center text-center">
+                    <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center text-xl font-bold">2</div>
+                    <h3 class="card-title mt-4">Make Predictions</h3>
+                    <p class="text-base-content/60 text-sm">Users input data and get instant predictions powered by trained models.</p>
+                </div>
+            </div>
+            <!-- Step 3 -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body items-center text-center">
+                    <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center text-xl font-bold">3</div>
+                    <h3 class="card-title mt-4">Track & Compare</h3>
+                    <p class="text-base-content/60 text-sm">Track execution history and compare results across multiple predictions.</p>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Features Section -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Feature 1 -->
-        <div class="card bg-base-200 shadow-lg">
-            <div class="card-body">
-                <div class="flex items-start gap-4">
-                    <div class="p-3 bg-primary rounded-lg">
-                        <svg class="w-6 h-6 text-primary-content" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="font-bold text-lg">Reliable Execution</h3>
-                        <p class="text-sm opacity-70">Orchestrate workflows with automatic retries and error handling</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Feature 2 -->
-        <div class="card bg-base-200 shadow-lg">
-            <div class="card-body">
-                <div class="flex items-start gap-4">
-                    <div class="p-3 bg-secondary rounded-lg">
-                        <svg class="w-6 h-6 text-secondary-content" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="font-bold text-lg">Real-time Monitoring</h3>
-                        <p class="text-sm opacity-70">Monitor flow execution with detailed logs and performance metrics</p>
+    <div>
+        <h2 class="text-3xl font-bold text-center mb-10">Features</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Feature 1 -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-primary/10 rounded-lg">
+                            <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold">Simple Interface</h3>
+                            <p class="text-sm text-base-content/60 mt-1">Clean, intuitive UI for making predictions with minimal effort.</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Feature 3 -->
-        <div class="card bg-base-200 shadow-lg">
-            <div class="card-body">
-                <div class="flex items-start gap-4">
-                    <div class="p-3 bg-success rounded-lg">
-                        <svg class="w-6 h-6 text-success-content" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
-                        </svg>
-                    </div>
-                    <div class="flex-1">
-                        <h3 class="font-bold text-lg">Easy Configuration</h3>
-                        <p class="text-sm opacity-70">Simple YAML-based configuration for complex workflows</p>
+            <!-- Feature 2 -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-secondary/10 rounded-lg">
+                            <svg class="w-6 h-6 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold">Pre-trained Models</h3>
+                            <p class="text-sm text-base-content/60 mt-1">Access ready-to-use ML models deployed and managed by administrators.</p>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Feature 4 -->
-        <div class="card bg-base-200 shadow-lg">
-            <div class="card-body">
-                <div class="flex items-start gap-4">
-                    <div class="p-3 bg-accent rounded-lg">
-                        <svg class="w-6 h-6 text-accent-content" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
+            <!-- Feature 3 -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-accent/10 rounded-lg">
+                            <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold">History Tracking</h3>
+                            <p class="text-sm text-base-content/60 mt-1">Full execution history with detailed logs and performance metrics.</p>
+                        </div>
                     </div>
-                    <div class="flex-1">
-                        <h3 class="font-bold text-lg">Scale Efficiently</h3>
-                        <p class="text-sm opacity-70">Scale your workflows from thousands to millions of runs</p>
+                </div>
+            </div>
+
+            <!-- Feature 4 -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-success/10 rounded-lg">
+                            <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold">Save Presets</h3>
+                            <p class="text-sm text-base-content/60 mt-1">Save input configurations as presets for quick re-use.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 5 -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-info/10 rounded-lg">
+                            <svg class="w-6 h-6 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold">Compare Predictions</h3>
+                            <p class="text-sm text-base-content/60 mt-1">Compare results side-by-side across different prediction runs.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 6 -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <div class="flex items-start gap-4">
+                        <div class="p-3 bg-warning/10 rounded-lg">
+                            <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="font-bold">Real-time Notifications</h3>
+                            <p class="text-sm text-base-content/60 mt-1">Get notified when predictions complete or require attention.</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -111,15 +163,16 @@
     </div>
 
     <!-- CTA Section -->
-    <div class="alert alert-info">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        <div>
-            <h3 class="font-bold">Ready to get started?</h3>
-            <div class="text-xs">Create your first flow and start orchestrating your workflows today.</div>
+    {% if not user.is_authenticated %}
+    <div class="text-center py-12 bg-base-200 rounded-lg">
+        <h2 class="text-2xl font-bold">Ready to get started?</h2>
+        <p class="text-base-content/60 mt-2">Create your account and start making predictions today.</p>
+        <div class="flex gap-3 justify-center mt-6">
+            <a href="{% url 'accounts:login' %}" class="btn btn-primary">Login to Get Started</a>
+            <a href="{% url 'accounts:signup' %}" class="btn btn-outline">Sign Up</a>
         </div>
-        <a href="{% url 'flows:index' %}" class="btn btn-sm btn-primary">View Flows</a>
     </div>
+    {% endif %}
+
 </div>
 {% endblock %}

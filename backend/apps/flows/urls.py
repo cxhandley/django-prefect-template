@@ -5,6 +5,10 @@ app_name = 'flows'
 
 urlpatterns = [
     path('', views.index, name='index'),
+    path('dashboard/', views.dashboard, name='dashboard'),
+    path('history/', views.history, name='history'),
+    path('execution/<uuid:run_id>/', views.execution_detail, name='execution_detail'),
+    path('comparison/', views.comparison, name='comparison'),
     path('api/flows-menu/', views.flows_menu, name='flows_menu'),
     path('upload-and-process/', views.upload_and_process, name='upload_and_process'),
     path('status/<uuid:run_id>/', views.flow_status, name='flow_status'),
