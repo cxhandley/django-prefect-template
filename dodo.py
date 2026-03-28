@@ -23,6 +23,7 @@ PIPELINE_PARAMS environment variable (JSON):
         "notebook_output_dir": "data/notebook_outputs"
     }
 """
+
 import json
 import os
 from pathlib import Path
@@ -60,6 +61,7 @@ def _run_notebook(step_name: str, params: dict, run_id: str) -> None:
 # ============================================================================
 # Task definitions
 # ============================================================================
+
 
 def task_ingest():
     """Step 01 — Ingest raw file from S3 and write to staging Parquet."""
@@ -121,5 +123,41 @@ def task_pipeline():
     return {
         "actions": None,
         "task_dep": ["ingest", "validate", "transform", "aggregate"],
+        "verbosity": 2,
+    }
+
+
+def task_predict_ingest():
+    """Predict Step 01 — Ingest 1-row prediction CSV from S3."""
+    params = _get_params()
+    run_id = params.get("run_id", "dev")
+
+    return {
+        "actions": [lambda: _run_notebook("predict_01_ingest", params, run_id)],
+        "targets": [str(OUTPUT_DIR / f"{run_id}_predict_01_ingest.ipynb")],
+        "uptodate": [False],
+        "verbosity": 2,
+    }
+
+
+def task_predict_score():
+    """Predict Step 02 — Score the ingested prediction data."""
+    params = _get_params()
+    run_id = params.get("run_id", "dev")
+
+    return {
+        "actions": [lambda: _run_notebook("predict_02_score", params, run_id)],
+        "task_dep": ["predict_ingest"],
+        "targets": [str(OUTPUT_DIR / f"{run_id}_predict_02_score.ipynb")],
+        "uptodate": [False],
+        "verbosity": 2,
+    }
+
+
+def task_predict_pipeline():
+    """Full prediction pipeline: predict_ingest → predict_score."""
+    return {
+        "actions": None,
+        "task_dep": ["predict_ingest", "predict_score"],
         "verbosity": 2,
     }

@@ -1,0 +1,11 @@
+<div id="prediction-result"
+     hx-get="{% url 'flows:prediction_status' run_id %}"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML"
+     class="flex items-center gap-4 p-4 bg-base-200 rounded-lg">
+    <span class="loading loading-spinner loading-md text-primary"></span>
+    <div>
+        <p class="font-medium">Running prediction…</p>
+        <p class="text-sm text-base-content/60">This usually takes 15-30 seconds.</p>
+    </div>
+</div>

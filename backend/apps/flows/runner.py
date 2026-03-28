@@ -2,6 +2,7 @@
 PipelineRunner: invokes doit pipelines (which use papermill internally).
 Used by Celery tasks to execute notebook-based pipelines asynchronously.
 """
+
 import json
 import os
 import subprocess
@@ -25,6 +26,7 @@ class PipelineRunner:
         run_id: uuid.UUID,
         input_s3_path: str,
         extra_params: dict[str, Any] | None = None,
+        doit_task: str = "pipeline",
     ) -> dict[str, Any]:
         """
         Execute the full data processing pipeline via doit.
@@ -68,7 +70,7 @@ class PipelineRunner:
         }
 
         result = subprocess.run(
-            ["python", "-m", "doit", "-f", "dodo.py", "run", "pipeline"],
+            ["python", "-m", "doit", "-f", "dodo.py", "run", doit_task],
             cwd=project_root,
             env=env,
             capture_output=True,

@@ -1,7 +1,5 @@
 {
   "name": "Django + doit + DuckDB",
-  // Attach to the 'devcontainer' service in docker-compose.yml so this
-  // container shares app-network with db, redis, and rustfs.
   "dockerComposeFile": [
     "../docker-compose.yml"
   ],
@@ -32,8 +30,7 @@
     }
   },
   "mounts": [
-    // Persist Claude Code config across rebuilds
-    "source=claude-code-config,target=/home/vscode/.claude,type=volume",
+    "source=${localEnv:USERPROFILE}/.claude,target=/home/vscode/.claude,type=bind",
     "source=${localEnv:USERPROFILE}/.gitconfig,target=/home/vscode/.gitconfig,type=bind,readonly"
   ],
   "customizations": {
@@ -68,5 +65,5 @@
     }
   },
   "remoteUser": "vscode",
-  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postCreateCommand": "bash .devcontainer/post-create.sh"
 }

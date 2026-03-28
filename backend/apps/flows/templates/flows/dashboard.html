@@ -1,125 +1,115 @@
 {% extends "core/base_dashboard.html" %}
-
-{% block title %}Dashboard - Django Prefect ML{% endblock %}
-
+{% block title %}
+    Dashboard - Django Prefect ML
+{% endblock title %}
 {% block dashboard_content %}
-<div class="space-y-6">
-    <!-- Welcome -->
-    <div>
-        <h1 class="text-2xl font-bold">Welcome Back, {{ user.first_name|default:user.username }}</h1>
-        <p class="text-base-content/60 text-sm mt-1">Manage your predictions and track results.</p>
-    </div>
-
-    <!-- Active Prediction -->
-    {% if active_prediction %}
-    <div class="card bg-base-100 border border-base-200 shadow-sm">
-        <div class="card-body">
-            <div class="flex items-center justify-between">
-                <div>
-                    <h2 class="card-title text-lg">Active Prediction</h2>
-                    <p class="text-sm text-base-content/60 mt-1">{{ active_prediction.flow_name }} - Running</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    {% include "core/components/ui/badge.html" with status="RUNNING" %}
-                    <a href="{% url 'flows:execution_detail' active_prediction.flow_run_id %}" class="btn btn-primary btn-sm">View Details</a>
-                </div>
-            </div>
-            <progress class="progress progress-primary w-full mt-2" value="65" max="100"></progress>
+    <div class="space-y-6">
+        <!-- Welcome -->
+        <div>
+            <h1 class="text-2xl font-bold">Welcome Back, {{ user.first_name|default:user.username }}</h1>
+            <p class="text-base-content/60 text-sm mt-1">Manage your predictions and track results.</p>
         </div>
-    </div>
-    {% endif %}
-
-    <!-- Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {% include "core/components/ui/stat_card.html" with title="Total Executions" value=total_executions description="All time" color="primary" %}
-        {% include "core/components/ui/stat_card.html" with title="Average Duration" value=avg_duration description="Completed runs" color="secondary" %}
-        {% include "core/components/ui/stat_card.html" with title="Success Rate" value=success_rate description="Overall" color="success" %}
-    </div>
-
-    <!-- Make a Prediction -->
-    <div class="card bg-base-100 border border-base-200 shadow-sm">
-        <div class="card-body">
-            <h2 class="card-title text-lg">Make a Prediction</h2>
-            <form hx-post="{% url 'flows:upload_and_process' %}"
-                  hx-target="#prediction-result"
-                  hx-swap="innerHTML"
-                  hx-indicator="#prediction-loading"
-                  enctype="multipart/form-data"
-                  class="mt-4">
-                {% csrf_token %}
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {% include "core/components/ui/form_input.html" with name="income" label="Income ($)" type="number" placeholder="75000" required=True %}
-                    {% include "core/components/ui/form_input.html" with name="age" label="Age (years)" type="number" placeholder="35" required=True %}
-                    {% include "core/components/ui/form_input.html" with name="credit_score" label="Credit Score" type="number" placeholder="720" required=True %}
-                    {% include "core/components/ui/form_input.html" with name="employment_years" label="Employment Years" type="number" placeholder="8" required=True %}
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    {% include "core/components/ui/form_input.html" with name="preset_name" label="Save as Preset Name" type="text" placeholder="My preset" %}
-                </div>
-
-                <div class="flex gap-3 mt-6">
-                    <button type="submit" class="btn btn-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        Run Prediction
-                    </button>
-                    <div class="dropdown">
-                        <div tabindex="0" role="button" class="btn btn-outline">Load Preset</div>
-                        <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-10 w-52 p-2 shadow-lg border border-base-200">
-                            <li class="menu-title"><span>Saved Presets</span></li>
-                            <li><a>No presets saved</a></li>
-                        </ul>
+        <!-- Active Prediction -->
+        {% if active_prediction %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="card-title text-lg">Active Prediction</h2>
+                            <p class="text-sm text-base-content/60 mt-1">{{ active_prediction.flow_name }} - Running</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            {% include "core/components/ui/badge.html" with status="RUNNING" %}
+                            <a href="{% url 'flows:execution_detail' active_prediction.flow_run_id %}"
+                               class="btn btn-primary btn-sm">View Details</a>
+                        </div>
                     </div>
+                    <progress class="progress progress-primary w-full mt-2" value="65" max="100"></progress>
                 </div>
-
-                <span id="prediction-loading" class="loading loading-spinner loading-md htmx-indicator mt-4"></span>
-                <div id="prediction-result" class="mt-4"></div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Recent Executions -->
-    <div class="card bg-base-100 border border-base-200 shadow-sm">
-        <div class="card-body">
-            <div class="flex items-center justify-between">
-                <h2 class="card-title text-lg">Recent Executions</h2>
-                <a href="{% url 'flows:history' %}" class="btn btn-ghost btn-sm">View More</a>
             </div>
-            <div class="overflow-x-auto mt-4">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Input Summary</th>
-                            <th>Prediction</th>
-                            <th>Status</th>
-                            <th></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for execution in recent_executions %}
-                        <tr class="hover">
-                            <td class="text-sm">{{ execution.created_at|date:"M d, Y H:i" }}</td>
-                            <td class="text-sm text-base-content/60">{{ execution.flow_name }}</td>
-                            <td class="text-sm">-</td>
-                            <td>{% include "core/components/ui/badge.html" with status=execution.status %}</td>
-                            <td>
-                                <a href="{% url 'flows:execution_detail' execution.flow_run_id %}" class="btn btn-ghost btn-xs">Details</a>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5">
-                                {% include "core/components/ui/empty_state.html" with title="No executions yet" message="Run your first prediction to see results here." %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        {% endif %}
+        <!-- Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {% include "core/components/ui/stat_card.html" with title="Total Executions" value=total_executions description="All time" color="primary" %}
+            {% include "core/components/ui/stat_card.html" with title="Average Duration" value=avg_duration description="Completed runs" color="secondary" %}
+            {% include "core/components/ui/stat_card.html" with title="Success Rate" value=success_rate description="Overall" color="success" %}
+        </div>
+        <!-- Make a Prediction -->
+        <div class="card bg-base-100 border border-base-200 shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title text-lg">Make a Prediction</h2>
+                <form hx-post="{% url 'flows:run_prediction' %}"
+                      hx-target="#prediction-result"
+                      hx-swap="innerHTML"
+                      hx-indicator="#prediction-loading"
+                      hx-disabled-elt="find button[type=submit]"
+                      class="mt-4">
+                    {% csrf_token %}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {% include "core/components/ui/form_input.html" with name="income" label="Annual Income ($)" type="number" placeholder="75000" min=1 max=10000000 step=1000 help_text="Gross annual income in dollars" required=True %}
+                        {% include "core/components/ui/form_input.html" with name="age" label="Age" type="number" placeholder="35" min=18 max=120 step=1 help_text="Must be 18 or older" required=True %}
+                        {% include "core/components/ui/form_input.html" with name="credit_score" label="Credit Score" type="number" placeholder="720" min=300 max=850 step=1 help_text="FICO score (300–850)" required=True %}
+                        {% include "core/components/ui/form_input.html" with name="employment_years" label="Employment Years" type="number" placeholder="8" min=0 max=60 step=0.5 help_text="Years in current or most recent role" required=True %}
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button type="submit" class="btn btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="h-5 w-5"
+                                 fill="none"
+                                 viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Run Prediction
+                        </button>
+                    </div>
+                    <span id="prediction-loading"
+                          class="loading loading-spinner loading-md htmx-indicator mt-4"></span>
+                    <div id="prediction-result" class="mt-4"></div>
+                </form>
             </div>
         </div>
+        <!-- Recent Executions -->
+        <div class="card bg-base-100 border border-base-200 shadow-sm">
+            <div class="card-body">
+                <div class="flex items-center justify-between">
+                    <h2 class="card-title text-lg">Recent Executions</h2>
+                    <a href="{% url 'flows:history' %}" class="btn btn-ghost btn-sm">View More</a>
+                </div>
+                <div class="overflow-x-auto mt-4">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Input Summary</th>
+                                <th>Prediction</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for execution in recent_executions %}
+                                <tr class="hover">
+                                    <td class="text-sm">{{ execution.created_at|date:"M d, Y H:i" }}</td>
+                                    <td class="text-sm text-base-content/60">{{ execution.flow_name }}</td>
+                                    <td class="text-sm">-</td>
+                                    <td>{% include "core/components/ui/badge.html" with status=execution.status %}</td>
+                                    <td>
+                                        <a href="{% url 'flows:execution_detail' execution.flow_run_id %}"
+                                           class="btn btn-ghost btn-xs">Details</a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5">
+                                        {% include "core/components/ui/empty_state.html" with title="No executions yet" message="Run your first prediction to see results here." %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
-{% endblock %}
+{% endblock dashboard_content %}
