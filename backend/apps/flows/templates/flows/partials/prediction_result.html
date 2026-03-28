@@ -1,0 +1,30 @@
+<div id="prediction-result"
+     class="space-y-4 p-4 bg-base-100 border border-base-200 rounded-lg">
+    <div class="flex items-center justify-between">
+        <span class="text-base-content/60 text-sm">Score</span>
+        <span class="text-2xl font-bold text-primary">{{ score }}</span>
+    </div>
+    <div class="flex items-center justify-between">
+        <span class="text-base-content/60 text-sm">Decision</span>
+        {% if classification == "Approved" %}
+            <span class="badge badge-success badge-lg">{{ classification }}</span>
+        {% elif classification == "Review" %}
+            <span class="badge badge-warning badge-lg">{{ classification }}</span>
+        {% else %}
+            <span class="badge badge-error badge-lg">{{ classification }}</span>
+        {% endif %}
+    </div>
+    <div>
+        <div class="flex items-center justify-between mb-1">
+            <span class="text-base-content/60 text-sm">Confidence</span>
+            <span class="text-sm font-semibold">{{ confidence }}%</span>
+        </div>
+        <progress class="progress progress-primary w-full"
+                  value="{{ confidence }}"
+                  max="100"></progress>
+    </div>
+    <div class="pt-2 border-t border-base-200">
+        <a href="{% url 'flows:execution_detail' run_id %}"
+           class="btn btn-ghost btn-sm">View Full Details →</a>
+    </div>
+</div>
