@@ -1,0 +1,18 @@
+<!-- Form Checkbox component
+     Parameters: name, label, checked (bool), required (bool), error -->
+<div class="form-control">
+    <label class="label cursor-pointer justify-start gap-3" for="id_{{ name }}">
+        <input type="checkbox"
+               id="id_{{ name }}"
+               name="{{ name }}"
+               class="checkbox checkbox-primary checkbox-sm"
+               {% if checked %}checked{% endif %}
+               {% if required %}required{% endif %} />
+        <span class="label-text">{{ label }}</span>
+    </label>
+    {% if error %}
+    <label class="label pt-0">
+        <span class="label-text-alt text-error">{{ error }}</span>
+    </label>
+    {% endif %}
+</div>

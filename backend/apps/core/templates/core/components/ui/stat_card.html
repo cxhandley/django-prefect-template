@@ -1,0 +1,7 @@
+<!-- Stat Card component
+     Parameters: title (string), value (string), description (string), color (string: primary/secondary/accent/success/error/info) -->
+<div class="stat place-items-center bg-base-200 rounded-lg">
+    <div class="stat-title">{{ title }}</div>
+    <div class="stat-value text-{{ color|default:'primary' }}">{{ value }}</div>
+    {% if description %}<div class="stat-desc">{{ description }}</div>{% endif %}
+</div>

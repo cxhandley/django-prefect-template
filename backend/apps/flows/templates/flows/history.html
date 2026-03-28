@@ -1,0 +1,107 @@
+{% extends "core/base_dashboard.html" %}
+
+{% block title %}Execution History - Django Prefect ML{% endblock %}
+
+{% block dashboard_content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div>
+        <h1 class="text-2xl font-bold">Execution History</h1>
+        <p class="text-base-content/60 text-sm mt-1">View and manage all your prediction executions.</p>
+    </div>
+
+    <!-- Search & Filters -->
+    <div class="flex flex-col md:flex-row gap-4">
+        <div class="flex-1">
+            {% include "core/components/ui/search_bar.html" with placeholder="Search executions..." hx_url="/flows/history/" hx_target="#history-table-container" %}
+        </div>
+        <div class="flex gap-2">
+            <select name="status" class="select select-bordered select-sm"
+                    hx-get="{% url 'flows:history' %}"
+                    hx-trigger="change"
+                    hx-target="#history-table-container"
+                    hx-include="[name='q']">
+                <option value="">All Statuses</option>
+                <option value="COMPLETED" {% if status_filter == "COMPLETED" %}selected{% endif %}>Completed</option>
+                <option value="RUNNING" {% if status_filter == "RUNNING" %}selected{% endif %}>Running</option>
+                <option value="FAILED" {% if status_filter == "FAILED" %}selected{% endif %}>Failed</option>
+                <option value="PENDING" {% if status_filter == "PENDING" %}selected{% endif %}>Pending</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Bulk Actions -->
+    <div id="bulk-actions" class="flex gap-2 hidden">
+        <button class="btn btn-outline btn-sm" onclick="compareSelected()">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Compare Selected
+        </button>
+        <button class="btn btn-outline btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Download as CSV
+        </button>
+    </div>
+
+    <!-- Results Table -->
+    <div class="card bg-base-100 border border-base-200 shadow-sm">
+        <div class="card-body p-0">
+            <div class="overflow-x-auto" id="history-table-container">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>
+                                <input type="checkbox" class="checkbox checkbox-sm" id="select-all" />
+                            </th>
+                            <th>Date/Time</th>
+                            <th>Input Summary</th>
+                            <th>Prediction</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    {% include "flows/partials/history_table_body.html" %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Select all checkbox
+    document.getElementById('select-all')?.addEventListener('change', function() {
+        document.querySelectorAll('.execution-checkbox').forEach(cb => {
+            cb.checked = this.checked;
+        });
+        toggleBulkActions();
+    });
+
+    // Toggle bulk actions visibility
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('execution-checkbox')) {
+            toggleBulkActions();
+        }
+    });
+
+    function toggleBulkActions() {
+        const checked = document.querySelectorAll('.execution-checkbox:checked');
+        const bulkActions = document.getElementById('bulk-actions');
+        if (bulkActions) {
+            bulkActions.classList.toggle('hidden', checked.length === 0);
+        }
+    }
+
+    function compareSelected() {
+        const checked = document.querySelectorAll('.execution-checkbox:checked');
+        const ids = Array.from(checked).map(cb => cb.value).join(',');
+        if (ids) {
+            window.location.href = '/flows/comparison/?ids=' + ids;
+        }
+    }
+</script>
+{% endblock %}

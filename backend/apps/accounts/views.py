@@ -1,8 +1,71 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import logout
+from django.contrib.auth import authenticate, login, logout, get_user_model
 from django.views.decorators.http import require_http_methods
+
+from .forms import LoginForm, SignupForm
+
+User = get_user_model()
+
+
+def login_user(request):
+    """Login page - GET renders form, POST authenticates"""
+    if request.user.is_authenticated:
+        return redirect('flows:dashboard')
+
+    if request.method == 'POST':
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            password = form.cleaned_data['password']
+            # Try to find user by email, then authenticate by username
+            try:
+                user_obj = User.objects.get(email=email)
+                user = authenticate(request, username=user_obj.username, password=password)
+            except User.DoesNotExist:
+                user = None
+
+            if user is not None:
+                login(request, user)
+                if request.headers.get('HX-Request'):
+                    return HttpResponse(status=200, headers={'HX-Redirect': '/flows/dashboard/'})
+                return redirect('flows:dashboard')
+            else:
+                form.add_error(None, 'Invalid email or password.')
+    else:
+        form = LoginForm()
+
+    return render(request, 'accounts/login.html', {'form': form})
+
+
+def signup_user(request):
+    """Signup page - GET renders form, POST creates user"""
+    if request.user.is_authenticated:
+        return redirect('flows:dashboard')
+
+    if request.method == 'POST':
+        form = SignupForm(request.POST)
+        if form.is_valid():
+            name_parts = form.cleaned_data['full_name'].split(' ', 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ''
+
+            user = User.objects.create_user(
+                username=form.cleaned_data['username'],
+                email=form.cleaned_data['email'],
+                password=form.cleaned_data['password'],
+                first_name=first_name,
+                last_name=last_name,
+            )
+            login(request, user)
+            if request.headers.get('HX-Request'):
+                return HttpResponse(status=200, headers={'HX-Redirect': '/flows/dashboard/'})
+            return redirect('flows:dashboard')
+    else:
+        form = SignupForm()
+
+    return render(request, 'accounts/signup.html', {'form': form})
 
 
 @login_required

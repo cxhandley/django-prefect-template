@@ -1,6 +1,7 @@
 import uuid
 from django.conf import settings
 from django.core.files.storage import default_storage
+from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -24,6 +25,162 @@ def index(request):
         'recent_runs': executions.filter(status='COMPLETED').count(),
     }
     return render(request, 'flows/index.html', context)
+
+
+@login_required
+def dashboard(request):
+    """User dashboard with stats, prediction form, and recent executions"""
+    executions = FlowExecution.objects.filter(
+        triggered_by=request.user
+    ).order_by('-created_at')
+
+    total = executions.count()
+    completed = executions.filter(status='COMPLETED')
+    failed = executions.filter(status='FAILED').count()
+    success_rate = round((completed.count() / total * 100), 1) if total > 0 else 0
+
+    # Calculate average duration for completed executions
+    avg_duration = 0
+    if completed.exists():
+        durations = []
+        for ex in completed:
+            if ex.completed_at and ex.created_at:
+                diff = (ex.completed_at - ex.created_at).total_seconds()
+                durations.append(diff)
+        if durations:
+            avg_duration = round(sum(durations) / len(durations), 1)
+
+    # Get the most recent running execution as active prediction
+    active_prediction = executions.filter(status='RUNNING').first()
+
+    context = {
+        'user': request.user,
+        'active_page': 'dashboard',
+        'active_prediction': active_prediction,
+        'total_executions': total,
+        'avg_duration': f"{avg_duration}s",
+        'success_rate': f"{success_rate}%",
+        'recent_executions': executions[:5],
+    }
+    return render(request, 'flows/dashboard.html', context)
+
+
+@login_required
+def history(request):
+    """Execution history with search, filtering, and pagination"""
+    executions = FlowExecution.objects.filter(
+        triggered_by=request.user
+    ).order_by('-created_at')
+
+    # Search
+    q = request.GET.get('q', '')
+    if q:
+        executions = executions.filter(flow_name__icontains=q)
+
+    # Status filter
+    status = request.GET.get('status', '')
+    if status:
+        executions = executions.filter(status=status)
+
+    paginator = Paginator(executions, 10)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'user': request.user,
+        'active_page': 'history',
+        'page_obj': page_obj,
+        'executions': page_obj,
+        'search_query': q,
+        'status_filter': status,
+    }
+
+    if request.headers.get('HX-Request'):
+        return render(request, 'flows/partials/history_table_body.html', context)
+
+    return render(request, 'flows/history.html', context)
+
+
+@login_required
+def execution_detail(request, run_id):
+    """Single execution detail page"""
+    execution = get_object_or_404(
+        FlowExecution, flow_run_id=run_id, triggered_by=request.user
+    )
+
+    duration = None
+    if execution.completed_at and execution.created_at:
+        duration = round((execution.completed_at - execution.created_at).total_seconds(), 2)
+
+    # Mock prediction result data for the UI
+    prediction_result = {
+        'value': '0.82',
+        'classification': 'Approved',
+        'confidence': 82,
+    }
+
+    # Mock input values
+    input_values = execution.parameters or {
+        'income': '$75,000',
+        'age': '35',
+        'credit_score': '720',
+        'employment_years': '8',
+    }
+
+    context = {
+        'user': request.user,
+        'active_page': 'history',
+        'execution': execution,
+        'duration': duration,
+        'prediction_result': prediction_result,
+        'input_values': input_values,
+        'breadcrumbs': [
+            {'name': 'Dashboard', 'url': '/flows/dashboard/'},
+            {'name': 'History', 'url': '/flows/history/'},
+            {'name': f'Execution #{str(execution.flow_run_id)[:8]}'},
+        ],
+    }
+    return render(request, 'flows/execution_detail.html', context)
+
+
+@login_required
+def comparison(request):
+    """Compare multiple executions side-by-side"""
+    ids_param = request.GET.get('ids', '')
+    run_ids = [i.strip() for i in ids_param.split(',') if i.strip()]
+
+    executions = FlowExecution.objects.filter(
+        flow_run_id__in=run_ids,
+        triggered_by=request.user,
+    ).order_by('-created_at')
+
+    comparison_data = []
+    for ex in executions:
+        duration = None
+        if ex.completed_at and ex.created_at:
+            duration = round((ex.completed_at - ex.created_at).total_seconds(), 2)
+        comparison_data.append({
+            'execution': ex,
+            'duration': duration,
+            'prediction': {
+                'value': '0.82',
+                'classification': 'Approved',
+                'confidence': 82,
+            },
+            'inputs': ex.parameters or {},
+        })
+
+    context = {
+        'user': request.user,
+        'active_page': 'history',
+        'comparison_data': comparison_data,
+        'breadcrumbs': [
+            {'name': 'Dashboard', 'url': '/flows/dashboard/'},
+            {'name': 'History', 'url': '/flows/history/'},
+            {'name': 'Compare Predictions'},
+        ],
+    }
+    return render(request, 'flows/comparison.html', context)
 
 
 @login_required

@@ -1,0 +1,58 @@
+{% extends "core/base_public.html" %}
+
+{% block title %}Login - Django Prefect ML{% endblock %}
+
+{% block public_content %}
+<div class="flex items-center justify-center min-h-[70vh]">
+    <div class="card bg-base-100 shadow-xl border border-base-200 w-full max-w-md">
+        <div class="card-body">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h1 class="text-2xl font-bold">Login</h1>
+                <p class="text-base-content/60 text-sm mt-1">Welcome back! Sign in to your account.</p>
+            </div>
+
+            <!-- Non-field errors -->
+            {% if form.non_field_errors %}
+            <div class="alert alert-error text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                {% for error in form.non_field_errors %}
+                <span>{{ error }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Login Form -->
+            <form method="post"
+                  hx-post="{% url 'accounts:login' %}"
+                  hx-target="closest .card-body"
+                  hx-swap="innerHTML">
+                {% csrf_token %}
+
+                {% include "core/components/ui/form_input.html" with name="email" label="Email" type="email" placeholder="you@example.com" required=True value=form.email.value error=form.email.errors.0 %}
+
+                {% include "core/components/ui/form_input.html" with name="password" label="Password" type="password" placeholder="Enter your password" required=True error=form.password.errors.0 %}
+
+                <div class="flex items-center justify-between mt-2">
+                    {% include "core/components/ui/form_checkbox.html" with name="remember_me" label="Remember me" %}
+                    <a href="#" class="link link-primary text-sm">Forgot Password?</a>
+                </div>
+
+                <div class="form-control mt-6">
+                    <button type="submit" class="btn btn-primary w-full">Login</button>
+                </div>
+            </form>
+
+            <!-- Sign up link -->
+            <div class="text-center mt-4">
+                <p class="text-sm text-base-content/60">
+                    Don't have an account?
+                    <a href="{% url 'accounts:signup' %}" class="link link-primary font-semibold">Sign Up</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

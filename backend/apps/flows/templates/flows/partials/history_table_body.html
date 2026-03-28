@@ -1,0 +1,30 @@
+<!-- HTMX partial: history table body + pagination -->
+<tbody id="history-table-body">
+    {% for execution in executions %}
+    <tr class="hover">
+        <td>
+            <input type="checkbox" name="selected" value="{{ execution.flow_run_id }}" class="checkbox checkbox-sm execution-checkbox" />
+        </td>
+        <td class="text-sm">{{ execution.created_at|date:"M d, Y H:i" }}</td>
+        <td class="text-sm text-base-content/60">{{ execution.flow_name }}</td>
+        <td class="text-sm">-</td>
+        <td>{% include "core/components/ui/badge.html" with status=execution.status %}</td>
+        <td>
+            <a href="{% url 'flows:execution_detail' execution.flow_run_id %}" class="btn btn-ghost btn-xs">View</a>
+        </td>
+    </tr>
+    {% empty %}
+    <tr>
+        <td colspan="6">
+            {% include "core/components/ui/empty_state.html" with title="No executions found" message="Try adjusting your search or filters." %}
+        </td>
+    </tr>
+    {% endfor %}
+</tbody>
+<tfoot>
+    <tr>
+        <td colspan="6">
+            {% include "core/components/ui/pagination.html" with page_obj=page_obj target_id="history-table-container" hx_url="/flows/history/" %}
+        </td>
+    </tr>
+</tfoot>
