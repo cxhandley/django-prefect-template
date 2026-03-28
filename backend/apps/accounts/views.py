@@ -36,7 +36,8 @@ def login_user(request):
     else:
         form = LoginForm()
 
-    return render(request, 'accounts/login.html', {'form': form})
+    template = 'accounts/partials/login_form.html' if request.headers.get('HX-Request') else 'accounts/login.html'
+    return render(request, template, {'form': form})
 
 
 def signup_user(request):
@@ -65,7 +66,8 @@ def signup_user(request):
     else:
         form = SignupForm()
 
-    return render(request, 'accounts/signup.html', {'form': form})
+    template = 'accounts/partials/signup_form.html' if request.headers.get('HX-Request') else 'accounts/signup.html'
+    return render(request, template, {'form': form})
 
 
 @login_required
