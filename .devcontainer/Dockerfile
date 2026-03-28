@@ -9,8 +9,10 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     locales \
     openssh-client \
-    && locale-gen en_US.UTF-8 \
+    && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen \
     && rm -rf /var/lib/apt/lists/*
+
 
 ENV LANG=en_US.UTF-8 \
     LC_ALL=en_US.UTF-8

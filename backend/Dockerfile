@@ -4,7 +4,8 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     curl \
     locales \
-    && locale-gen en_US.UTF-8 \
+    && sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
+    && locale-gen \
     && rm -rf /var/lib/apt/lists/*
 
 ENV LANG=en_US.UTF-8 \
