@@ -1,13 +1,23 @@
 {% extends "core/base.html" %}
 
+{% block extra_css %}
+<style>
+    main {
+        max-width: none;
+        padding: 0;
+        margin: 0;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="drawer lg:drawer-open -mt-8 -mx-4 sm:-mx-6 lg:-mx-8 min-h-screen">
+<div class="drawer lg:drawer-open min-h-screen">
     <input id="dashboard-drawer" type="checkbox" class="drawer-toggle" />
     <div class="drawer-content">
         <!-- Breadcrumbs -->
         {% block breadcrumbs %}{% endblock %}
         <!-- Dashboard page content -->
-        <div class="p-6">
+        <div class="p-6 pt-8">
             {% block dashboard_content %}{% endblock %}
         </div>
     </div>
