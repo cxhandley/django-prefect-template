@@ -12,32 +12,31 @@ repos:
       - id: debug-statements
       - id: check-toml
 
-  - repo: https://github.com/kynan/nbstripout
-    rev: 0.8.1
+  - repo: local
     hooks:
       - id: nbstripout
+        name: nbstripout
+        entry: nbstripout
+        language: system
+        files: ".*\\.ipynb$"
         args: ["--extra-keys", "metadata.kernelspec metadata.language_info"]
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.0
-    hooks:
       - id: ruff
-        args: ["--fix"]
+        name: ruff
+        entry: ruff check --fix
+        language: system
         types_or: [python, pyi]
       - id: ruff-format
+        name: ruff-format
+        entry: ruff format
+        language: system
         types_or: [python, pyi]
-
-  - repo: https://github.com/rtts/djlint
-    rev: v1.36.4
-    hooks:
       - id: djlint-reformat-django
+        name: djlint-reformat-django
+        entry: djlint --reformat --profile django
+        language: system
         files: "backend/.*\\.html$"
       - id: djlint-django
-        files: "backend/.*\\.html$"
-
-  - repo: https://github.com/avencera/rustywind
-    rev: v0.21.0
-    hooks:
-      - id: rustywind
-        args: ["--write"]
+        name: djlint-django
+        entry: djlint --profile django
+        language: system
         files: "backend/.*\\.html$"

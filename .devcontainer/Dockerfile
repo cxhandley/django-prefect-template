@@ -7,9 +7,18 @@ RUN apt-get update && apt-get install -y \
     wget \
     postgresql-client \
     build-essential \
+    locales \
+    openssh-client \
+    && locale-gen en_US.UTF-8 \
     && rm -rf /var/lib/apt/lists/*
 
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8
+
 RUN git config --system --add safe.directory /workspace
+
+RUN git config --system credential.helper "" && \
+    git config --system url."git@github.com:".pushInsteadOf "https://github.com/"
 
 # ── Node.js 20 (required for Claude Code) ─────────────────────────────
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \

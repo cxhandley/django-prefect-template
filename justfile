@@ -15,9 +15,6 @@ default:
 # Complete first-time setup: start services, create S3 buckets, run migrations
 setup:
     @echo "Setting up project..."
-    just docker-up
-    @echo "Waiting for services to be ready..."
-    sleep 10
     just setup-rustfs
     just migrate
     @echo "Setup complete!"
