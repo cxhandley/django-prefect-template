@@ -1,23 +1,20 @@
 """
 Development settings.
 """
-from .base import *
+
+from .base import *  # noqa: F401, F403
 
 DEBUG = True
 
-INSTALLED_APPS += [
-    'django_extensions',
-    'debug_toolbar',
+INSTALLED_APPS += [  # noqa: F405
+    "django_extensions",
+    "debug_toolbar",
 ]
 
-MIDDLEWARE += [
-    'debug_toolbar.middleware.DebugToolbarMiddleware',
+MIDDLEWARE += [  # noqa: F405
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
 ]
 
 INTERNAL_IPS = [
-    '127.0.0.1',
+    "127.0.0.1",
 ]
-
-# Disable S3 signature version (for RustFS)
-AWS_S3_SIGNATURE_VERSION = 's3v4'
-AWS_S3_ADDRESSING_STYLE = 'path'
