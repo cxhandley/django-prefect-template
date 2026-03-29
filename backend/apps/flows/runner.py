@@ -58,7 +58,7 @@ class PipelineRunner:
         if extra_params:
             params.update(extra_params)
 
-        project_root = str(Path(settings.BASE_DIR).parent)
+        project_root = os.environ.get("PROJECT_ROOT", str(Path(settings.BASE_DIR).parent))
         env = {
             **os.environ,
             "PIPELINE_PARAMS": json.dumps(params),

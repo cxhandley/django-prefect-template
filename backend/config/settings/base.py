@@ -151,8 +151,15 @@ AWS_DEFAULT_ACL = "private"
 AWS_S3_SIGNATURE_VERSION = "s3v4"
 AWS_S3_ADDRESSING_STYLE = "path"
 
-# Use S3 for default file storage
-DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+# Use S3 for default file storage (Django 4.2+ / django-storages 1.14+)
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 # Data Lake bucket
 DATA_LAKE_BUCKET = env("DATA_LAKE_BUCKET")

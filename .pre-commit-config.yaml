@@ -19,7 +19,6 @@ repos:
         entry: nbstripout
         language: system
         files: ".*\\.ipynb$"
-        args: ["--extra-keys", "metadata.kernelspec metadata.language_info"]
       - id: ruff
         name: ruff
         entry: ruff check --fix

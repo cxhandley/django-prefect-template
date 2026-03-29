@@ -1,128 +1,163 @@
 {% extends "core/base_dashboard.html" %}
-
-{% block title %}Execution Detail - Django Prefect ML{% endblock %}
-
+{% block title %}
+    Execution Detail - Django Prefect ML
+{% endblock title %}
 {% block breadcrumbs %}
-{% include "core/components/ui/breadcrumbs.html" with items=breadcrumbs %}
-{% endblock %}
-
+    {% include "core/components/ui/breadcrumbs.html" with items=breadcrumbs %}
+{% endblock breadcrumbs %}
 {% block dashboard_content %}
-<div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-bold">Execution Detail</h1>
-            <p class="text-base-content/60 text-sm mt-1">ID: {{ execution.flow_run_id }}</p>
-        </div>
-        <div class="flex gap-2">
-            <button class="btn btn-primary btn-sm"
-                    hx-post="{% url 'flows:upload_and_process' %}"
-                    hx-confirm="Rerun this prediction with the same parameters?">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Rerun
-            </button>
-            <a href="{% url 'flows:history' %}" class="btn btn-ghost btn-sm">Back</a>
-        </div>
-    </div>
-
-    <!-- Metadata Stats -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {% include "core/components/ui/stat_card.html" with title="Execution ID" value=execution.flow_run_id|truncatechars:12 color="primary" %}
-        {% include "core/components/ui/stat_card.html" with title="Date" value=execution.created_at|date:"M d, Y" color="secondary" %}
-        <div class="stat place-items-center bg-base-200 rounded-lg">
-            <div class="stat-title">Status</div>
-            <div class="stat-value text-sm py-1">
-                {% include "core/components/ui/badge.html" with status=execution.status %}
+    <div class="space-y-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold">Execution Detail</h1>
+                <p class="text-base-content/60 text-sm mt-1">ID: {{ execution.flow_run_id }}</p>
+            </div>
+            <div class="flex gap-2">
+                <button class="btn btn-primary btn-sm"
+                        hx-post="{% url 'flows:upload_and_process' %}"
+                        hx-confirm="Rerun this prediction with the same parameters?">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-4 w-4"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Rerun
+                </button>
+                {% if execution.status == "RUNNING" or execution.status == "PENDING" %}
+                    <form method="post"
+                          action="{% url 'flows:stop_execution' execution.flow_run_id %}">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="btn btn-warning btn-sm"
+                                onclick="return confirm('Stop this execution?')">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="h-4 w-4"
+                                 fill="none"
+                                 viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Stop
+                        </button>
+                    </form>
+                {% endif %}
+                <form method="post"
+                      action="{% url 'flows:delete_execution' execution.flow_run_id %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="btn btn-error btn-sm"
+                            onclick="return confirm('Delete this execution? This cannot be undone.')">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             class="h-4 w-4"
+                             fill="none"
+                             viewBox="0 0 24 24"
+                             stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete
+                    </button>
+                </form>
+                <a href="{% url 'flows:history' %}" class="btn btn-ghost btn-sm">Back</a>
             </div>
         </div>
-        {% if duration %}
-        {% include "core/components/ui/stat_card.html" with title="Duration" value=duration description="seconds" color="accent" %}
-        {% else %}
-        {% include "core/components/ui/stat_card.html" with title="Duration" value="-" color="accent" %}
-        {% endif %}
-    </div>
-
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Prediction Result -->
-        <div class="card bg-base-100 border border-base-200 shadow-sm">
-            <div class="card-body">
-                <h2 class="card-title text-lg">Prediction Result</h2>
-                {% if execution.status == "COMPLETED" %}
-                <div class="space-y-4 mt-4">
-                    <div class="flex items-center justify-between">
-                        <span class="text-base-content/60">Prediction Value</span>
-                        <span class="text-2xl font-bold text-primary">{{ prediction_result.value }}</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-base-content/60">Classification</span>
-                        <span class="badge badge-success badge-lg">{{ prediction_result.classification }}</span>
-                    </div>
-                    <div>
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-base-content/60">Confidence</span>
-                            <span class="text-sm font-semibold">{{ prediction_result.confidence }}%</span>
+        <!-- Metadata Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {% include "core/components/ui/stat_card.html" with title="Execution ID" value=execution.flow_run_id|truncatechars:12 color="primary" %}
+            {% include "core/components/ui/stat_card.html" with title="Date" value=execution.created_at|date:"M d, Y" color="secondary" %}
+            <div class="stat place-items-center bg-base-200 rounded-lg">
+                <div class="stat-title">Status</div>
+                <div class="stat-value text-sm py-1">{% include "core/components/ui/badge.html" with status=execution.status %}</div>
+            </div>
+            {% if duration %}
+                {% include "core/components/ui/stat_card.html" with title="Duration" value=duration description="seconds" color="accent" %}
+            {% else %}
+                {% include "core/components/ui/stat_card.html" with title="Duration" value="-" color="accent" %}
+            {% endif %}
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Prediction Result -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-lg">Prediction Result</h2>
+                    {% if execution.status == "COMPLETED" %}
+                        <div class="space-y-4 mt-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-base-content/60">Prediction Value</span>
+                                <span class="text-2xl font-bold text-primary">{{ prediction_result.value }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-base-content/60">Classification</span>
+                                <span class="badge badge-success badge-lg">{{ prediction_result.classification }}</span>
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-base-content/60">Confidence</span>
+                                    <span class="text-sm font-semibold">{{ prediction_result.confidence }}%</span>
+                                </div>
+                                <progress class="progress progress-primary w-full"
+                                          value="{{ prediction_result.confidence }}"
+                                          max="100"></progress>
+                            </div>
                         </div>
-                        <progress class="progress progress-primary w-full" value="{{ prediction_result.confidence }}" max="100"></progress>
+                    {% else %}
+                        <div class="mt-4">
+                            {% include "core/components/ui/empty_state.html" with title="No results yet" message="This execution has not completed." %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Input Values -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-lg">Input Values</h2>
+                    <div class="overflow-x-auto mt-4">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Parameter</th>
+                                    <th>Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key, val in input_values.items %}
+                                    <tr>
+                                        <td class="font-medium">{{ key }}</td>
+                                        <td class="text-base-content/70">{{ val }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="2" class="text-center text-base-content/50">No input data available</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-                {% else %}
-                <div class="mt-4">
-                    {% include "core/components/ui/empty_state.html" with title="No results yet" message="This execution has not completed." %}
-                </div>
-                {% endif %}
             </div>
         </div>
-
-        <!-- Input Values -->
+        <!-- Execution Logs -->
         <div class="card bg-base-100 border border-base-200 shadow-sm">
             <div class="card-body">
-                <h2 class="card-title text-lg">Input Values</h2>
-                <div class="overflow-x-auto mt-4">
-                    <table class="table table-sm">
-                        <thead>
-                            <tr>
-                                <th>Parameter</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for key, val in input_values.items %}
-                            <tr>
-                                <td class="font-medium">{{ key }}</td>
-                                <td class="text-base-content/70">{{ val }}</td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="2" class="text-center text-base-content/50">No input data available</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <h2 class="card-title text-lg">Execution Logs</h2>
+                <div class="bg-base-200 rounded-lg p-4 mt-4 max-h-64 overflow-y-auto font-mono text-sm">
+                    {% if execution.error_message %}
+                        <p class="text-error">{{ execution.error_message }}</p>
+                    {% else %}
+                        <p class="text-base-content/60">[{{ execution.created_at|date:"Y-m-d H:i:s" }}] Execution started</p>
+                        <p class="text-base-content/60">
+                            [{{ execution.created_at|date:"Y-m-d H:i:s" }}] Loading model: {{ execution.flow_name }}
+                        </p>
+                        {% if execution.status == "COMPLETED" %}
+                            <p class="text-success">[{{ execution.completed_at|date:"Y-m-d H:i:s" }}] Execution completed successfully</p>
+                        {% elif execution.status == "RUNNING" %}
+                            <p class="text-info">[...] Execution in progress...</p>
+                        {% endif %}
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Execution Logs -->
-    <div class="card bg-base-100 border border-base-200 shadow-sm">
-        <div class="card-body">
-            <h2 class="card-title text-lg">Execution Logs</h2>
-            <div class="bg-base-200 rounded-lg p-4 mt-4 max-h-64 overflow-y-auto font-mono text-sm">
-                {% if execution.error_message %}
-                <p class="text-error">{{ execution.error_message }}</p>
-                {% else %}
-                <p class="text-base-content/60">[{{ execution.created_at|date:"Y-m-d H:i:s" }}] Execution started</p>
-                <p class="text-base-content/60">[{{ execution.created_at|date:"Y-m-d H:i:s" }}] Loading model: {{ execution.flow_name }}</p>
-                {% if execution.status == "COMPLETED" %}
-                <p class="text-success">[{{ execution.completed_at|date:"Y-m-d H:i:s" }}] Execution completed successfully</p>
-                {% elif execution.status == "RUNNING" %}
-                <p class="text-info">[...] Execution in progress...</p>
-                {% endif %}
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
-{% endblock %}
+{% endblock dashboard_content %}

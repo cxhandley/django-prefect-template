@@ -8,7 +8,8 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .models import FlowExecution
@@ -456,3 +457,39 @@ def prediction_status(request, run_id):
             "run_id": str(run_id),
         },
     )
+
+
+@login_required
+@require_http_methods(["POST"])
+def stop_execution(request, run_id):
+    """Revoke the Celery task and mark the execution as stopped."""
+    execution = get_object_or_404(FlowExecution, flow_run_id=run_id, triggered_by=request.user)
+
+    if execution.celery_task_id:
+        from config.celery import app as celery_app
+
+        celery_app.control.revoke(execution.celery_task_id, terminate=True, signal="SIGTERM")
+
+    FlowExecution.objects.filter(flow_run_id=run_id).update(
+        status="FAILED",
+        error_message="Stopped by user.",
+        completed_at=timezone.now(),
+    )
+
+    return redirect("flows:execution_detail", run_id=run_id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_execution(request, run_id):
+    """Revoke any running task and delete the execution record."""
+    execution = get_object_or_404(FlowExecution, flow_run_id=run_id, triggered_by=request.user)
+
+    if execution.celery_task_id:
+        from config.celery import app as celery_app
+
+        celery_app.control.revoke(execution.celery_task_id, terminate=True, signal="SIGTERM")
+
+    execution.delete()
+
+    return redirect("flows:history")

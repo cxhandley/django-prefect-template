@@ -86,3 +86,7 @@ package-lock.json
 dmypy.json
 
 .claude/
+
+.doit.db*
+
+data/notebook_outputs/
