@@ -1,0 +1,52 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Django as Django (views.py)
+    participant DB as PostgreSQL
+    participant S3 as S3 / RustFS
+    participant Celery as Celery Worker
+    participant Doit as doit + papermill
+    participant Notebooks as Notebooks (steps/)
+
+    User->>Browser: Upload CSV/Parquet file
+    Browser->>Django: POST /flows/upload/
+    Django->>S3: Upload raw file → raw/flows/{run_id}/input.*
+    Django->>DB: Create FlowExecution (status=PENDING)
+    Django->>Celery: run_pipeline_task.delay(run_id, s3_path, ...)
+    Django-->>Browser: 200 + HTMX poll trigger
+
+    loop Poll every 2s until terminal status
+        Browser->>Django: GET /flows/{run_id}/status/
+        Django->>DB: Read FlowExecution.status
+        Django-->>Browser: HTMX partial (status badge)
+    end
+
+    Celery->>DB: Update status → RUNNING
+    Celery->>Doit: subprocess doit pipeline (PIPELINE_PARAMS env)
+
+    Doit->>Notebooks: papermill 01_ingest.ipynb
+    Notebooks->>S3: Read raw input
+    Notebooks->>S3: Write processed/flows/{run_id}/01_raw.parquet
+    Notebooks-->>Doit: JSON output (row_count)
+
+    Doit->>Notebooks: papermill 02_validate.ipynb
+    Notebooks->>S3: Read 01_raw.parquet
+    Notebooks->>S3: Write 02_validated.parquet
+
+    Doit->>Notebooks: papermill 03_transform.ipynb
+    Notebooks->>S3: Read 02_validated.parquet
+    Notebooks->>S3: Write 03_transformed.parquet
+
+    Doit->>Notebooks: papermill 04_aggregate.ipynb
+    Notebooks->>S3: Read 03_transformed.parquet
+    Notebooks->>S3: Write output.parquet
+
+    Doit-->>Celery: Exit 0 + stdout with JSON metadata
+    Celery->>DB: Update FlowExecution (status=COMPLETED, row_count, s3_output_path)
+
+    Browser->>Django: GET /flows/{run_id}/status/
+    Django-->>Browser: HTMX partial (COMPLETED + link to results)
+    User->>Browser: Click "View Results"
+    Browser->>Django: GET /flows/{run_id}/results/
+    Django->>S3: DuckDB query output.parquet (preview 100 rows)
+    Django-->>Browser: Results table + summary stats

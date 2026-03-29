@@ -1,0 +1,42 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Django as Django (views.py)
+    participant DB as PostgreSQL
+    participant S3 as S3 / RustFS
+    participant Celery as Celery Worker
+    participant Doit as doit + papermill
+    participant Score as predict_02_score.ipynb
+
+    User->>Browser: Enter income, age, credit_score, employment_years
+    Browser->>Django: POST /flows/predict/
+    Django->>Django: Validate form inputs
+    Django->>S3: Write 1-row CSV → raw/flows/predictions/{run_id}/input.csv
+    Django->>DB: Create FlowExecution (flow_name=predict_pipeline, status=PENDING)
+    Django->>Celery: run_prediction_task.delay(run_id, s3_path, ...)
+    Django-->>Browser: 200 + HTMX poll trigger (prediction_running partial)
+
+    loop Poll every 2s until terminal status
+        Browser->>Django: GET /flows/{run_id}/prediction-status/
+        Django->>DB: Read FlowExecution.status
+        Django-->>Browser: HTMX partial (spinner or result)
+    end
+
+    Celery->>DB: Update status → RUNNING
+    Celery->>Doit: subprocess doit predict_pipeline (PIPELINE_PARAMS env)
+
+    Doit->>S3: papermill predict_01_ingest.ipynb
+    Note over Doit,S3: Reads CSV from S3, writes prediction_input.parquet
+
+    Doit->>Score: papermill predict_02_score.ipynb
+    Score->>Score: Compute weighted score<br/>(40% credit_score, 30% income,<br/>20% employment, 10% age)
+    Score->>Score: Classify: Approved / Review / Declined
+    Score->>S3: Write prediction_result.json
+    Score-->>Doit: JSON output (score, classification, confidence)
+
+    Doit-->>Celery: Exit 0 + stdout with result JSON
+    Celery->>DB: Update FlowExecution<br/>(status=COMPLETED, parameters.score,<br/>parameters.classification, parameters.confidence)
+
+    Browser->>Django: GET /flows/{run_id}/prediction-status/
+    Django->>DB: Read FlowExecution.parameters
+    Django-->>Browser: HTMX partial (prediction_result: score + classification badge)

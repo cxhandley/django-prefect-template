@@ -2,6 +2,60 @@
 
 Guidelines and conventions for this project.
 
+## Development Workflow
+
+When implementing any new feature, follow this sequence in order. Each step produces an artifact in the `docs/` folder that informs the next.
+
+### 1. Write a User Story (`docs/user-stories.md`)
+
+Before writing any code, define the feature as a user story:
+- Format: *As a [role], I want to [action], so that [benefit]*
+- Include acceptance criteria
+- Mark status as `[ ]` (not started), `[~]` (in progress), or `[x]` (complete)
+
+### 2. Design a Wireframe (`docs/wireframes/`)
+
+Create an Excalidraw wireframe (`.excalidraw`) for any new UI surface:
+- File naming: `<feature_name>.excalidraw`
+- Captures page layout, forms, navigation, and interactive elements
+- Must align with acceptance criteria from the user story
+
+### 3. Update the Entity Relationship Diagram (`docs/data-model.mmd`)
+
+Update the Mermaid ER diagram to include any new or changed models:
+- Only include models that will be or are implemented (not aspirational)
+- Keep in sync with actual Django model definitions in `backend/`
+- Use Mermaid `erDiagram` syntax
+
+### 4. Create Sequence and Flow Control Diagrams (`docs/sequences/`, `docs/flow-control/`)
+
+For non-trivial features, add Mermaid diagrams before implementing:
+- **Sequence diagrams** (`docs/sequences/`): show interactions between actors, Django views, Celery tasks, external services (S3, doit, notebooks)
+- **Flow control diagrams** (`docs/flow-control/`): show decision logic and branching within a process
+- Use Mermaid `sequenceDiagram` and `flowchart TD` syntax respectively
+
+### 5. Implement Model Logic (`backend/apps/<app>/models.py`)
+
+Add or update Django models based on the ER diagram:
+- Run `python manage.py makemigrations` and `python manage.py migrate`
+- Keep models focused — store only what cannot be derived from S3/DuckDB
+
+### 6. Implement View Logic (`backend/apps/<app>/views.py`, `tasks.py`, `services/`)
+
+Implement views, Celery tasks, and services:
+- Views handle HTTP; delegate business logic to services and tasks
+- HTMX partials live in `templates/<app>/partials/`
+- Celery tasks in `tasks.py` for anything async
+
+### 7. Write Tests (`backend/apps/<app>/tests/`)
+
+Add tests before marking the user story complete:
+- `test_models.py` — model field behaviour and properties
+- `test_views.py` — HTTP responses, authenticated/unauthenticated access
+- `test_tasks.py` — Celery task logic (mock S3/external calls)
+- `test_services.py` — service layer unit tests
+- Target ≥ 90% coverage on new code
+
 ## Pre-commit
 
 Pre-commit hooks run automatically on `git commit`. Always ensure they pass before committing.

@@ -1,0 +1,38 @@
+flowchart TD
+    A([User uploads file]) --> B[Validate file type\nCSV or Parquet]
+    B --> C{Valid?}
+    C -- No --> D[Return form error]
+    C -- Yes --> E[Upload to S3\nraw/flows/run_id/input.*]
+    E --> F[Create FlowExecution\nstatus=PENDING]
+    F --> G[Dispatch Celery task\nrun_pipeline_task]
+    G --> H[Return HTMX response\nbegin status polling]
+
+    subgraph Celery Worker
+        I[Set status=RUNNING] --> J
+
+        subgraph doit Pipeline
+            J[01_ingest\nRead raw → 01_raw.parquet]
+            J --> K[02_validate\nClean → 02_validated.parquet]
+            K --> L[03_transform\nTransform → 03_transformed.parquet]
+            L --> M[04_aggregate\nAggregate → output.parquet]
+        end
+
+        M --> N{Exit code 0?}
+        N -- Yes --> O[Extract row_count\nfrom notebook output]
+        O --> P[Set status=COMPLETED\nrow_count, s3_output_path]
+        N -- No --> Q{Retries < 2?}
+        Q -- Yes --> R[Wait 30s → retry]
+        R --> I
+        Q -- No --> S[Set status=FAILED\nerror_message]
+    end
+
+    H --> T{Poll: status?}
+    T -- PENDING/RUNNING --> T
+    T -- COMPLETED --> U[Show results link]
+    T -- FAILED --> V[Show error message]
+
+    U --> W[User views results\nDuckDB preview + stats]
+    W --> X{Download?}
+    X -- Yes --> Y[Generate presigned S3 URL\nCSV / Parquet / JSON]
+    X -- No --> Z([Done])
+    Y --> Z
