@@ -44,6 +44,7 @@ media/
 .coverage
 htmlcov/
 coverage.xml
+junit.xml
 *.cover
 .hypothesis/
 .tox/

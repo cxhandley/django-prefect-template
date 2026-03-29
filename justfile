@@ -82,9 +82,17 @@ test:
     pytest backend/apps/ -v
     @echo "All tests passed!"
 
-# Run tests with coverage report
+# Run tests with coverage report and regenerate badges/tests.svg + badges/coverage.svg
 test-cov:
-    pytest backend/apps/ --cov=backend/apps --cov-report=html --cov-report=term-missing -v
+    cd backend && pytest apps/ \
+        --cov=apps \
+        --cov-report=html:../htmlcov \
+        --cov-report=term-missing \
+        --cov-report=xml:../coverage.xml \
+        --junitxml=../junit.xml \
+        -v
+    $HOME/.local/bin/genbadge tests -i junit.xml -o badges/tests.svg -n Tests
+    $HOME/.local/bin/genbadge coverage -i coverage.xml -o badges/coverage.svg -n Coverage
 
 
 # ============================================================================
