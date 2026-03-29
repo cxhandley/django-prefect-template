@@ -1,6 +1,6 @@
 # django-doit-template
 
-![Tests](https://img.shields.io/badge/tests-84%20passed-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-97%25-brightgreen)
+![Tests](https://img.shields.io/badge/tests-96%20passed-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 
 Django + doit + papermill + DuckDB data pipeline template. Upload a file, trigger a multi-step notebook pipeline asynchronously via Celery, and query the results with DuckDB — all inside a VS Code DevContainer.
 

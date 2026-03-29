@@ -6,7 +6,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ## Epic 1: User Management & Authentication
 
-### US-1.1: User Registration and Login `[~]`
+### US-1.1: User Registration and Login `[x]`
 **As a** new user
 **I want to** create an account and log in
 **So that** I can access the pipeline and prediction system
@@ -15,7 +15,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [x] User can register with email and password
 - [x] User can log in with credentials
 - [x] User can view and edit their basic profile
-- [ ] User can reset a forgotten password
+- [x] User can reset a forgotten password
 - [ ] User receives a confirmation email on registration
 
 ### US-1.2: Superuser Management `[ ]`
@@ -198,7 +198,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 | Area | Status |
 |------|--------|
-| User registration & login | Partial (no password reset) |
+| User registration & login | Complete (email confirmation not implemented) |
 | File upload & pipeline execution | Complete |
 | Pipeline status polling | Complete |
 | View & download results | Complete |

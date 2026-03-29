@@ -18,6 +18,7 @@ Excalidraw wireframes for each UI page. Open `.excalidraw` files at excalidraw.c
 
 | Missing file | Implemented template |
 |--------------|----------------------|
+| `password_reset_page.excalidraw` | `accounts/password_reset.html` + done/confirm/complete |
 | `results_page.excalidraw` | `flows/results.html` |
 | `upload_page.excalidraw` | `flows/upload.html` |
 | `profile_page.excalidraw` | `accounts/profile.html` |
