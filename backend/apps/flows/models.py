@@ -1,9 +1,11 @@
 """
 Flow execution models.
 """
-from django.db import models
-from django.conf import settings
+
 import boto3
+from botocore.config import Config
+from django.conf import settings
+from django.db import models
 
 
 class FlowExecution(models.Model):
@@ -11,12 +13,10 @@ class FlowExecution(models.Model):
     Stores metadata about flow executions.
     Actual data is stored in S3.
     """
+
     flow_run_id = models.UUIDField(unique=True)
     flow_name = models.CharField(max_length=200)
-    triggered_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE
-    )
+    triggered_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     # S3 paths - NOT the actual data
     s3_input_path = models.CharField(max_length=500, blank=True)
@@ -24,14 +24,9 @@ class FlowExecution(models.Model):
 
     # Metadata for quick filtering
     row_count = models.BigIntegerField(null=True, blank=True)
-    file_size_mb = models.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        null=True,
-        blank=True
-    )
+    file_size_mb = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
-    status = models.CharField(max_length=50, default='PENDING')
+    status = models.CharField(max_length=50, default="PENDING")
     parameters = models.JSONField(default=dict)
 
     # Async execution tracking
@@ -43,11 +38,11 @@ class FlowExecution(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['triggered_by', '-created_at']),
-            models.Index(fields=['flow_name', 'status']),
-            models.Index(fields=['-created_at']),
+            models.Index(fields=["triggered_by", "-created_at"]),
+            models.Index(fields=["flow_name", "status"]),
+            models.Index(fields=["-created_at"]),
         ]
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"{self.flow_name} - {self.flow_run_id}"
@@ -72,17 +67,16 @@ class FlowExecution(models.Model):
             return None
 
         s3_client = boto3.client(
-            's3',
+            "s3",
             endpoint_url=settings.AWS_S3_ENDPOINT_URL,
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+            config=Config(signature_version="s3v4"),
         )
 
         return s3_client.generate_presigned_url(
-            'get_object',
-            Params={
-                'Bucket': settings.DATA_LAKE_BUCKET,
-                'Key': self.s3_output_path
-            },
-            ExpiresIn=expires_in
+            "get_object",
+            Params={"Bucket": settings.DATA_LAKE_BUCKET, "Key": self.s3_output_path},
+            ExpiresIn=expires_in,
         )

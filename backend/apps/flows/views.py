@@ -20,14 +20,13 @@ from .tasks import run_pipeline_task, run_prediction_task
 @login_required
 def index(request):
     """Main flows dashboard"""
-    executions = FlowExecution.objects.filter(triggered_by=request.user).order_by("-created_at")[
-        :10
-    ]
+    qs = FlowExecution.objects.filter(triggered_by=request.user).order_by("-created_at")
+    executions = qs[:10]
     context = {
         "user": request.user,
         "executions": executions,
-        "flows_count": executions.count(),
-        "recent_runs": executions.filter(status="COMPLETED").count(),
+        "flows_count": qs.count(),
+        "recent_runs": qs.filter(status="COMPLETED").count(),
     }
     return render(request, "flows/index.html", context)
 
