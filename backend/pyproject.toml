@@ -51,5 +51,6 @@ include = ["apps", "config"]
 
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
-testpaths = ["apps"] 
+testpaths = ["apps"]
 pythonpath = ["."]
+addopts = "-n auto"
