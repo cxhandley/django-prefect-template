@@ -1,177 +1,210 @@
-# Django Project Structure
+# Django Project Architecture
 
 ## App Organization
 
 ```
 backend/apps/
-├── core/                          # Shared components & layouts
-│   ├── __init__.py
-│   ├── apps.py
-│   ├── views.py                  # Navbar rendering
-│   ├── urls.py                   # Core routes
+├── core/                          # Shared layouts & components
+│   ├── views.py                  # index, base_layout, navbar
+│   ├── urls.py
 │   ├── templates/
 │   │   └── core/
-│   │       ├── base.html         # Main layout template
-│   │       └── components/
-│   │           └── navbar.html   # Navbar component
-│   ├── static/
-│   │   └── core/
-│   │       ├── css/
-│   │       └── js/
+│   │       ├── base.html             # Authenticated layout (sidebar + navbar)
+│   │       ├── base_dashboard.html   # Dashboard variant of base
+│   │       ├── base_public.html      # Unauthenticated / marketing layout
+│   │       ├── index.html            # Home page
+│   │       ├── components/
+│   │       │   ├── navbar.html
+│   │       │   ├── sidebar.html
+│   │       │   └── footer.html
+│   │       └── components/ui/
+│   │           ├── badge.html
+│   │           ├── breadcrumbs.html
+│   │           ├── empty_state.html
+│   │           ├── form_checkbox.html
+│   │           ├── form_input.html
+│   │           ├── modal.html
+│   │           ├── pagination.html
+│   │           ├── search_bar.html
+│   │           └── stat_card.html
 │   └── migrations/
 │
-├── accounts/                      # User & authentication
-│   ├── __init__.py
-│   ├── apps.py
-│   ├── models.py                 # User profile extensions
-│   ├── views.py                  # User menu, settings, profile
-│   ├── urls.py                   # Account routes
-│   ├── forms.py                  # User forms
+├── accounts/                      # Authentication & user profile
+│   ├── views.py                  # login, signup, logout, profile, settings, user_menu
+│   ├── urls.py
+│   ├── forms.py
 │   ├── templates/
 │   │   └── accounts/
+│   │       ├── login.html
+│   │       ├── signup.html
 │   │       ├── profile.html
 │   │       ├── settings.html
-│   │       └── components/
-│   │           └── user_menu.html
-│   ├── static/
+│   │       ├── components/
+│   │       │   └── user_menu.html    # HTMX dropdown
+│   │       └── partials/
+│   │           ├── login_form.html
+│   │           └── signup_form.html
 │   └── migrations/
 │
-├── flows/                         # Flow management
-│   ├── __init__.py
-│   ├── apps.py
-│   ├── models.py                 # FlowExecution, etc.
-│   ├── views.py                  # Flow-specific views
-│   ├── urls.py                   # Flow routes
-│   ├── api_client.py             # FastAPI integration
-│   ├── services/
-│   │   ├── datalake.py           # DuckDB queries
-│   │   └── s3_manager.py         # S3 operations
-│   ├── templates/
-│   │   └── flows/
-│   │       ├── index.html        # Dashboard
-│   │       └── components/
-│   │           └── flows_menu.html
-│   ├── static/
-│   └── migrations/
+└── flows/                         # Pipeline & prediction execution
+    ├── models.py                 # FlowExecution
+    ├── views.py                  # All pipeline & prediction views
+    ├── urls.py
+    ├── tasks.py                  # Celery: run_pipeline_task, run_prediction_task
+    ├── runner.py                 # PipelineRunner — doit subprocess wrapper
+    ├── admin.py
+    ├── services/
+    │   └── datalake.py           # DuckDB analytics over S3 Parquet
+    ├── templatetags/
+    │   └── flow_extras.py
+    ├── management/commands/
+    │   └── setup_s3_buckets.py
+    ├── templates/
+    │   └── flows/
+    │       ├── index.html            # Flows landing page
+    │       ├── dashboard.html        # Prediction form + recent executions
+    │       ├── history.html          # Paginated execution history
+    │       ├── execution_detail.html # Single execution detail
+    │       ├── comparison.html       # Side-by-side execution comparison
+    │       ├── results.html          # DuckDB results preview + download
+    │       ├── upload.html           # File upload form
+    │       ├── components/
+    │       │   └── flows_menu.html   # HTMX dropdown
+    │       └── partials/
+    │           ├── history_table_body.html
+    │           ├── prediction_running.html
+    │           ├── prediction_result.html
+    │           └── prediction_error.html
+    └── migrations/
 ```
 
 ## URL Routing
 
 ### Main Project (`config/urls.py`)
 ```python
-from django.contrib import admin
-from django.urls import path, include
-
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin/',    admin.site.urls),
     path('accounts/', include('apps.accounts.urls')),
-    path('flows/', include('apps.flows.urls')),
-    path('', include('apps.core.urls')),
+    path('flows/',    include('apps.flows.urls')),
+    path('',          include('apps.core.urls')),
 ]
 ```
 
-### Core App Routes (`apps/core/urls.py`)
-- `/` → base layout
-- `/navbar/` → navbar component
+### Core Routes (`apps/core/urls.py`)
+| URL | View | Name |
+|-----|------|------|
+| `/` | `index` | `core:index` |
+| `/base/` | `base_layout` | `core:base` |
+| `/navbar/` | `navbar` | `core:navbar` |
 
 ### Accounts Routes (`apps/accounts/urls.py`)
-- `/profile/` → user profile page
-- `/settings/` → user settings page
-- `/api/user-menu/` → HTMX user menu dropdown
-- `/api/logout/` → logout endpoint
+| URL | View | Name |
+|-----|------|------|
+| `/accounts/login/` | `login_user` | `accounts:login` |
+| `/accounts/signup/` | `signup_user` | `accounts:signup` |
+| `/accounts/profile/` | `profile` | `accounts:profile` |
+| `/accounts/settings/` | `settings` | `accounts:settings` |
+| `/accounts/api/user-menu/` | `user_menu` | `accounts:user_menu` |
+| `/accounts/api/logout/` | `logout_user` | `accounts:logout` |
 
 ### Flows Routes (`apps/flows/urls.py`)
-- `/` → flows dashboard
-- `/api/flows-menu/` → HTMX flows dropdown
+| URL | View | Name |
+|-----|------|------|
+| `/flows/` | `index` | `flows:index` |
+| `/flows/dashboard/` | `dashboard` | `flows:dashboard` |
+| `/flows/history/` | `history` | `flows:history` |
+| `/flows/execution/<uuid>/` | `execution_detail` | `flows:execution_detail` |
+| `/flows/execution/<uuid>/stop/` | `stop_execution` | `flows:stop_execution` |
+| `/flows/execution/<uuid>/delete/` | `delete_execution` | `flows:delete_execution` |
+| `/flows/comparison/` | `comparison` | `flows:comparison` |
+| `/flows/upload-and-process/` | `upload_and_process` | `flows:upload_and_process` |
+| `/flows/run-prediction/` | `run_prediction` | `flows:run_prediction` |
+| `/flows/prediction-status/<uuid>/` | `prediction_status` | `flows:prediction_status` |
+| `/flows/status/<uuid>/` | `flow_status` | `flows:flow_status` |
+| `/flows/results/<uuid>/` | `view_flow_results` | `flows:view_flow_results` |
+| `/flows/results/<uuid>/download/<fmt>/` | `download_results` | `flows:download_results` |
+| `/flows/api/flows-menu/` | `flows_menu` | `flows:flows_menu` |
 
-## INSTALLED_APPS Configuration
+## INSTALLED_APPS
 
 ```python
 INSTALLED_APPS = [
+    # Django
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+    'django.contrib.humanize',
     # Third-party
-    'rest_framework',
     'storages',
-    
-    # Local apps
+    # Local
     'apps.core',
     'apps.accounts',
     'apps.flows',
 ]
 ```
 
-## Templates Inheritance Chain
+## Template Inheritance Chain
+
+Three base layouts cover all pages:
 
 ```
-base.html (core/base.html)
-├── {% include "core/components/navbar.html" %}
-├── {% block content %}
-│   └── flows/index.html (extends base.html)
-│   └── accounts/profile.html (extends base.html)
-│   └── accounts/settings.html (extends base.html)
-└── {% include scripts %}
+core/base.html                    ← authenticated pages (sidebar + navbar)
+├── flows/dashboard.html
+├── flows/history.html
+├── flows/execution_detail.html
+├── flows/comparison.html
+├── flows/results.html
+├── flows/upload.html
+├── accounts/profile.html
+└── accounts/settings.html
+
+core/base_dashboard.html          ← dashboard variant (extends base.html)
+└── flows/index.html
+
+core/base_public.html             ← unauthenticated / marketing
+├── core/index.html
+├── accounts/login.html
+└── accounts/signup.html
 ```
+
+HTMX partials and component snippets (`partials/`, `components/`) are rendered
+standalone and swapped into the page — they do **not** extend any base template.
 
 ## Key Separation of Concerns
 
 | App | Responsibility |
-|-----|-----------------|
-| **core** | Layout templates, navbar, shared components, CSS/JS utilities |
-| **accounts** | User profile, settings, authentication endpoints, user menu |
-| **flows** | Flow management, dashboards, flow-specific operations |
+|-----|----------------|
+| **core** | Base layouts, navbar, sidebar, footer, shared UI components |
+| **accounts** | Login, signup, profile, settings, user-menu dropdown |
+| **flows** | Pipeline upload/execution, prediction form, history, results, Celery tasks, DuckDB analytics |
 
-## Benefits
+## Adding a New Page
 
-✅ **Modularity**: Each app has a single responsibility  
-✅ **Reusability**: Core components can be included anywhere  
-✅ **Maintainability**: Easy to find and update related code  
-✅ **Scalability**: Simple to add new apps that extend base layout  
-✅ **Testability**: Can test each app independently  
-
-## Template File Locations
-
-**Always place templates in: `apps/<app_name>/templates/<app_name>/`**
-
-This follows Django's template namespace convention and prevents naming conflicts.
-
-```
-apps/core/templates/core/              # Core namespace
-apps/accounts/templates/accounts/      # Accounts namespace
-apps/flows/templates/flows/            # Flows namespace
-```
-
-## Creating New Pages
-
-1. Create view in `<app>/views.py`
-2. Create template in `<app>/templates/<app>/yourpage.html`
-3. Extend `core/base.html`
-4. Add URL to `<app>/urls.py`
-
-Example:
+1. Add a view in `<app>/views.py`
+2. Add a template in `<app>/templates/<app>/yourpage.html` that extends the appropriate base
+3. Add a URL to `<app>/urls.py`
+4. Follow the [development workflow](../CLAUDE.md) — user story → wireframe → ER diagram first
 
 ```python
 # flows/views.py
 @login_required
-def run_detail(request, run_id):
-    return render(request, 'flows/run_detail.html', {'run_id': run_id})
+def my_new_page(request):
+    return render(request, 'flows/my_new_page.html', {})
 
 # flows/urls.py
-path('runs/<int:run_id>/', views.run_detail, name='run_detail'),
+path('my-new-page/', views.my_new_page, name='my_new_page'),
 ```
 
 ```django
-{# flows/templates/flows/run_detail.html #}
+{# flows/templates/flows/my_new_page.html #}
 {% extends "core/base.html" %}
 
-{% block title %}Run #{{ run_id }} - Prefect{% endblock %}
+{% block title %}My New Page{% endblock title %}
 
 {% block content %}
-    <!-- Your run detail content -->
-{% endblock %}
+  <!-- page content -->
+{% endblock content %}
 ```

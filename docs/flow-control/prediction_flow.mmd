@@ -1,0 +1,47 @@
+flowchart TD
+    A([User submits prediction form]) --> B[Validate inputs\nincome, age, credit_score,\nemployment_years]
+    B --> C{Valid?}
+    C -- No --> D[Return form errors]
+    C -- Yes --> E[Write 1-row CSV to S3\nraw/flows/predictions/run_id/input.csv]
+    E --> F[Create FlowExecution\nflow_name=predict_pipeline\nstatus=PENDING]
+    F --> G[Dispatch Celery task\nrun_prediction_task]
+    G --> H[Return HTMX spinner\nbegin status polling]
+
+    subgraph Celery Worker
+        I[Set status=RUNNING] --> J
+
+        subgraph doit Predict Pipeline
+            J[predict_01_ingest\nRead CSV → prediction_input.parquet]
+            J --> K[predict_02_score\nCompute weighted score]
+        end
+
+        subgraph Scoring Logic
+            K --> L[credit_score × 0.40]
+            K --> M[income × 0.30]
+            K --> N[employment_years × 0.20]
+            K --> O[age × 0.10]
+            L & M & N & O --> P[Composite score 0–100]
+        end
+
+        P --> Q{Score threshold}
+        Q -- score ≥ 70 --> R[Approved]
+        Q -- 40 ≤ score < 70 --> S[Review]
+        Q -- score < 40 --> T[Declined]
+
+        R & S & T --> U[Write prediction_result.json to S3]
+        U --> V{Exit code 0?}
+        V -- Yes --> W[Merge score + classification\n+ confidence into parameters]
+        W --> X[Set status=COMPLETED]
+        V -- No --> Y{Retries < 2?}
+        Y -- Yes --> Z[Wait 30s → retry]
+        Z --> I
+        Y -- No --> AA[Set status=FAILED]
+    end
+
+    H --> BB{Poll: status?}
+    BB -- PENDING/RUNNING --> BB
+    BB -- COMPLETED --> CC[Display result badge\nscore + classification + confidence]
+    BB -- FAILED --> DD[Display error message]
+
+    CC --> EE([Done])
+    DD --> EE
