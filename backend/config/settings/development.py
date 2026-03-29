@@ -18,3 +18,6 @@ MIDDLEWARE += [  # noqa: F405
 INTERNAL_IPS = [
     "127.0.0.1",
 ]
+
+# Email — print to console in development
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

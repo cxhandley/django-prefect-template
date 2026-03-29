@@ -12,7 +12,9 @@ These close gaps in already-delivered epics. Low risk, small scope.
 
 ---
 
-### BL-001 · Password Reset Flow `M`
+### ~~BL-001 · Password Reset Flow~~ `M` ✓ Complete
+
+
 **User story:** US-1.1
 **Value:** Users who forget their password currently have no self-service path — an admin must intervene.
 
@@ -219,7 +221,7 @@ Valuable but not blocking any core workflow.
 
 | ID | Title | Tier | Effort | Depends on |
 |----|-------|------|--------|------------|
-| BL-001 | Password reset flow | 1 | M | — |
+| ~~BL-001~~ | ~~Password reset flow~~ | 1 | M | — |
 | BL-002 | S3 cleanup on delete | 1 | S | — |
 | BL-003 | Presigned download URLs | 1 | S | — |
 | BL-004 | Export history as CSV | 1 | S | — |
