@@ -38,7 +38,9 @@
         <div class="card bg-base-100 border border-base-200 shadow-sm">
             <div class="card-body">
                 <h2 class="card-title text-lg">Make a Prediction</h2>
-                <form hx-post="{% url 'flows:run_prediction' %}"
+                <form id="prediction-form"
+                      novalidate
+                      hx-post="{% url 'flows:run_prediction' %}"
                       hx-target="#prediction-result"
                       hx-swap="innerHTML"
                       hx-indicator="#prediction-loading"
@@ -46,7 +48,7 @@
                       class="mt-4">
                     {% csrf_token %}
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {% include "core/components/ui/form_input.html" with name="income" label="Annual Income ($)" type="number" placeholder="75000" min=1 max=10000000 step=1000 help_text="Gross annual income in dollars" required=True %}
+                        {% include "core/components/ui/form_input.html" with name="income" label="Annual Income ($)" type="number" placeholder="75000" min=0 max=10000000 step=1000 help_text="Gross annual income in dollars" required=True %}
                         {% include "core/components/ui/form_input.html" with name="age" label="Age" type="number" placeholder="35" min=18 max=120 step=1 help_text="Must be 18 or older" required=True %}
                         {% include "core/components/ui/form_input.html" with name="credit_score" label="Credit Score" type="number" placeholder="720" min=300 max=850 step=1 help_text="FICO score (300–850)" required=True %}
                         {% include "core/components/ui/form_input.html" with name="employment_years" label="Employment Years" type="number" placeholder="8" min=0 max=60 step=0.5 help_text="Years in current or most recent role" required=True %}
@@ -113,3 +115,105 @@
         </div>
     </div>
 {% endblock dashboard_content %}
+{% block extra_js %}
+    <script>
+    (function () {
+        function setFieldError(form, name, message) {
+            const input = form.querySelector('[name="' + name + '"]');
+            if (!input) return;
+            const fc = input.closest('.form-control');
+            let errLabel = fc.querySelector('.field-error-label');
+            if (!errLabel) {
+                errLabel = document.createElement('label');
+                errLabel.className = 'label field-error-label';
+                errLabel.innerHTML = '<span class="label-text-alt text-error"></span>';
+                fc.appendChild(errLabel);
+            }
+            errLabel.querySelector('span').textContent = message;
+            input.classList.add('input-error');
+        }
+
+        function clearFieldError(form, name) {
+            const input = form.querySelector('[name="' + name + '"]');
+            if (!input) return;
+            const fc = input.closest('.form-control');
+            const errLabel = fc.querySelector('.field-error-label');
+            if (errLabel) errLabel.remove();
+            input.classList.remove('input-error');
+        }
+
+        function validatePredictionForm(form) {
+            let valid = true;
+
+            const rules = [
+                {
+                    name: 'income',
+                    label: 'Annual Income',
+                    validate: (v) => {
+                        if (v === '' || v === null) return 'Annual income is required.';
+                        const n = Number(v);
+                        if (isNaN(n) || n <= 0) return 'Please enter a positive income amount.';
+                        if (n > 10000000) return 'Income must be $10,000,000 or less.';
+                        return null;
+                    },
+                },
+                {
+                    name: 'age',
+                    label: 'Age',
+                    validate: (v) => {
+                        if (v === '' || v === null) return 'Age is required.';
+                        const n = Number(v);
+                        if (!Number.isInteger(n)) return 'Age must be a whole number.';
+                        if (n < 18) return 'You must be 18 or older.';
+                        if (n > 120) return 'Please enter a valid age (18–120).';
+                        return null;
+                    },
+                },
+                {
+                    name: 'credit_score',
+                    label: 'Credit Score',
+                    validate: (v) => {
+                        if (v === '' || v === null) return 'Credit score is required.';
+                        const n = Number(v);
+                        if (!Number.isInteger(n)) return 'Credit score must be a whole number.';
+                        if (n < 300 || n > 850) return 'Credit score must be between 300 and 850.';
+                        return null;
+                    },
+                },
+                {
+                    name: 'employment_years',
+                    label: 'Employment Years',
+                    validate: (v) => {
+                        if (v === '' || v === null) return 'Employment years is required.';
+                        const n = Number(v);
+                        if (isNaN(n) || n < 0) return 'Employment years cannot be negative.';
+                        if (n > 60) return 'Please enter a valid employment duration (0–60 years).';
+                        return null;
+                    },
+                },
+            ];
+
+            rules.forEach(({ name, validate }) => {
+                const input = form.querySelector('[name="' + name + '"]');
+                const error = input ? validate(input.value) : 'Field not found.';
+                clearFieldError(form, name);
+                if (error) {
+                    setFieldError(form, name, error);
+                    valid = false;
+                }
+            });
+
+            return valid;
+        }
+
+        document.addEventListener('htmx:beforeRequest', function (event) {
+            const form = event.detail.elt;
+            if (form && form.id === 'prediction-form') {
+                if (!validatePredictionForm(form)) {
+                    event.preventDefault();
+                }
+            }
+        });
+    }());
+    </script>
+{% endblock extra_js %}
