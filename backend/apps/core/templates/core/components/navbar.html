@@ -3,14 +3,17 @@
     <!-- Navbar start: Logo & mobile menu -->
     <div class="navbar-start">
         {% if user.is_authenticated %}
-        <!-- Dashboard drawer toggle (mobile) -->
-        <label for="dashboard-drawer" class="btn btn-ghost btn-square lg:hidden">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
-            </svg>
-        </label>
+            <!-- Dashboard drawer toggle (mobile) -->
+            <label for="dashboard-drawer" class="btn btn-ghost btn-square lg:hidden">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="h-5 w-5"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
+                </svg>
+            </label>
         {% endif %}
-
         <!-- Logo -->
         <a href="{% url 'core:index' %}" class="btn btn-ghost text-xl font-bold">
             <svg class="w-6 h-6 text-primary" fill="currentColor" viewBox="0 0 20 20">
@@ -19,68 +22,84 @@
             Django Prefect ML
         </a>
     </div>
-
     {% if user.is_authenticated %}
-    <!-- Navbar center: Authenticated desktop menu -->
-    <div class="navbar-center hidden lg:flex">
-        <ul class="menu menu-horizontal px-1 z-40">
-            <li><a href="{% url 'flows:dashboard' %}">Dashboard</a></li>
-            <li><a href="{% url 'flows:dashboard' %}">Predictions</a></li>
-            <li><a href="{% url 'flows:history' %}">History</a></li>
-        </ul>
-    </div>
-
-    <!-- Navbar end: User menu & notifications -->
-    <div class="navbar-end gap-2">
-        <!-- Notifications dropdown -->
-        <div class="dropdown dropdown-end z-50">
-            <div tabindex="0" role="button" class="btn btn-ghost btn-circle indicator">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                <span class="indicator-item badge badge-sm badge-primary">2</span>
-            </div>
-            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-64 p-2 shadow-lg border border-base-200">
-                <li class="menu-title">
-                    <span>Notifications</span>
-                </li>
-                <li><a>Flow run completed <span class="badge badge-xs">2 min ago</span></a></li>
-                <li><a>Flow run failed <span class="badge badge-xs">1 hour ago</span></a></li>
-            </ul>
-        </div>
-
-        <!-- User menu dropdown -->
-        <div class="dropdown dropdown-end z-50">
-            <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
-                <div class="w-10 rounded-full bg-primary text-primary-content flex items-center justify-center font-bold">
-                    {{ user.first_name|first|default:"U" }}
-                </div>
-            </div>
-            <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-50 w-52 p-2 shadow-lg border border-base-200">
-                <li class="menu-title">
-                    <span>{{ user.get_full_name|default:user.username }}</span>
-                </li>
-                <li><a href="{% url 'accounts:profile' %}">Profile</a></li>
-                <li><a href="{% url 'accounts:settings' %}">Settings</a></li>
-                <li><a href="#">API Keys</a></li>
-                <li><a href="#">Help & Docs</a></li>
+        <!-- Navbar center: Authenticated desktop menu -->
+        <div class="navbar-center hidden lg:flex">
+            <ul class="menu menu-horizontal px-1 z-40">
                 <li>
-                    <a hx-post="{% url 'accounts:logout' %}"
-                       hx-trigger="click"
-                       hx-confirm="Sign out of your account?"
-                       class="text-error">
-                        Logout
-                    </a>
+                    <a href="{% url 'flows:dashboard' %}">Dashboard</a>
+                </li>
+                <li>
+                    <a href="{% url 'flows:dashboard' %}">Predictions</a>
+                </li>
+                <li>
+                    <a href="{% url 'flows:history' %}">History</a>
                 </li>
             </ul>
         </div>
-    </div>
-
+        <!-- Navbar end: User menu & notifications -->
+        <div class="navbar-end gap-2">
+            <!-- Notifications dropdown -->
+            <div class="dropdown dropdown-end z-50">
+                <div tabindex="0" role="button" class="btn btn-ghost btn-circle indicator">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-5 w-5"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    <span class="indicator-item badge badge-sm badge-primary">2</span>
+                </div>
+                <ul tabindex="0"
+                    class="dropdown-content menu bg-base-100 rounded-box z-50 w-64 p-2 shadow-lg border border-base-200">
+                    <li class="menu-title">
+                        <span>Notifications</span>
+                    </li>
+                    <li>
+                        <a>Flow run completed <span class="badge badge-xs">2 min ago</span></a>
+                    </li>
+                    <li>
+                        <a>Flow run failed <span class="badge badge-xs">1 hour ago</span></a>
+                    </li>
+                </ul>
+            </div>
+            <!-- User menu dropdown -->
+            <div class="dropdown dropdown-end z-50">
+                <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
+                    <div class="w-10 rounded-full bg-primary text-primary-content flex items-center justify-center font-bold">
+                        {{ user.first_name|first|default:"U" }}
+                    </div>
+                </div>
+                <ul tabindex="0"
+                    class="dropdown-content menu bg-base-100 rounded-box z-50 w-52 p-2 shadow-lg border border-base-200">
+                    <li class="menu-title">
+                        <span>{{ user.get_full_name|default:user.username }}</span>
+                    </li>
+                    <li>
+                        <a href="{% url 'accounts:profile' %}">Profile</a>
+                    </li>
+                    <li>
+                        <a href="{% url 'accounts:settings' %}">Settings</a>
+                    </li>
+                    <li>
+                        <a href="#">API Keys</a>
+                    </li>
+                    <li>
+                        <a href="#">Help & Docs</a>
+                    </li>
+                    <li>
+                        <a onclick="document.getElementById('logout_modal').showModal()"
+                           class="text-error cursor-pointer">Logout</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
     {% else %}
-    <!-- Navbar end: Public nav (Login / Sign Up) -->
-    <div class="navbar-end gap-2">
-        <a href="{% url 'accounts:login' %}" class="btn btn-ghost btn-sm">Login</a>
-        <a href="{% url 'accounts:signup' %}" class="btn btn-primary btn-sm">Sign Up</a>
-    </div>
+        <!-- Navbar end: Public nav (Login / Sign Up) -->
+        <div class="navbar-end gap-2">
+            <a href="{% url 'accounts:login' %}" class="btn btn-ghost btn-sm">Login</a>
+            <a href="{% url 'accounts:signup' %}" class="btn btn-primary btn-sm">Sign Up</a>
+        </div>
     {% endif %}
 </div>

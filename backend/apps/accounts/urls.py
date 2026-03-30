@@ -12,6 +12,22 @@ urlpatterns = [
     path("settings/", views.settings, name="settings"),
     path("api/user-menu/", views.user_menu, name="user_menu"),
     path("api/logout/", views.logout_user, name="logout"),
+    # Password change flow for logged-in users (form-based, no email)
+    path(
+        "password-change/",
+        auth_views.PasswordChangeView.as_view(
+            template_name="accounts/password_change.html",
+            success_url="/accounts/password-change/done/",
+        ),
+        name="password_change",
+    ),
+    path(
+        "password-change/done/",
+        auth_views.PasswordChangeDoneView.as_view(
+            template_name="accounts/password_change_done.html",
+        ),
+        name="password_change_done",
+    ),
     # Password reset flow (Django built-in views, custom templates)
     path(
         "password-reset/",

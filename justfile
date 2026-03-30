@@ -91,8 +91,8 @@ test-cov:
         --cov-report=xml:../coverage.xml \
         --junitxml=../junit.xml \
         -v
-    $HOME/.local/bin/genbadge tests -i junit.xml -o badges/tests.svg -n Tests
-    $HOME/.local/bin/genbadge coverage -i coverage.xml -o badges/coverage.svg -n Coverage
+    genbadge tests -i junit.xml -o badges/tests.svg -n Tests
+    genbadge coverage -i coverage.xml -o badges/coverage.svg -n Coverage
 
 
 # ============================================================================

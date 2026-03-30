@@ -1,13 +1,13 @@
 {% extends "core/base.html" %}
-
 {% block content %}
-<!-- Public page content with footer -->
-<div class="min-h-screen flex flex-col -mt-8 -mx-4 sm:-mx-6 lg:-mx-8">
-    <div class="flex-1">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {% block public_content %}{% endblock %}
+    <!-- Public page content with footer -->
+    <div class="min-h-screen flex flex-col -mt-8 -mx-4 sm:-mx-6 lg:-mx-8">
+        <div class="flex-1">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                {% block public_content %}
+                {% endblock public_content %}
+            </div>
         </div>
+        {% include "core/components/footer.html" %}
     </div>
-    {% include "core/components/footer.html" %}
-</div>
-{% endblock %}
+{% endblock content %}

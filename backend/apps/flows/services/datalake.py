@@ -1,23 +1,23 @@
 import duckdb
-from django.conf import settings
 import polars as pl
+from django.conf import settings
 
 
 class DataLakeAnalytics:
     """Service for querying the S3 data lake with DuckDB."""
 
     def __init__(self):
-        self.conn = duckdb.connect(':memory:')
+        self.conn = duckdb.connect(":memory:")
         self._configure_s3()
 
     def _configure_s3(self):
         """Configure DuckDB S3 extension with project credentials."""
-        endpoint = getattr(settings, 'AWS_S3_ENDPOINT_URL', None) or ''
+        endpoint = getattr(settings, "AWS_S3_ENDPOINT_URL", None) or ""
         # Strip protocol prefix — DuckDB expects host:port only
-        if endpoint.startswith('http://'):
-            endpoint = endpoint[len('http://'):]
-        elif endpoint.startswith('https://'):
-            endpoint = endpoint[len('https://'):]
+        if endpoint.startswith("http://"):
+            endpoint = endpoint[len("http://") :]
+        elif endpoint.startswith("https://"):
+            endpoint = endpoint[len("https://") :]
 
         self.conn.execute(f"""
             CREATE SECRET datalake_s3 (
@@ -61,10 +61,10 @@ class DataLakeAnalytics:
         """
         result = self.conn.execute(query).fetchone()
         return {
-            'total_rows': result[0],
-            'grand_total_revenue': float(result[1]) if result[1] else 0,
-            'avg_transactions': float(result[2]) if result[2] else 0,
-            'max_customers': result[3],
+            "total_rows": result[0],
+            "grand_total_revenue": float(result[1]) if result[1] else 0,
+            "avg_transactions": float(result[2]) if result[2] else 0,
+            "max_customers": result[3],
         }
 
     def query_across_flows(self, flow_name: str, start_date: str, end_date: str) -> pl.DataFrame:

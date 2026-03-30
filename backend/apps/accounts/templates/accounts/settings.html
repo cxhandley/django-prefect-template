@@ -1,45 +1,41 @@
 {% extends "core/base_dashboard.html" %}
-
-{% block title %}Settings - Django Prefect ML{% endblock %}
-
+{% block title %}
+    Settings - Django Prefect ML
+{% endblock title %}
 {% block dashboard_content %}
-<div class="max-w-2xl">
-    <h1 class="text-2xl font-bold mb-6">Settings</h1>
-
-    <div class="card bg-base-100 border border-base-200 shadow-sm">
-        <div class="card-body space-y-8">
-
-            <!-- Profile Settings -->
-            <div>
-                <h2 class="text-lg font-semibold mb-4">Profile Settings</h2>
-                <div class="space-y-4">
-                    {% include "core/components/ui/form_input.html" with name="first_name" label="First Name" type="text" value=user.first_name %}
-                    {% include "core/components/ui/form_input.html" with name="last_name" label="Last Name" type="text" value=user.last_name %}
+    <div class="max-w-2xl">
+        <h1 class="text-2xl font-bold mb-6">Settings</h1>
+        <div class="card bg-base-100 border border-base-200 shadow-sm">
+            <div class="card-body space-y-8">
+                <!-- Profile Settings -->
+                <div>
+                    <h2 class="text-lg font-semibold mb-4">Profile Settings</h2>
+                    <div class="space-y-4">
+                        {% include "core/components/ui/form_input.html" with name="first_name" label="First Name" type="text" value=user.first_name %}
+                        {% include "core/components/ui/form_input.html" with name="last_name" label="Last Name" type="text" value=user.last_name %}
+                    </div>
                 </div>
-            </div>
-
-            <!-- Security Settings -->
-            <div class="border-t border-base-200 pt-8">
-                <h2 class="text-lg font-semibold mb-4">Security</h2>
-                <div class="flex gap-3">
-                    <button class="btn btn-outline btn-sm">Change Password</button>
-                    <button class="btn btn-outline btn-sm">Two-Factor Authentication</button>
+                <!-- Security Settings -->
+                <div class="border-t border-base-200 pt-8">
+                    <h2 class="text-lg font-semibold mb-4">Security</h2>
+                    <div class="flex gap-3">
+                        <a href="{% url 'accounts:password_change' %}"
+                           class="btn btn-outline btn-sm">Change Password</a>
+                        <button class="btn btn-outline btn-sm">Two-Factor Authentication</button>
+                    </div>
                 </div>
-            </div>
-
-            <!-- API Keys -->
-            <div class="border-t border-base-200 pt-8">
-                <h2 class="text-lg font-semibold mb-4">API Keys</h2>
-                <p class="text-sm text-base-content/60 mb-4">Manage your API keys for programmatic access.</p>
-                <button class="btn btn-primary btn-sm">Generate New Key</button>
-            </div>
-
-            <!-- Danger Zone -->
-            <div class="border-t border-error/30 pt-8">
-                <h2 class="text-lg font-semibold mb-4 text-error">Danger Zone</h2>
-                <button class="btn btn-error btn-sm">Delete Account</button>
+                <!-- API Keys -->
+                <div class="border-t border-base-200 pt-8">
+                    <h2 class="text-lg font-semibold mb-4">API Keys</h2>
+                    <p class="text-sm text-base-content/60 mb-4">Manage your API keys for programmatic access.</p>
+                    <button class="btn btn-primary btn-sm">Generate New Key</button>
+                </div>
+                <!-- Danger Zone -->
+                <div class="border-t border-error/30 pt-8">
+                    <h2 class="text-lg font-semibold mb-4 text-error">Danger Zone</h2>
+                    <button class="btn btn-error btn-sm">Delete Account</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
+{% endblock dashboard_content %}

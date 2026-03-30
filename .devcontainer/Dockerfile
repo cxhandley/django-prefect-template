@@ -28,7 +28,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Claude Code ───────────────────────────────────────────────────────
-RUN npm install -g @anthropic-ai/claude-code
+RUN npm install -g @anthropic-ai/claude-code \
+    && chmod -R o+rx "$(npm root -g)/@anthropic-ai"
 
 # Install uv (fast Python package manager)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -50,18 +51,18 @@ ARG USER_GID=$USER_UID
 RUN groupadd --gid $USER_GID $USERNAME \
     && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME
 
+# ── Python venv (outside /workspace so the bind mount doesn't overlay it) ──
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 WORKDIR /workspace
 
 # Pre-install Python dependencies at build time for faster container startup
+COPY pyproject.toml uv.lock ./
 COPY backend/pyproject.toml backend/
-RUN uv pip install --system -e "backend[dev,test]"
+RUN uv sync --no-install-workspace --group dev
 
-# Install root-level dev tools (code quality, hooks) — pinned to match pyproject.toml
-RUN uv pip install --system \
-    ruff==0.15.0 \
-    mypy==1.19.1 \
-    pre-commit==4.5.1 \
-    djlint==1.36.4 \
-    nbstripout
+# Ensure vscode user can write to the venv (for post-create uv sync)
+RUN chown -R $USERNAME:$USERNAME /opt/venv
 
 USER $USERNAME

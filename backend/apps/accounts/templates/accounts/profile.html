@@ -1,34 +1,31 @@
 {% extends "core/base_dashboard.html" %}
-
-{% block title %}Profile - Django Prefect ML{% endblock %}
-
+{% block title %}
+    Profile - Django Pipeline
+{% endblock title %}
 {% block dashboard_content %}
-<div class="max-w-2xl">
-    <h1 class="text-2xl font-bold mb-6">User Profile</h1>
-
-    <div class="card bg-base-100 border border-base-200 shadow-sm">
-        <div class="card-body space-y-6">
-            <div>
-                <label class="text-sm font-semibold text-base-content/60">Name</label>
-                <p class="text-lg mt-1">{{ user.get_full_name|default:user.username }}</p>
-            </div>
-
-            <div>
-                <label class="text-sm font-semibold text-base-content/60">Email</label>
-                <p class="text-lg mt-1">{{ user.email }}</p>
-            </div>
-
-            <div>
-                <label class="text-sm font-semibold text-base-content/60">Username</label>
-                <p class="text-lg mt-1">{{ user.username }}</p>
-            </div>
-
-            <div class="pt-4 border-t border-base-200">
-                <a href="{% url 'accounts:settings' %}" class="btn btn-primary">
-                    Edit Profile
-                </a>
+    <div class="max-w-2xl">
+        <h1 class="text-2xl font-bold mb-6">User Profile</h1>
+        <div class="card bg-base-100 border border-base-200 shadow-sm">
+            <div class="card-body space-y-6">
+                <div>
+                    <label class="text-sm font-semibold text-base-content/60">Name</label>
+                    <p class="text-lg mt-1">{{ user.get_full_name|default:user.username }}</p>
+                </div>
+                <div>
+                    <label class="text-sm font-semibold text-base-content/60">Email</label>
+                    <p class="text-lg mt-1">{{ user.email }}</p>
+                </div>
+                <div>
+                    <label class="text-sm font-semibold text-base-content/60">Username</label>
+                    <p class="text-lg mt-1">{{ user.username }}</p>
+                </div>
+                <div class="pt-4 border-t border-base-200 flex flex-wrap gap-3">
+                    <a href="{% url 'accounts:settings' %}" class="btn btn-primary">Edit Profile</a>
+                    <a href="{% url 'accounts:password_change' %}" class="btn btn-outline">Change Password</a>
+                    <button onclick="document.getElementById('logout_modal').showModal()"
+                            class="btn btn-error btn-outline">Sign Out</button>
+                </div>
             </div>
         </div>
     </div>
-</div>
-{% endblock %}
+{% endblock dashboard_content %}

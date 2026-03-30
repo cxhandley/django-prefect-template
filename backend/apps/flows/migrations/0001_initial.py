@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,26 +14,48 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='FlowExecution',
+            name="FlowExecution",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('flow_run_id', models.UUIDField(unique=True)),
-                ('flow_name', models.CharField(max_length=200)),
-                ('s3_input_path', models.CharField(blank=True, max_length=500)),
-                ('s3_output_path', models.CharField(blank=True, max_length=500)),
-                ('row_count', models.BigIntegerField(blank=True, null=True)),
-                ('file_size_mb', models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True)),
-                ('status', models.CharField(default='PENDING', max_length=50)),
-                ('parameters', models.JSONField(default=dict)),
-                ('celery_task_id', models.CharField(blank=True, max_length=255)),
-                ('error_message', models.TextField(blank=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('completed_at', models.DateTimeField(blank=True, null=True)),
-                ('triggered_by', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
+                ("flow_run_id", models.UUIDField(unique=True)),
+                ("flow_name", models.CharField(max_length=200)),
+                ("s3_input_path", models.CharField(blank=True, max_length=500)),
+                ("s3_output_path", models.CharField(blank=True, max_length=500)),
+                ("row_count", models.BigIntegerField(blank=True, null=True)),
+                (
+                    "file_size_mb",
+                    models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True),
+                ),
+                ("status", models.CharField(default="PENDING", max_length=50)),
+                ("parameters", models.JSONField(default=dict)),
+                ("celery_task_id", models.CharField(blank=True, max_length=255)),
+                ("error_message", models.TextField(blank=True)),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("completed_at", models.DateTimeField(blank=True, null=True)),
+                (
+                    "triggered_by",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-created_at'],
-                'indexes': [models.Index(fields=['triggered_by', '-created_at'], name='flows_flowe_trigger_36d427_idx'), models.Index(fields=['flow_name', 'status'], name='flows_flowe_flow_na_4fc9a1_idx'), models.Index(fields=['-created_at'], name='flows_flowe_created_202b12_idx')],
+                "ordering": ["-created_at"],
+                "indexes": [
+                    models.Index(
+                        fields=["triggered_by", "-created_at"],
+                        name="flows_flowe_trigger_36d427_idx",
+                    ),
+                    models.Index(
+                        fields=["flow_name", "status"], name="flows_flowe_flow_na_4fc9a1_idx"
+                    ),
+                    models.Index(fields=["-created_at"], name="flows_flowe_created_202b12_idx"),
+                ],
             },
         ),
     ]
