@@ -5,23 +5,24 @@
         <span>{{ user.get_full_name|default:user.username }}</span>
         <span class="text-xs opacity-70">{{ user.email }}</span>
     </li>
-    
     <!-- Menu Items -->
-    <li><a href="{% url 'accounts:profile' %}">Profile</a></li>
-    <li><a href="{% url 'accounts:settings' %}">Settings</a></li>
-    <li><a href="#">API Keys</a></li>
-    <li><a href="#">Help & Docs</a></li>
-    
+    <li>
+        <a href="{% url 'accounts:profile' %}">Profile</a>
+    </li>
+    <li>
+        <a href="{% url 'accounts:settings' %}">Settings</a>
+    </li>
+    <li>
+        <a href="#">API Keys</a>
+    </li>
+    <li>
+        <a href="#">Help & Docs</a>
+    </li>
     <!-- Divider -->
     <li class="divider my-0"></li>
-    
     <!-- Logout -->
     <li>
-        <a hx-post="{% url 'accounts:logout' %}" 
-           hx-trigger="click" 
-           hx-confirm="Sign out of your account?"
-           class="text-error">
-            Logout
-        </a>
+        <a onclick="document.getElementById('logout_modal').showModal()"
+           class="text-error cursor-pointer">Logout</a>
     </li>
 </div>

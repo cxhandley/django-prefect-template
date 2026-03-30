@@ -1,6 +1,6 @@
 import pytest
-from django.contrib.auth import get_user_model
 from apps.flows.models import FlowExecution
+from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
@@ -26,7 +26,7 @@ class TestFlowExecution:
         assert execution.error_message == ""
 
     def test_s3_url_properties(self, flow_execution_factory, settings):
-        settings.DATA_LAKE_BUCKET = 'test-bucket'
+        settings.DATA_LAKE_BUCKET = "test-bucket"
         execution = flow_execution_factory(
             s3_input_path="raw/data.csv",
             s3_output_path="processed/output.parquet",
@@ -36,9 +36,7 @@ class TestFlowExecution:
         assert execution.s3_output_url == "s3://test-bucket/processed/output.parquet"
 
     def test_generate_download_url(self, flow_execution_factory, mock_s3):
-        execution = flow_execution_factory(
-            s3_output_path="processed/output.parquet"
-        )
+        execution = flow_execution_factory(s3_output_path="processed/output.parquet")
 
         url = execution.generate_download_url(expires_in=3600)
 

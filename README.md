@@ -177,6 +177,7 @@ just doit-list
 |---------|-----|-------|
 | Django | http://localhost:8000 | Main web app |
 | Flower | http://localhost:5555 | Celery task monitoring |
+| Mailhog | http://localhost:8025 | Dev email inbox (SMTP sink) |
 | RustFS (S3) | http://localhost:9000 | Local S3-compatible storage |
 | PostgreSQL | localhost:5432 | Metadata DB |
 | Redis | localhost:6379 | Celery broker + cache |

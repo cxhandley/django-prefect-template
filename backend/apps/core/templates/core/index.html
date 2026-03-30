@@ -1,178 +1,198 @@
 {% extends "core/base_public.html" %}
-
-{% block title %}Django Prefect ML Prediction System{% endblock %}
-
+{% block title %}
+    Django Prefect ML Prediction System
+{% endblock title %}
 {% block public_content %}
-<div class="space-y-16">
-
-    <!-- Hero Section -->
-    <div class="hero py-20">
-        <div class="hero-content text-center">
-            <div class="max-w-2xl">
-                <h1 class="text-5xl font-bold tracking-tight">Django Prefect ML Prediction System</h1>
-                <p class="text-lg text-base-content/60 mt-6">Make Data-Driven Predictions with ML Models</p>
-                <div class="flex gap-3 justify-center mt-8">
-                    {% if user.is_authenticated %}
-                    <a href="{% url 'flows:dashboard' %}" class="btn btn-primary btn-lg">Go to Dashboard</a>
-                    {% else %}
-                    <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg">Login to Get Started</a>
-                    <a href="{% url 'accounts:signup' %}" class="btn btn-outline btn-lg">Sign Up</a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- How it Works Section -->
-    <div>
-        <h2 class="text-3xl font-bold text-center mb-10">How it Works</h2>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <!-- Step 1 -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body items-center text-center">
-                    <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center text-xl font-bold">1</div>
-                    <h3 class="card-title mt-4">Configure Models</h3>
-                    <p class="text-base-content/60 text-sm">Admins upload and train ML models for your specific prediction needs.</p>
-                </div>
-            </div>
-            <!-- Step 2 -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body items-center text-center">
-                    <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center text-xl font-bold">2</div>
-                    <h3 class="card-title mt-4">Make Predictions</h3>
-                    <p class="text-base-content/60 text-sm">Users input data and get instant predictions powered by trained models.</p>
-                </div>
-            </div>
-            <!-- Step 3 -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body items-center text-center">
-                    <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center text-xl font-bold">3</div>
-                    <h3 class="card-title mt-4">Track & Compare</h3>
-                    <p class="text-base-content/60 text-sm">Track execution history and compare results across multiple predictions.</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Features Section -->
-    <div>
-        <h2 class="text-3xl font-bold text-center mb-10">Features</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Feature 1 -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body">
-                    <div class="flex items-start gap-4">
-                        <div class="p-3 bg-primary/10 rounded-lg">
-                            <svg class="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-bold">Simple Interface</h3>
-                            <p class="text-sm text-base-content/60 mt-1">Clean, intuitive UI for making predictions with minimal effort.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Feature 2 -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body">
-                    <div class="flex items-start gap-4">
-                        <div class="p-3 bg-secondary/10 rounded-lg">
-                            <svg class="w-6 h-6 text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-bold">Pre-trained Models</h3>
-                            <p class="text-sm text-base-content/60 mt-1">Access ready-to-use ML models deployed and managed by administrators.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Feature 3 -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body">
-                    <div class="flex items-start gap-4">
-                        <div class="p-3 bg-accent/10 rounded-lg">
-                            <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-bold">History Tracking</h3>
-                            <p class="text-sm text-base-content/60 mt-1">Full execution history with detailed logs and performance metrics.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Feature 4 -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body">
-                    <div class="flex items-start gap-4">
-                        <div class="p-3 bg-success/10 rounded-lg">
-                            <svg class="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-bold">Save Presets</h3>
-                            <p class="text-sm text-base-content/60 mt-1">Save input configurations as presets for quick re-use.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Feature 5 -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body">
-                    <div class="flex items-start gap-4">
-                        <div class="p-3 bg-info/10 rounded-lg">
-                            <svg class="w-6 h-6 text-info" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-bold">Compare Predictions</h3>
-                            <p class="text-sm text-base-content/60 mt-1">Compare results side-by-side across different prediction runs.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Feature 6 -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body">
-                    <div class="flex items-start gap-4">
-                        <div class="p-3 bg-warning/10 rounded-lg">
-                            <svg class="w-6 h-6 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                            </svg>
-                        </div>
-                        <div>
-                            <h3 class="font-bold">Real-time Notifications</h3>
-                            <p class="text-sm text-base-content/60 mt-1">Get notified when predictions complete or require attention.</p>
-                        </div>
+    <div class="space-y-16">
+        <!-- Hero Section -->
+        <div class="hero py-20">
+            <div class="hero-content text-center">
+                <div class="max-w-2xl">
+                    <h1 class="text-5xl font-bold tracking-tight">Django Prefect ML Prediction System</h1>
+                    <p class="text-lg text-base-content/60 mt-6">Make Data-Driven Predictions with ML Models</p>
+                    <div class="flex gap-3 justify-center mt-8">
+                        {% if user.is_authenticated %}
+                            <a href="{% url 'flows:dashboard' %}" class="btn btn-primary btn-lg">Go to Dashboard</a>
+                        {% else %}
+                            <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg">Login to Get Started</a>
+                            <a href="{% url 'accounts:signup' %}" class="btn btn-outline btn-lg">Sign Up</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- CTA Section -->
-    {% if not user.is_authenticated %}
-    <div class="text-center py-12 bg-base-200 rounded-lg">
-        <h2 class="text-2xl font-bold">Ready to get started?</h2>
-        <p class="text-base-content/60 mt-2">Create your account and start making predictions today.</p>
-        <div class="flex gap-3 justify-center mt-6">
-            <a href="{% url 'accounts:login' %}" class="btn btn-primary">Login to Get Started</a>
-            <a href="{% url 'accounts:signup' %}" class="btn btn-outline">Sign Up</a>
+        <!-- How it Works Section -->
+        <div>
+            <h2 class="text-3xl font-bold text-center mb-10">How it Works</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Step 1 -->
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body items-center text-center">
+                        <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center text-xl font-bold">
+                            1
+                        </div>
+                        <h3 class="card-title mt-4">Configure Models</h3>
+                        <p class="text-base-content/60 text-sm">Admins upload and train ML models for your specific prediction needs.</p>
+                    </div>
+                </div>
+                <!-- Step 2 -->
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body items-center text-center">
+                        <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center text-xl font-bold">
+                            2
+                        </div>
+                        <h3 class="card-title mt-4">Make Predictions</h3>
+                        <p class="text-base-content/60 text-sm">Users input data and get instant predictions powered by trained models.</p>
+                    </div>
+                </div>
+                <!-- Step 3 -->
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body items-center text-center">
+                        <div class="w-12 h-12 rounded-full bg-primary text-primary-content flex items-center justify-center text-xl font-bold">
+                            3
+                        </div>
+                        <h3 class="card-title mt-4">Track & Compare</h3>
+                        <p class="text-base-content/60 text-sm">Track execution history and compare results across multiple predictions.</p>
+                    </div>
+                </div>
+            </div>
         </div>
+        <!-- Features Section -->
+        <div>
+            <h2 class="text-3xl font-bold text-center mb-10">Features</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Feature 1 -->
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body">
+                        <div class="flex items-start gap-4">
+                            <div class="p-3 bg-primary/10 rounded-lg">
+                                <svg class="w-6 h-6 text-primary"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">Simple Interface</h3>
+                                <p class="text-sm text-base-content/60 mt-1">Clean, intuitive UI for making predictions with minimal effort.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Feature 2 -->
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body">
+                        <div class="flex items-start gap-4">
+                            <div class="p-3 bg-secondary/10 rounded-lg">
+                                <svg class="w-6 h-6 text-secondary"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">Pre-trained Models</h3>
+                                <p class="text-sm text-base-content/60 mt-1">Access ready-to-use ML models deployed and managed by administrators.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Feature 3 -->
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body">
+                        <div class="flex items-start gap-4">
+                            <div class="p-3 bg-accent/10 rounded-lg">
+                                <svg class="w-6 h-6 text-accent"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">History Tracking</h3>
+                                <p class="text-sm text-base-content/60 mt-1">Full execution history with detailed logs and performance metrics.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Feature 4 -->
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body">
+                        <div class="flex items-start gap-4">
+                            <div class="p-3 bg-success/10 rounded-lg">
+                                <svg class="w-6 h-6 text-success"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">Save Presets</h3>
+                                <p class="text-sm text-base-content/60 mt-1">Save input configurations as presets for quick re-use.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Feature 5 -->
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body">
+                        <div class="flex items-start gap-4">
+                            <div class="p-3 bg-info/10 rounded-lg">
+                                <svg class="w-6 h-6 text-info"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">Compare Predictions</h3>
+                                <p class="text-sm text-base-content/60 mt-1">Compare results side-by-side across different prediction runs.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Feature 6 -->
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body">
+                        <div class="flex items-start gap-4">
+                            <div class="p-3 bg-warning/10 rounded-lg">
+                                <svg class="w-6 h-6 text-warning"
+                                     fill="none"
+                                     stroke="currentColor"
+                                     viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 class="font-bold">Real-time Notifications</h3>
+                                <p class="text-sm text-base-content/60 mt-1">Get notified when predictions complete or require attention.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- CTA Section -->
+        {% if not user.is_authenticated %}
+            <div class="text-center py-12 bg-base-200 rounded-lg">
+                <h2 class="text-2xl font-bold">Ready to get started?</h2>
+                <p class="text-base-content/60 mt-2">Create your account and start making predictions today.</p>
+                <div class="flex gap-3 justify-center mt-6">
+                    <a href="{% url 'accounts:login' %}" class="btn btn-primary">Login to Get Started</a>
+                    <a href="{% url 'accounts:signup' %}" class="btn btn-outline">Sign Up</a>
+                </div>
+            </div>
+        {% endif %}
     </div>
-    {% endif %}
-
-</div>
-{% endblock %}
+{% endblock public_content %}

@@ -68,6 +68,8 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       AWS_S3_ENDPOINT_URL: http://rustfs:9000
+      EMAIL_HOST: mailhog
+      EMAIL_PORT: "1025"
     volumes:
       - ./backend:/app
     ports:
@@ -100,6 +102,8 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
       AWS_S3_ENDPOINT_URL: http://rustfs:9000
+      EMAIL_HOST: mailhog
+      EMAIL_PORT: "1025"
     volumes:
       - .:/workspace:cached
       - notebook_outputs:/workspace/data/notebook_outputs
@@ -144,6 +148,16 @@ services:
       - ./backend:/app
       - .:/project
       - notebook_outputs:/project/data/notebook_outputs
+    networks:
+      - app-network
+
+  # ─── Mailhog (SMTP sink + web UI for dev email testing) ─────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: django-mailhog
+    ports:
+      - "1025:1025"   # SMTP — Django sends here
+      - "8025:8025"   # Web UI — http://localhost:8025
     networks:
       - app-network
 
