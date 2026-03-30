@@ -39,6 +39,13 @@ backend/apps/
 │   │       ├── signup.html
 │   │       ├── profile.html
 │   │       ├── settings.html
+│   │       ├── password_reset.html          # Enter email to request reset link
+│   │       ├── password_reset_done.html     # "Check your email" confirmation
+│   │       ├── password_reset_confirm.html  # Set new password (or "Link Expired")
+│   │       ├── password_reset_complete.html # Success — password updated
+│   │       ├── email/
+│   │       │   ├── password_reset.txt              # Email body
+│   │       │   └── password_reset_subject.txt      # Email subject
 │   │       ├── components/
 │   │       │   └── user_menu.html    # HTMX dropdown
 │   │       └── partials/
@@ -106,6 +113,10 @@ urlpatterns = [
 | `/accounts/settings/` | `settings` | `accounts:settings` |
 | `/accounts/api/user-menu/` | `user_menu` | `accounts:user_menu` |
 | `/accounts/api/logout/` | `logout_user` | `accounts:logout` |
+| `/accounts/password-reset/` | `PasswordResetView` | `accounts:password_reset` |
+| `/accounts/password-reset/done/` | `PasswordResetDoneView` | `accounts:password_reset_done` |
+| `/accounts/password-reset/confirm/<uidb64>/<token>/` | `PasswordResetConfirmView` | `accounts:password_reset_confirm` |
+| `/accounts/password-reset/complete/` | `PasswordResetCompleteView` | `accounts:password_reset_complete` |
 
 ### Flows Routes (`apps/flows/urls.py`)
 | URL | View | Name |
@@ -167,7 +178,11 @@ core/base_dashboard.html          ← dashboard variant (extends base.html)
 core/base_public.html             ← unauthenticated / marketing
 ├── core/index.html
 ├── accounts/login.html
-└── accounts/signup.html
+├── accounts/signup.html
+├── accounts/password_reset.html
+├── accounts/password_reset_done.html
+├── accounts/password_reset_confirm.html
+└── accounts/password_reset_complete.html
 ```
 
 HTMX partials and component snippets (`partials/`, `components/`) are rendered

@@ -5,6 +5,10 @@ Tests for accounts views and forms.
 import pytest
 from apps.accounts.forms import SignupForm
 from django.contrib.auth import get_user_model
+from django.contrib.auth.tokens import default_token_generator
+from django.core import mail
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 
 User = get_user_model()
 
@@ -261,3 +265,169 @@ def test_signup_form_password_mismatch():
     )
     assert not form.is_valid()
     assert "confirm_password" in form.errors
+
+
+# ============================================================================
+# Password reset flow
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_password_reset_get(anon_client):
+    response = anon_client.get("/accounts/password-reset/")
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_password_reset_post_known_email_sends_email(anon_client, existing_user):
+    response = anon_client.post(
+        "/accounts/password-reset/",
+        {"email": "test@example.com"},
+    )
+    assert response.status_code == 302
+    assert response["Location"] == "/accounts/password-reset/done/"
+    assert len(mail.outbox) == 1
+    assert "test@example.com" in mail.outbox[0].to
+
+
+@pytest.mark.django_db
+def test_password_reset_post_unknown_email_no_email_sent(anon_client):
+    # Should redirect identically to avoid user enumeration
+    response = anon_client.post(
+        "/accounts/password-reset/",
+        {"email": "nobody@example.com"},
+    )
+    assert response.status_code == 302
+    assert response["Location"] == "/accounts/password-reset/done/"
+    assert len(mail.outbox) == 0
+
+
+@pytest.mark.django_db
+def test_password_reset_done_get(anon_client):
+    response = anon_client.get("/accounts/password-reset/done/")
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_password_reset_confirm_invalid_token(anon_client):
+    response = anon_client.get("/accounts/password-reset/confirm/bad-uid/bad-token/")
+    assert response.status_code == 200
+    assert b"Link Expired" in response.content
+
+
+@pytest.mark.django_db
+def test_password_reset_confirm_valid_token_and_set_password(anon_client, existing_user):
+    uid = urlsafe_base64_encode(force_bytes(existing_user.pk))
+    token = default_token_generator.make_token(existing_user)
+
+    # GET — Django redirects to a session-based URL on valid tokens
+    get_response = anon_client.get(
+        f"/accounts/password-reset/confirm/{uid}/{token}/",
+        follow=True,
+    )
+    assert get_response.status_code == 200
+
+    # POST the new password to the redirected URL
+    post_url = (
+        get_response.redirect_chain[-1][0]
+        if get_response.redirect_chain
+        else f"/accounts/password-reset/confirm/{uid}/set-password/"
+    )
+    post_response = anon_client.post(
+        post_url,
+        {"new_password1": "NewSecurePass99!", "new_password2": "NewSecurePass99!"},
+        follow=True,
+    )
+    assert post_response.status_code == 200
+
+    existing_user.refresh_from_db()
+    assert existing_user.check_password("NewSecurePass99!")
+
+
+@pytest.mark.django_db
+def test_password_reset_complete_get(anon_client):
+    response = anon_client.get("/accounts/password-reset/complete/")
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_password_reset_email_contains_reset_link(anon_client, existing_user):
+    anon_client.post("/accounts/password-reset/", {"email": "test@example.com"})
+    body = mail.outbox[0].body
+    assert "/accounts/password-reset/confirm/" in body
+
+
+@pytest.mark.django_db
+def test_password_reset_email_subject(anon_client, existing_user):
+    anon_client.post("/accounts/password-reset/", {"email": "test@example.com"})
+    assert mail.outbox[0].subject == "Reset your password"
+
+
+@pytest.mark.django_db
+def test_password_reset_confirm_password_mismatch(anon_client, existing_user):
+    uid = urlsafe_base64_encode(force_bytes(existing_user.pk))
+    token = default_token_generator.make_token(existing_user)
+
+    get_response = anon_client.get(
+        f"/accounts/password-reset/confirm/{uid}/{token}/",
+        follow=True,
+    )
+    post_url = (
+        get_response.redirect_chain[-1][0]
+        if get_response.redirect_chain
+        else f"/accounts/password-reset/confirm/{uid}/set-password/"
+    )
+    post_response = anon_client.post(
+        post_url,
+        {"new_password1": "NewSecurePass99!", "new_password2": "DifferentPass99!"},
+    )
+    assert post_response.status_code == 200
+    existing_user.refresh_from_db()
+    assert not existing_user.check_password("NewSecurePass99!")
+
+
+@pytest.mark.django_db
+def test_password_reset_confirm_weak_password_rejected(anon_client, existing_user):
+    uid = urlsafe_base64_encode(force_bytes(existing_user.pk))
+    token = default_token_generator.make_token(existing_user)
+
+    get_response = anon_client.get(
+        f"/accounts/password-reset/confirm/{uid}/{token}/",
+        follow=True,
+    )
+    post_url = (
+        get_response.redirect_chain[-1][0]
+        if get_response.redirect_chain
+        else f"/accounts/password-reset/confirm/{uid}/set-password/"
+    )
+    post_response = anon_client.post(
+        post_url,
+        {"new_password1": "password", "new_password2": "password"},
+    )
+    assert post_response.status_code == 200
+    existing_user.refresh_from_db()
+    assert not existing_user.check_password("password")
+
+
+@pytest.mark.django_db
+def test_password_reset_link_unusable_after_use(anon_client, existing_user):
+    """Token can only be used once — second use shows Link Expired."""
+    uid = urlsafe_base64_encode(force_bytes(existing_user.pk))
+    token = default_token_generator.make_token(existing_user)
+    confirm_url = f"/accounts/password-reset/confirm/{uid}/{token}/"
+
+    # First use — follow redirect to session-based URL and set password
+    get_response = anon_client.get(confirm_url, follow=True)
+    post_url = (
+        get_response.redirect_chain[-1][0]
+        if get_response.redirect_chain
+        else f"/accounts/password-reset/confirm/{uid}/set-password/"
+    )
+    anon_client.post(
+        post_url,
+        {"new_password1": "NewSecurePass99!", "new_password2": "NewSecurePass99!"},
+    )
+
+    # Second attempt with the original token URL — token is now consumed
+    second_response = anon_client.get(confirm_url, follow=True)
+    assert b"Link Expired" in second_response.content
