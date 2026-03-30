@@ -56,9 +56,63 @@
             transition: opacity 150ms ease-in;
         }
 
-        /* Ensure primary buttons always have white text */
+        /*
+         * Tailwind CDN v3 preflight sets `button { background-color: transparent }`
+         * which overrides DaisyUI 5 component backgrounds. Restore them explicitly.
+         */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
         .btn-primary {
-            color: white;
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+            color: var(--color-primary-content, white);
+        }
+
+        .btn-primary:hover {
+            background-color: color-mix(in oklch, var(--color-primary) 85%, black);
+            border-color: color-mix(in oklch, var(--color-primary) 85%, black);
+        }
+
+        .btn-error {
+            background-color: var(--color-error);
+            border-color: var(--color-error);
+            color: var(--color-error-content, white);
+        }
+
+        .btn-error:hover {
+            background-color: color-mix(in oklch, var(--color-error) 85%, black);
+            border-color: color-mix(in oklch, var(--color-error) 85%, black);
+        }
+
+        /* Form input: softer border, smooth focus animation */
+        .form-control .label {
+            padding-bottom: 0.375rem;
+        }
+
+        .input.input-bordered {
+            border-color: rgba(0, 0, 0, 0.1);
+            transition: border-color 200ms ease, box-shadow 200ms ease;
+            padding-inline: 1rem;
+            padding-block: 0.625rem;
+        }
+
+        .input.input-bordered:hover:not(:focus) {
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+
+        .input.input-bordered:focus {
+            outline: none;
+            border-color: var(--color-primary, #6366f1);
+            box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary, #6366f1) 15%, transparent);
+        }
+
+        .input.input-error {
+            transition: border-color 200ms ease, box-shadow 200ms ease;
         }
         </style>
         {% block extra_css %}

@@ -2,15 +2,15 @@
      Parameters: name, label, type (text/email/password/number), placeholder, required (bool), value, error, help_text -->
 <div class="form-control w-full">
     {% if label %}
-        <label class="label" for="id_{{ name }}">
-            <span class="label-text">{{ label }}</span>
+        <label class="label pb-0" for="id_{{ name }}">
+            <span class="label-text text-sm font-medium text-base-content/60">{{ label }}</span>
         </label>
     {% endif %}
     <input type="{{ type|default:'text' }}"
            id="id_{{ name }}"
            name="{{ name }}"
            placeholder="{{ placeholder }}"
-           value="{{ value }}"
+           value="{{ value|default:'' }}"
            class="input input-bordered w-full {% if error %}input-error{% endif %}"
            {% if min is not None %}min="{{ min }}"{% endif %}
            {% if max is not None %}max="{{ max }}"{% endif %}

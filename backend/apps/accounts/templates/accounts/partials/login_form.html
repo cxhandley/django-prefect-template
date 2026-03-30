@@ -22,9 +22,11 @@
       hx-target="closest .card-body"
       hx-swap="innerHTML">
     {% csrf_token %}
-    {% include "core/components/ui/form_input.html" with name="email" label="Email" type="email" placeholder="you@example.com" required=True value=form.email.value error=form.email.errors.0 %}
-    {% include "core/components/ui/form_input.html" with name="password" label="Password" type="password" placeholder="Enter your password" required=True error=form.password.errors.0 %}
-    <div class="flex items-center justify-between mt-2">
+    <div class="space-y-4">
+        {% include "core/components/ui/form_input.html" with name="email" label="Email" type="email" placeholder="you@example.com" required=True value=form.email.value error=form.email.errors.0 %}
+        {% include "core/components/ui/form_input.html" with name="password" label="Password" type="password" placeholder="Enter your password" required=True error=form.password.errors.0 %}
+    </div>
+    <div class="flex items-center justify-between mt-4">
         {% include "core/components/ui/form_checkbox.html" with name="remember_me" label="Remember me" %}
         <a href="{% url 'accounts:password_reset' %}"
            class="link link-primary text-sm">Forgot Password?</a>
