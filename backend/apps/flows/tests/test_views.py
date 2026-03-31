@@ -207,14 +207,32 @@ def test_view_flow_results(authenticated_client, user, flow_execution_factory, m
 
 
 @pytest.mark.django_db
-def test_download_results_parquet(authenticated_client, user, flow_execution_factory, mock_s3):
+def test_download_results_parquet_redirects_to_presigned_url(
+    authenticated_client, user, flow_execution_factory, mock_s3, settings
+):
+    settings.DOWNLOAD_URL_EXPIRY_SECONDS = 3600
     execution = flow_execution_factory(
         triggered_by=user,
         s3_output_path="processed/output.parquet",
     )
     response = authenticated_client.get(f"/flows/results/{execution.flow_run_id}/download/parquet/")
-    # Presigned URL redirect
     assert response.status_code == 302
+    assert "processed/output.parquet" in response["Location"]
+    assert "X-Amz-Expires=3600" in response["Location"]
+
+
+@pytest.mark.django_db
+def test_download_results_parquet_uses_expiry_setting(
+    authenticated_client, user, flow_execution_factory, mock_s3, settings
+):
+    settings.DOWNLOAD_URL_EXPIRY_SECONDS = 600
+    execution = flow_execution_factory(
+        triggered_by=user,
+        s3_output_path="processed/output.parquet",
+    )
+    response = authenticated_client.get(f"/flows/results/{execution.flow_run_id}/download/parquet/")
+    assert response.status_code == 302
+    assert "X-Amz-Expires=600" in response["Location"]
 
 
 @pytest.mark.django_db
@@ -233,6 +251,8 @@ def test_download_results_csv(authenticated_client, user, flow_execution_factory
     response = authenticated_client.get(f"/flows/results/{execution.flow_run_id}/download/csv/")
     assert response.status_code == 200
     assert response["Content-Type"] == "text/csv"
+    assert "attachment" in response["Content-Disposition"]
+    assert ".csv" in response["Content-Disposition"]
 
 
 @pytest.mark.django_db
@@ -251,6 +271,8 @@ def test_download_results_json(authenticated_client, user, flow_execution_factor
 
     response = authenticated_client.get(f"/flows/results/{execution.flow_run_id}/download/json/")
     assert response.status_code == 200
+    assert "attachment" in response["Content-Disposition"]
+    assert ".json" in response["Content-Disposition"]
 
 
 @pytest.mark.django_db
@@ -264,6 +286,20 @@ def test_download_results_unsupported_format(
     mocker.patch("apps.flows.views.DataLakeAnalytics")
     response = authenticated_client.get(f"/flows/results/{execution.flow_run_id}/download/xml/")
     assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_download_results_requires_ownership(
+    authenticated_client, flow_execution_factory, user_factory, mock_s3, settings
+):
+    settings.DOWNLOAD_URL_EXPIRY_SECONDS = 3600
+    other_user = user_factory()
+    execution = flow_execution_factory(
+        triggered_by=other_user,
+        s3_output_path="processed/output.parquet",
+    )
+    response = authenticated_client.get(f"/flows/results/{execution.flow_run_id}/download/parquet/")
+    assert response.status_code == 404
 
 
 # ============================================================================

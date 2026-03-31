@@ -289,14 +289,18 @@ def view_flow_results(request, run_id):
 @login_required
 @require_http_methods(["GET"])
 def download_results(request, run_id, format="csv"):
-    """Download results in various formats"""
+    """Download results in various formats.
+
+    Parquet: redirects to a presigned S3 URL (no server-side data transfer).
+    CSV/JSON: generated server-side from the output Parquet via DuckDB.
+    """
     from django.http import HttpResponse
     from django.shortcuts import redirect
 
-    execution = get_object_or_404(FlowExecution, flow_run_id=run_id)
+    execution = get_object_or_404(FlowExecution, flow_run_id=run_id, triggered_by=request.user)
 
     if format == "parquet":
-        url = execution.generate_download_url(expires_in=3600)
+        url = execution.generate_download_url(filename=f"results_{run_id}.parquet")
         return redirect(url)
 
     with DataLakeAnalytics() as analytics:
@@ -308,7 +312,9 @@ def download_results(request, run_id, format="csv"):
 
         if format == "json":
             df = analytics.get_flow_results(execution.s3_output_path, limit=10000)
-            return JsonResponse(df.to_dicts(), safe=False)
+            response = JsonResponse(df.to_dicts(), safe=False)
+            response["Content-Disposition"] = f'attachment; filename="results_{run_id}.json"'
+            return response
 
     return HttpResponse("Unsupported format", status=400)
 
