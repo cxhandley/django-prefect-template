@@ -29,7 +29,7 @@ These close gaps in already-delivered epics. Low risk, small scope.
 
 ---
 
-### BL-002 · S3 Cleanup on Execution Delete `S`
+### ~~BL-002 · S3 Cleanup on Execution Delete~~ `S` ✓ Complete
 **User story:** US-2.4
 **Value:** Deleting an execution currently orphans its S3 files; storage grows unbounded.
 
@@ -37,6 +37,7 @@ These close gaps in already-delivered epics. Low risk, small scope.
 - Override `FlowExecution.delete()` (or use a `post_delete` signal) to remove `s3_input_path` and `s3_output_path` objects from S3
 - Handle the case where S3 objects are already absent (idempotent)
 - Add test coverage in `test_models.py`
+- Use daisy_ui modals for confirmation of delete.
 
 **No new wireframe or diagram needed.**
 
@@ -222,7 +223,7 @@ Valuable but not blocking any core workflow.
 | ID | Title | Tier | Effort | Depends on |
 |----|-------|------|--------|------------|
 | ~~BL-001~~ | ~~Password reset flow~~ | 1 | M | — |
-| BL-002 | S3 cleanup on delete | 1 | S | — |
+| ~~BL-002~~ | ~~S3 cleanup on delete~~ | 1 | S | — |
 | BL-003 | Presigned download URLs | 1 | S | — |
 | BL-004 | Export history as CSV | 1 | S | — |
 | BL-005 | Prediction comparison detail | 1 | M | — |
