@@ -98,6 +98,57 @@ def test_history_htmx_partial(authenticated_client, user):
 
 
 # ============================================================================
+# export_history_csv
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_export_history_csv_returns_csv(authenticated_client, user, flow_execution_factory):
+    make_completed(flow_execution_factory, user, flow_name="pipeline-a")
+    make_completed(flow_execution_factory, user, flow_name="pipeline-b")
+    response = authenticated_client.get("/flows/history/export/")
+    assert response.status_code == 200
+    assert response["Content-Type"] == "text/csv"
+    assert response["Content-Disposition"] == 'attachment; filename="execution_history.csv"'
+
+
+@pytest.mark.django_db
+def test_export_history_csv_contains_header_and_rows(
+    authenticated_client, user, flow_execution_factory
+):
+    make_completed(flow_execution_factory, user, flow_name="my-flow")
+    content = authenticated_client.get("/flows/history/export/").content.decode()
+    lines = content.strip().splitlines()
+    assert lines[0] == "id,flow_name,status,row_count,file_size_mb,created_at,completed_at"
+    assert "my-flow" in content
+
+
+@pytest.mark.django_db
+def test_export_history_csv_only_own_executions(
+    authenticated_client, user, flow_execution_factory, user_factory
+):
+    other = user_factory()
+    flow_execution_factory(triggered_by=other, flow_name="other-flow")
+    make_completed(flow_execution_factory, user, flow_name="my-flow")
+    content = authenticated_client.get("/flows/history/export/").content.decode()
+    assert "my-flow" in content
+    assert "other-flow" not in content
+
+
+@pytest.mark.django_db
+def test_export_history_csv_empty(authenticated_client, user):
+    content = authenticated_client.get("/flows/history/export/").content.decode()
+    lines = content.strip().splitlines()
+    assert len(lines) == 1  # header only
+
+
+@pytest.mark.django_db
+def test_export_history_csv_requires_login(client):
+    response = client.get("/flows/history/export/")
+    assert response.status_code == 302
+
+
+# ============================================================================
 # execution_detail
 # ============================================================================
 

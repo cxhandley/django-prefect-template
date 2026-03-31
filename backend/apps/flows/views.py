@@ -101,6 +101,37 @@ def history(request):
 
 
 @login_required
+@require_http_methods(["GET"])
+def export_history_csv(request):
+    """Export all of the authenticated user's executions as a CSV download."""
+    from django.http import HttpResponse
+
+    executions = FlowExecution.objects.filter(triggered_by=request.user).order_by("-created_at")
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["id", "flow_name", "status", "row_count", "file_size_mb", "created_at", "completed_at"]
+    )
+    for ex in executions:
+        writer.writerow(
+            [
+                ex.flow_run_id,
+                ex.flow_name,
+                ex.status,
+                ex.row_count,
+                ex.file_size_mb,
+                ex.created_at.isoformat(),
+                ex.completed_at.isoformat() if ex.completed_at else "",
+            ]
+        )
+
+    response = HttpResponse(buffer.getvalue(), content_type="text/csv")
+    response["Content-Disposition"] = 'attachment; filename="execution_history.csv"'
+    return response
+
+
+@login_required
 def execution_detail(request, run_id):
     """Single execution detail page"""
     execution = get_object_or_404(FlowExecution, flow_run_id=run_id, triggered_by=request.user)

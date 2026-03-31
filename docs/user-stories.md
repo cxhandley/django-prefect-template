@@ -119,7 +119,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [x] List shows: date, flow name, status, row count
 - [x] User can filter by status and search by flow name
 - [x] User can click any execution to view full details
-- [ ] User can download their full execution history as CSV
+- [x] User can download their full execution history as CSV
 - [x] Failed executions show error messages
 
 ### US-4.2: Compare Multiple Executions `[~]`

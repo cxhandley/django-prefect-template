@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.index, name="index"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("history/", views.history, name="history"),
+    path("history/export/", views.export_history_csv, name="export_history_csv"),
     path("execution/<uuid:run_id>/", views.execution_detail, name="execution_detail"),
     path("execution/<uuid:run_id>/stop/", views.stop_execution, name="stop_execution"),
     path("execution/<uuid:run_id>/delete/", views.delete_execution, name="delete_execution"),
