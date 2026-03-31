@@ -169,6 +169,9 @@ DATA_LAKE_BUCKET = env("DATA_LAKE_BUCKET")
 DUCKDB_THREADS = env.int("DUCKDB_THREADS", default=4)
 DUCKDB_MEMORY_LIMIT = env("DUCKDB_MEMORY_LIMIT", default="4GB")
 
+# S3 presigned URL expiry in seconds (default: 1 hour)
+DOWNLOAD_URL_EXPIRY_SECONDS = env.int("DOWNLOAD_URL_EXPIRY_SECONDS", default=3600)
+
 # Celery
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/0")

@@ -43,7 +43,7 @@ These close gaps in already-delivered epics. Low risk, small scope.
 
 ---
 
-### BL-003 · Presigned S3 Download URLs `S`
+### ~~BL-003 · Presigned S3 Download URLs~~ `S` ✓ Complete
 **User story:** US-2.3
 **Value:** Download links currently expose internal S3 paths directly; presigned URLs scope access and set an expiry.
 
@@ -56,7 +56,7 @@ These close gaps in already-delivered epics. Low risk, small scope.
 
 ---
 
-### BL-004 · Export Execution History as CSV `S`
+### ~~BL-004 · Export Execution History as CSV~~ `S` ✓ Complete
 **User story:** US-4.1
 **Value:** Users frequently want to take their history into a spreadsheet.
 
@@ -224,8 +224,8 @@ Valuable but not blocking any core workflow.
 |----|-------|------|--------|------------|
 | ~~BL-001~~ | ~~Password reset flow~~ | 1 | M | — |
 | ~~BL-002~~ | ~~S3 cleanup on delete~~ | 1 | S | — |
-| BL-003 | Presigned download URLs | 1 | S | — |
-| BL-004 | Export history as CSV | 1 | S | — |
+| ~~BL-003~~ | ~~Presigned download URLs~~ | 1 | S | — |
+| ~~BL-004~~ | ~~Export history as CSV~~ | 1 | S | — |
 | BL-005 | Prediction comparison detail | 1 | M | — |
 | BL-006 | Superuser user management UI | 2 | L | — |
 | BL-007 | Registration email confirmation | 2 | M | BL-001 |

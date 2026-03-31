@@ -66,7 +66,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [x] User can view a preview of the output Parquet (up to 100 rows via DuckDB)
 - [x] User can see summary statistics (total rows, revenue, transactions, customers)
 - [x] User can download results in CSV, Parquet, or JSON format
-- [ ] Download link uses a presigned S3 URL with expiry
+- [x] Download link uses a presigned S3 URL with expiry
 
 ### US-2.4: Delete a Pipeline Execution `[x]`
 **As a** user
@@ -119,7 +119,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [x] List shows: date, flow name, status, row count
 - [x] User can filter by status and search by flow name
 - [x] User can click any execution to view full details
-- [ ] User can download their full execution history as CSV
+- [x] User can download their full execution history as CSV
 - [x] Failed executions show error messages
 
 ### US-4.2: Compare Multiple Executions `[~]`

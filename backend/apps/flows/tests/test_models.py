@@ -36,14 +36,51 @@ class TestFlowExecution:
         assert execution.s3_input_url == "s3://test-bucket/raw/data.csv"
         assert execution.s3_output_url == "s3://test-bucket/processed/output.parquet"
 
-    def test_generate_download_url(self, flow_execution_factory, mock_s3):
+    def test_generate_download_url(self, flow_execution_factory, mock_s3, settings):
+        settings.DOWNLOAD_URL_EXPIRY_SECONDS = 3600
         execution = flow_execution_factory(s3_output_path="processed/output.parquet")
 
-        url = execution.generate_download_url(expires_in=3600)
+        url = execution.generate_download_url()
 
         assert url is not None
         assert "processed/output.parquet" in url
         assert "X-Amz-Expires=3600" in url
+
+    def test_generate_download_url_uses_expiry_setting(
+        self, flow_execution_factory, mock_s3, settings
+    ):
+        settings.DOWNLOAD_URL_EXPIRY_SECONDS = 900
+        execution = flow_execution_factory(s3_output_path="processed/output.parquet")
+
+        url = execution.generate_download_url()
+
+        assert "X-Amz-Expires=900" in url
+
+    def test_generate_download_url_sets_content_disposition(
+        self, flow_execution_factory, mock_s3, settings
+    ):
+        settings.DOWNLOAD_URL_EXPIRY_SECONDS = 3600
+        execution = flow_execution_factory(s3_output_path="processed/output.parquet")
+
+        url = execution.generate_download_url(filename="results.parquet")
+
+        assert "results.parquet" in url
+        assert "response-content-disposition" in url
+
+    def test_generate_download_url_default_filename(
+        self, flow_execution_factory, mock_s3, settings
+    ):
+        settings.DOWNLOAD_URL_EXPIRY_SECONDS = 3600
+        execution = flow_execution_factory(s3_output_path="processed/flows/run/output.parquet")
+
+        url = execution.generate_download_url()
+
+        assert "output.parquet" in url
+
+    def test_generate_download_url_no_output_path(self, flow_execution_factory, mock_s3):
+        execution = flow_execution_factory(s3_output_path="")
+
+        assert execution.generate_download_url() is None
 
     def test_celery_task_id_stored(self, flow_execution_factory):
         execution = flow_execution_factory(celery_task_id="abc-123-task")

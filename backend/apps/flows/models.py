@@ -88,10 +88,23 @@ class FlowExecution(models.Model):
             except ClientError:
                 pass
 
-    def generate_download_url(self, expires_in=3600):
-        """Generate presigned S3 URL for direct download."""
+    def generate_download_url(self, filename=None):
+        """Generate presigned S3 URL for direct download of the output file.
+
+        Args:
+            filename: Optional filename for the Content-Disposition header.
+                      Defaults to the basename of s3_output_path.
+
+        Returns:
+            Presigned URL string, or None if no output path is set.
+        """
         if not self.s3_output_path:
             return None
+
+        expires_in = settings.DOWNLOAD_URL_EXPIRY_SECONDS
+
+        if filename is None:
+            filename = self.s3_output_path.rsplit("/", 1)[-1]
 
         s3_client = boto3.client(
             "s3",
@@ -104,6 +117,10 @@ class FlowExecution(models.Model):
 
         return s3_client.generate_presigned_url(
             "get_object",
-            Params={"Bucket": settings.DATA_LAKE_BUCKET, "Key": self.s3_output_path},
+            Params={
+                "Bucket": settings.DATA_LAKE_BUCKET,
+                "Key": self.s3_output_path,
+                "ResponseContentDisposition": f'attachment; filename="{filename}"',
+            },
             ExpiresIn=expires_in,
         )
