@@ -1,0 +1,34 @@
+{% comment %}
+  Table header row.
+  Column visibility driven by Alpine x-show.
+  Sortable columns show an icon and handle click-to-sort.
+  This element is NOT swapped by HTMX — it stays in place across pagination.
+{% endcomment %}
+<thead>
+    <tr>
+        <!-- Select-all checkbox -->
+        <th class="w-10">
+            <input type="checkbox"
+                   class="checkbox checkbox-sm"
+                   :checked="allPageSelected"
+                   :indeterminate="somePageSelected && !allPageSelected"
+                   @change="toggleAll(pageRowIds)"
+                   aria-label="Select all rows on this page" />
+        </th>
+        <!-- Data columns -->
+        {% for col in table_config.columns %}
+            <th x-show="isVisible('{{ col.key }}')"
+                {% if col.sortable %} class="cursor-pointer select-none hover:bg-base-200" @click="sortBy('{{ col.sort_field }}')" {% endif %}>
+                <span class="flex items-center gap-1">
+                    {{ col.label }}
+                    {% if col.sortable %}
+                        <span class="text-base-content/40 text-xs"
+                              x-text="sortIcon('{{ col.sort_field }}')"></span>
+                    {% endif %}
+                </span>
+            </th>
+        {% endfor %}
+        <!-- Actions column -->
+        <th class="w-16"></th>
+    </tr>
+</thead>

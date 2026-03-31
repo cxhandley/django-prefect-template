@@ -1,0 +1,66 @@
+flowchart TD
+    subgraph PAGE_LOAD["Page load"]
+        A([Page rendered]) --> B[Alpine init:\nread localStorage for hiddenCols\nparse active_filters from URL\npopulate filterRows]
+        B --> C[Apply hidden CSS class\nto columns in hiddenCols set]
+    end
+
+    subgraph FILTER_BUILDER["Filter builder"]
+        D([User clicks Filters ▾]) --> E[Open filter dropdown\nfiltersOpen = true]
+        E --> F{filterRows\nempty?}
+        F -- Yes --> G[Show empty state:\n'Add a filter to get started']
+        F -- No --> H[Render filter rows\nfield / op / value inputs]
+        G & H --> I([User clicks Add filter])
+        I --> J[Append empty row to filterRows]
+        J --> K([User fills field / op / value])
+        K --> L{All rows\ncomplete?}
+        L -- No --> M[Apply button disabled]
+        L -- Yes --> N[Apply button enabled]
+        N --> O([User clicks Apply])
+        O --> P[Build URL with f_field\[\] f_op\[\] f_val\[\] params]
+        P --> Q[htmx.ajax GET to hx_url\ntarget = #dt-{id}-body\npushUrl = built URL]
+        Q --> R[filtersOpen = false]
+
+        K --> S([User clicks ✕ on row])
+        S --> T[removeFilter removes row\nif filterRows empty:\napplyFilters with no params]
+    end
+
+    subgraph CHIP_BAR["Active filter chips"]
+        U([Active filter chip ✕ clicked]) --> V[Find matching row in filterRows\nremove it]
+        V --> W[Call applyFilters\nrebuild URL without that filter]
+    end
+
+    subgraph COL_VISIBILITY["Column visibility"]
+        X([User clicks Columns ▾]) --> Y[Open column dropdown\ncolsOpen = true]
+        Y --> Z[Render checkbox per hideable column\nchecked = isVisible key]
+        Z --> AA([User toggles checkbox])
+        AA --> AB[toggleCol key\nupdate hiddenCols array]
+        AB --> AC[Persist to localStorage\ndt_{tableId}_cols]
+        AC --> AD[Toggle hidden class\non all th/td for that column\nno server round-trip]
+    end
+
+    subgraph BULK["Bulk selection & actions"]
+        AE([User checks row]) --> AF[toggleRow id\nadd or remove from selectedIds]
+        AF --> AG{selectedCount > 0?}
+        AG -- No --> AH[Hide bulk action bar]
+        AG -- Yes --> AI[Show bulk action bar\nwith selectedCount label]
+        AI --> AJ{For each action:\nselectedCount >= min\nAND <= max?}
+        AJ -- No --> AK[Button disabled\ntooltip shows constraint]
+        AJ -- Yes --> AL[Button enabled]
+        AL --> AM([User clicks action])
+        AM --> AN{confirm: true?}
+        AN -- Yes --> AO[window.confirm dialog]
+        AO -- Cancelled --> AI
+        AO -- Confirmed --> AP
+        AN -- No --> AP{method = GET?}
+        AP -- GET --> AQ[Navigate:\nwindow.location = url?idParam=id1,id2...]
+        AP -- POST --> AR[Build hidden form\nsubmit via JS]
+    end
+
+    subgraph SORT["Column sort"]
+        AS([User clicks sortable header]) --> AT{Current sort\nfor this field?}
+        AT -- None / other field --> AU[Set sort = field ASC]
+        AT -- ASC --> AV[Set sort = field DESC]
+        AT -- DESC --> AW[Clear sort = default]
+        AU & AV & AW --> AX[htmx.ajax GET\nwith &sort=... param\n+ existing filters]
+        AX --> AY[Swap tbody, pushUrl]
+    end

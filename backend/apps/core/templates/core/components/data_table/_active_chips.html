@@ -1,0 +1,32 @@
+{% comment %}
+  Active filter chip row.
+  Shown when activeFilters.length > 0.
+  Each chip shows a human-readable label and has a dismiss button.
+{% endcomment %}
+<div x-show="activeFilters.length > 0"
+     x-transition
+     class="flex flex-wrap items-center gap-2 py-1"
+     style="display: none">
+    <span class="text-xs text-base-content/50 font-medium">Active filters:</span>
+    <template x-for="(filter, i) in activeFilters" :key="i">
+        <span class="badge badge-outline gap-1 text-xs py-3">
+            <span x-text="filterLabel(filter)"></span>
+            <button @click="removeActiveFilter(i)"
+                    type="button"
+                    class="hover:text-error"
+                    aria-label="Remove filter">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="h-3 w-3"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </span>
+    </template>
+    <button x-show="activeFilters.length > 1"
+            @click="clearFilters()"
+            type="button"
+            class="text-xs text-base-content/40 underline hover:text-base-content">Clear all</button>
+</div>

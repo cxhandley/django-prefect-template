@@ -13,6 +13,7 @@ urlpatterns = [
     path("execution/<uuid:run_id>/stop/", views.stop_execution, name="stop_execution"),
     path("execution/<uuid:run_id>/delete/", views.delete_execution, name="delete_execution"),
     path("comparison/", views.comparison, name="comparison"),
+    path("comparison/export/", views.comparison_export, name="comparison_export"),
     path("api/flows-menu/", views.flows_menu, name="flows_menu"),
     path("upload-and-process/", views.upload_and_process, name="upload_and_process"),
     path("run-prediction/", views.run_prediction, name="run_prediction"),

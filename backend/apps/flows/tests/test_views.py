@@ -175,24 +175,238 @@ def test_execution_detail_not_found(authenticated_client):
 
 
 # ============================================================================
+# history — DataTable filter / sort params
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_history_datatable_filter_by_status(authenticated_client, user, flow_execution_factory):
+    make_completed(flow_execution_factory, user, flow_name="flow-a")
+    flow_execution_factory(triggered_by=user, flow_name="flow-b", status="FAILED")
+    response = authenticated_client.get(
+        "/flows/history/?f_field[]=status&f_op[]=eq&f_val[]=COMPLETED"
+    )
+    assert response.status_code == 200
+    assert b"flow-a" in response.content
+
+
+@pytest.mark.django_db
+def test_history_datatable_sort_param(authenticated_client, user, flow_execution_factory):
+    make_completed(flow_execution_factory, user)
+    response = authenticated_client.get("/flows/history/?sort=created_at")
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_history_datatable_invalid_sort_ignored(authenticated_client, user, flow_execution_factory):
+    make_completed(flow_execution_factory, user)
+    response = authenticated_client.get("/flows/history/?sort=__evil__")
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_history_datatable_pagination(authenticated_client, user, flow_execution_factory):
+    for _ in range(30):
+        make_completed(flow_execution_factory, user)
+    response = authenticated_client.get("/flows/history/?page=2")
+    assert response.status_code == 200
+
+
+# ============================================================================
 # comparison
 # ============================================================================
 
 
 @pytest.mark.django_db
-def test_comparison_view(authenticated_client, user, flow_execution_factory):
-    ex1 = make_completed(flow_execution_factory, user)
-    ex2 = make_completed(flow_execution_factory, user)
+def test_comparison_view_with_real_data(authenticated_client, user, flow_execution_factory):
+    """comparison() returns real inputs and result from FlowExecution.parameters."""
+    params_1 = {
+        "income": 60000,
+        "age": 30,
+        "credit_score": 700,
+        "employment_years": 5,
+        "score": 0.75,
+        "classification": "Approved",
+        "confidence": 75,
+    }
+    params_2 = {
+        "income": 40000,
+        "age": 45,
+        "credit_score": 600,
+        "employment_years": 2,
+        "score": 0.35,
+        "classification": "Declined",
+        "confidence": 35,
+    }
+    ex1 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
+    ex2 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
+    FlowExecution.objects.filter(pk=ex1.pk).update(parameters=params_1)
+    FlowExecution.objects.filter(pk=ex2.pk).update(parameters=params_2)
+
     response = authenticated_client.get(
         f"/flows/comparison/?ids={ex1.flow_run_id},{ex2.flow_run_id}"
     )
     assert response.status_code == 200
+    ctx = response.context
+    assert ctx["insufficient"] is False
+    assert len(ctx["comparison_data"]) == 2
+    # Both executions have different income → it's a differing field
+    assert "income" in ctx["differing_fields"]
 
 
 @pytest.mark.django_db
-def test_comparison_empty(authenticated_client):
+def test_comparison_differing_fields_identical_inputs(
+    authenticated_client, user, flow_execution_factory
+):
+    """differing_fields is empty when all inputs are the same."""
+    params = {
+        "income": 60000,
+        "age": 30,
+        "credit_score": 700,
+        "employment_years": 5,
+        "score": 0.75,
+        "classification": "Approved",
+        "confidence": 75,
+    }
+    ex1 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
+    ex2 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
+    FlowExecution.objects.filter(pk=ex1.pk).update(parameters=params)
+    FlowExecution.objects.filter(pk=ex2.pk).update(parameters=params)
+
+    response = authenticated_client.get(
+        f"/flows/comparison/?ids={ex1.flow_run_id},{ex2.flow_run_id}"
+    )
+    assert response.status_code == 200
+    assert response.context["differing_fields"] == set()
+
+
+@pytest.mark.django_db
+def test_comparison_insufficient_one_execution(authenticated_client, user, flow_execution_factory):
+    """insufficient=True when only 1 valid execution ID is provided."""
+    ex = make_completed(flow_execution_factory, user)
+    response = authenticated_client.get(f"/flows/comparison/?ids={ex.flow_run_id}")
+    assert response.status_code == 200
+    assert response.context["insufficient"] is True
+    assert response.context["comparison_data"] == []
+
+
+@pytest.mark.django_db
+def test_comparison_empty_ids(authenticated_client):
+    """No ids → empty comparison_data, insufficient=False."""
     response = authenticated_client.get("/flows/comparison/")
     assert response.status_code == 200
+    assert response.context["comparison_data"] == []
+    assert response.context["insufficient"] is False
+
+
+@pytest.mark.django_db
+def test_comparison_only_own_executions(
+    authenticated_client, user, flow_execution_factory, user_factory
+):
+    """Executions belonging to another user are not included in comparison."""
+    other = user_factory()
+    ex1 = make_completed(flow_execution_factory, user)
+    ex2 = make_completed(flow_execution_factory, other)
+    response = authenticated_client.get(
+        f"/flows/comparison/?ids={ex1.flow_run_id},{ex2.flow_run_id}"
+    )
+    assert response.status_code == 200
+    # Only 1 own execution resolved → insufficient
+    assert response.context["insufficient"] is True
+
+
+@pytest.mark.django_db
+def test_comparison_requires_login(client, user, flow_execution_factory):
+    ex1 = make_completed(flow_execution_factory, user)
+    ex2 = make_completed(flow_execution_factory, user)
+    response = client.get(f"/flows/comparison/?ids={ex1.flow_run_id},{ex2.flow_run_id}")
+    assert response.status_code == 302
+
+
+# ============================================================================
+# comparison_export
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_comparison_export_returns_csv(authenticated_client, user, flow_execution_factory):
+    params = {
+        "income": 60000,
+        "age": 30,
+        "credit_score": 700,
+        "employment_years": 5,
+        "score": 0.75,
+        "classification": "Approved",
+        "confidence": 75,
+    }
+    ex1 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
+    ex2 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
+    FlowExecution.objects.filter(pk=ex1.pk).update(parameters=params)
+    FlowExecution.objects.filter(pk=ex2.pk).update(parameters=params)
+
+    response = authenticated_client.get(
+        f"/flows/comparison/export/?ids={ex1.flow_run_id},{ex2.flow_run_id}"
+    )
+    assert response.status_code == 200
+    assert "text/csv" in response["Content-Type"]
+    assert "attachment" in response["Content-Disposition"]
+    assert ".csv" in response["Content-Disposition"]
+
+
+@pytest.mark.django_db
+def test_comparison_export_csv_content(authenticated_client, user, flow_execution_factory):
+    params_1 = {
+        "income": 60000,
+        "age": 30,
+        "credit_score": 700,
+        "employment_years": 5,
+        "score": 0.75,
+        "classification": "Approved",
+        "confidence": 75,
+    }
+    params_2 = {
+        "income": 40000,
+        "age": 45,
+        "credit_score": 600,
+        "employment_years": 2,
+        "score": 0.35,
+        "classification": "Declined",
+        "confidence": 35,
+    }
+    ex1 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
+    ex2 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
+    FlowExecution.objects.filter(pk=ex1.pk).update(parameters=params_1)
+    FlowExecution.objects.filter(pk=ex2.pk).update(parameters=params_2)
+
+    response = authenticated_client.get(
+        f"/flows/comparison/export/?ids={ex1.flow_run_id},{ex2.flow_run_id}"
+    )
+    content = b"".join(response.streaming_content).decode()
+    lines = content.strip().splitlines()
+    # Header row should be "field,<short_id1>,<short_id2>"
+    assert lines[0].startswith("field,")
+    # Should contain all comparison fields as rows
+    field_names = [line.split(",")[0] for line in lines[1:]]
+    assert "income" in field_names
+    assert "classification" in field_names
+    assert "confidence" in field_names
+
+
+@pytest.mark.django_db
+def test_comparison_export_redirects_with_insufficient_ids(
+    authenticated_client, user, flow_execution_factory
+):
+    ex = make_completed(flow_execution_factory, user)
+    response = authenticated_client.get(f"/flows/comparison/export/?ids={ex.flow_run_id}")
+    assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_comparison_export_requires_login(client, user, flow_execution_factory):
+    ex1 = make_completed(flow_execution_factory, user)
+    ex2 = make_completed(flow_execution_factory, user)
+    response = client.get(f"/flows/comparison/export/?ids={ex1.flow_run_id},{ex2.flow_run_id}")
+    assert response.status_code == 302
 
 
 # ============================================================================

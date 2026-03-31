@@ -1,0 +1,19 @@
+flowchart TD
+    A([comparison view called]) --> B[Query FlowExecution rows by ids]
+    B --> C{Any executions\nfound?}
+    C -- No --> D([render empty state])
+    C -- Yes --> E[Define INPUT_KEYS =\nincome, age, credit_score,\nemployment_years]
+    E --> F[For each input key:\ncollect values across all executions]
+    F --> G{All values\nfor key identical?}
+    G -- Yes --> H[Mark key as SAME]
+    G -- No --> I[Mark key as DIFFERS]
+    H & I --> J[Build comparison_data list per execution:\n· inputs = {k: params[k] for k in INPUT_KEYS}\n· result = {score, classification, confidence}\n  from parameters\n· duration from timestamps]
+    J --> K[Pass differing_fields set to template]
+    K --> L([render comparison.html])
+
+    L --> M{User clicks\nExport CSV?}
+    M -- No --> N([done])
+    M -- Yes --> O[GET /flows/comparison/export/?ids=...]
+    O --> P[Re-query executions for user]
+    P --> Q[Build CSV rows:\nheader: field + exec short-ids\nrows: each INPUT_KEY value\nrows: score, classification,\nconfidence]
+    Q --> R([StreamingHttpResponse text/csv\nattachment download])

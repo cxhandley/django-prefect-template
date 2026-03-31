@@ -130,8 +130,13 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 **Acceptance Criteria:**
 - [x] User can select executions and navigate to a comparison view
 - [x] Page displays execution metadata side-by-side
-- [ ] Prediction input values and scores compared visually
-- [ ] User can export comparison as CSV
+- [ ] Prediction input values (income, age, credit score, employment years) displayed per execution
+- [ ] Score, classification, and confidence read from `FlowExecution.parameters` (no mocks)
+- [ ] Input fields that differ across executions are visually highlighted (distinct badge colour)
+- [ ] User can export comparison as CSV via a dedicated endpoint
+- [ ] History page shows input summary per row so user can pick meaningful predictions to compare
+- [ ] Comparison page shows "No predictions yet" empty state with CTA to dashboard when user has 0 predictions
+- [ ] Comparison page shows "Need at least 2 predictions" state with warning alert and dual CTAs when fewer than 2 IDs are resolved
 
 ---
 
@@ -156,6 +161,28 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [ ] Admin can view logs for any user's execution
 - [ ] Logs filterable by user, date range, and status
 - [ ] Error messages and stack traces visible
+
+---
+
+## Epic 6: UI Component Library `[ ]`
+
+### US-6.1: Reusable Advanced DataTable `[ ]`
+**As a** developer
+**I want** a reusable DataTable template component
+**So that** every list view in the application gets consistent advanced filtering, column control, and bulk actions without duplicating logic
+
+**Acceptance Criteria:**
+- [ ] Column definitions passed from view context control which fields are shown, their labels, and whether they are sortable / filterable / hideable
+- [ ] Column visibility toggled per-user via browser localStorage (persists across page loads, keyed by `table_id`)
+- [ ] Filter builder supports operators: contains, not contains, equals, not equals, starts with, ends with, is empty, is not empty (text); eq, neq, gt, gte, lt, lte (number); eq, before, after (datetime); eq, neq (choice)
+- [ ] Multiple filters combinable (AND logic); each shown as a dismissable chip in an active-filters bar
+- [ ] Filter state encoded in URL query params so filtered views are shareable and browser back/forward works
+- [ ] Bulk action bar appears when ≥ 1 row is checked; actions are enabled/disabled based on `min_select` / `max_select` per action
+- [ ] Bulk actions configurable per table (GET navigation or POST form submission)
+- [ ] Sorting via column header click; sort state encoded in URL params
+- [ ] HTMX fetches filtered / sorted / paginated results without full page reload
+- [ ] Alpine.js manages all client-side interactive state (filter builder rows, column toggles, selected IDs)
+- [ ] Component requires no changes to base templates; added via `{% include %}` with a `table_config` context dict
 
 ---
 

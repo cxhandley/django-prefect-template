@@ -1,20 +1,101 @@
 import csv
+import datetime
 import io
+import json
 import uuid
 
+from apps.core.mixins import (
+    build_active_filters,
+    build_filter_query_string,
+    build_table_config_json,
+    get_filtered_queryset,
+)
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
 from .models import FlowExecution
 from .services.datalake import DataLakeAnalytics
 from .tasks import run_pipeline_task, run_prediction_task
+
+# ── DataTable configuration for the history view ──────────────────────────────
+
+HISTORY_COLUMNS = [
+    {
+        "key": "created_at",
+        "label": "Date / Time",
+        "sortable": True,
+        "sort_field": "created_at",
+        "filterable": True,
+        "filter_type": "datetime",
+        "filter_choices": [],
+        "visible": True,
+        "hideable": False,
+    },
+    {
+        "key": "input_summary",
+        "label": "Input Summary",
+        "sortable": False,
+        "filterable": False,
+        "visible": True,
+        "hideable": True,
+    },
+    {
+        "key": "classification",
+        "label": "Prediction",
+        "sortable": False,
+        "filterable": True,
+        "filter_type": "choice",
+        "filter_choices": ["Approved", "Review", "Declined"],
+        "visible": True,
+        "hideable": True,
+    },
+    {
+        "key": "status",
+        "label": "Status",
+        "sortable": True,
+        "sort_field": "status",
+        "filterable": True,
+        "filter_type": "choice",
+        "filter_choices": ["COMPLETED", "RUNNING", "FAILED", "PENDING"],
+        "visible": True,
+        "hideable": True,
+    },
+]
+
+HISTORY_FILTER_FIELDS = {
+    "created_at": {"type": "datetime", "orm_field": "created_at"},
+    "classification": {"type": "choice", "orm_field": "parameters__classification"},
+    "status": {"type": "choice", "orm_field": "status"},
+}
+
+HISTORY_BULK_ACTIONS = [
+    {
+        "key": "compare",
+        "label": "Compare Selected",
+        "method": "GET",
+        "url": "/flows/comparison/",
+        "id_param": "ids",
+        "id_sep": ",",
+        "min_select": 2,
+        "max_select": 3,
+        "confirm": False,
+        "variant": "btn-outline btn-sm",
+    },
+]
+
+# ── Comparison constants ───────────────────────────────────────────────────────
+
+PREDICTION_INPUT_KEYS = ["income", "age", "credit_score", "employment_years"]
+PREDICTION_RESULT_KEYS = ["score", "classification", "confidence"]
+COMPARISON_CSV_FIELDS = PREDICTION_INPUT_KEYS + PREDICTION_RESULT_KEYS
 
 
 @login_required
@@ -68,30 +149,34 @@ def dashboard(request):
 
 @login_required
 def history(request):
-    """Execution history with search, filtering, and pagination"""
-    executions = FlowExecution.objects.filter(triggered_by=request.user).order_by("-created_at")
+    """Execution history with DataTable: advanced filtering, sorting, pagination."""
+    qs = FlowExecution.objects.filter(triggered_by=request.user)
+    qs, sort = get_filtered_queryset(
+        request, qs, HISTORY_FILTER_FIELDS, HISTORY_COLUMNS, default_sort="-created_at"
+    )
 
-    # Search
-    q = request.GET.get("q", "")
-    if q:
-        executions = executions.filter(flow_name__icontains=q)
+    paginator = Paginator(qs, 10)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
 
-    # Status filter
-    status = request.GET.get("status", "")
-    if status:
-        executions = executions.filter(status=status)
-
-    paginator = Paginator(executions, 10)
-    page_number = request.GET.get("page", 1)
-    page_obj = paginator.get_page(page_number)
+    table_config = {
+        "table_id": "history",
+        "hx_url": reverse("flows:history"),
+        "hx_target": "#dt-history-body",
+        "columns": HISTORY_COLUMNS,
+        "bulk_actions": HISTORY_BULK_ACTIONS,
+        "active_filters": build_active_filters(request),
+        "sort_field": sort,
+    }
 
     context = {
         "user": request.user,
         "active_page": "history",
         "page_obj": page_obj,
-        "executions": page_obj,
-        "search_query": q,
-        "status_filter": status,
+        "table_config": table_config,
+        "table_config_json": build_table_config_json(table_config),
+        "page_row_ids_json": json.dumps([str(ex.flow_run_id) for ex in page_obj]),
+        "filter_query_string": build_filter_query_string(request),
+        "table_body_template": "flows/partials/history_table_body.html",
     }
 
     if request.headers.get("HX-Request"):
@@ -173,17 +258,48 @@ def execution_detail(request, run_id):
 
 @login_required
 def comparison(request):
-    """Compare multiple executions side-by-side"""
+    """Compare multiple prediction executions side-by-side using real parameters."""
     ids_param = request.GET.get("ids", "")
     run_ids = [i.strip() for i in ids_param.split(",") if i.strip()]
 
-    executions = FlowExecution.objects.filter(
-        flow_run_id__in=run_ids,
-        triggered_by=request.user,
-    ).order_by("-created_at")
+    executions = list(
+        FlowExecution.objects.filter(
+            flow_run_id__in=run_ids,
+            triggered_by=request.user,
+        ).order_by("-created_at")
+    )
+
+    breadcrumbs = [
+        {"name": "Dashboard", "url": "/flows/dashboard/"},
+        {"name": "History", "url": "/flows/history/"},
+        {"name": "Compare Predictions"},
+    ]
+
+    if len(executions) < 2:
+        return render(
+            request,
+            "flows/comparison.html",
+            {
+                "user": request.user,
+                "active_page": "history",
+                "comparison_data": [],
+                "differing_fields": set(),
+                "ids_param": ids_param,
+                "insufficient": len(executions) == 1,
+                "breadcrumbs": breadcrumbs,
+            },
+        )
+
+    # Determine which input fields differ across all selected executions
+    differing_fields = set()
+    for key in PREDICTION_INPUT_KEYS:
+        values = {str(ex.parameters.get(key)) for ex in executions if ex.parameters}
+        if len(values) > 1:
+            differing_fields.add(key)
 
     comparison_data = []
     for ex in executions:
+        params = ex.parameters or {}
         duration = None
         if ex.completed_at and ex.created_at:
             duration = round((ex.completed_at - ex.created_at).total_seconds(), 2)
@@ -191,12 +307,12 @@ def comparison(request):
             {
                 "execution": ex,
                 "duration": duration,
-                "prediction": {
-                    "value": "0.82",
-                    "classification": "Approved",
-                    "confidence": 82,
+                "inputs": {k: params.get(k) for k in PREDICTION_INPUT_KEYS},
+                "result": {
+                    "score": params.get("score"),
+                    "classification": params.get("classification"),
+                    "confidence": params.get("confidence"),
                 },
-                "inputs": ex.parameters or {},
             }
         )
 
@@ -204,13 +320,54 @@ def comparison(request):
         "user": request.user,
         "active_page": "history",
         "comparison_data": comparison_data,
-        "breadcrumbs": [
-            {"name": "Dashboard", "url": "/flows/dashboard/"},
-            {"name": "History", "url": "/flows/history/"},
-            {"name": "Compare Predictions"},
-        ],
+        "differing_fields": differing_fields,
+        "ids_param": ids_param,
+        "insufficient": False,
+        "breadcrumbs": breadcrumbs,
     }
     return render(request, "flows/comparison.html", context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def comparison_export(request):
+    """Download the comparison data as a CSV file."""
+    ids_param = request.GET.get("ids", "")
+    run_ids = [i.strip() for i in ids_param.split(",") if i.strip()]
+
+    executions = list(
+        FlowExecution.objects.filter(
+            flow_run_id__in=run_ids,
+            triggered_by=request.user,
+        ).order_by("-created_at")
+    )
+
+    if len(executions) < 2:
+        return redirect(f"/flows/comparison/?ids={ids_param}")
+
+    short_ids = [str(ex.flow_run_id)[:8] for ex in executions]
+
+    def _rows():
+        yield ["field"] + short_ids
+        for field in COMPARISON_CSV_FIELDS:
+            row = [field]
+            for ex in executions:
+                row.append(ex.parameters.get(field, "") if ex.parameters else "")
+            yield row
+
+    def _stream():
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        for row in _rows():
+            writer.writerow(row)
+            yield buf.getvalue()
+            buf.seek(0)
+            buf.truncate()
+
+    date_str = datetime.date.today().strftime("%Y-%m-%d")
+    response = StreamingHttpResponse(_stream(), content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="comparison_{date_str}.csv"'
+    return response
 
 
 @login_required

@@ -1,0 +1,30 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Django
+    participant DB as PostgreSQL
+
+    %% ── Comparison page load ──────────────────────────────────────────────────
+    User->>Browser: clicks "Compare" on selected executions
+    Browser->>Django: GET /flows/comparison/?ids=uuid1,uuid2[,uuid3]
+    Django->>DB: SELECT FlowExecution WHERE flow_run_id IN (...) AND triggered_by = user
+    DB-->>Django: execution rows (parameters JSON included)
+
+    Note over Django: For each execution:<br/>Extract INPUT_KEYS = {income, age,<br/>credit_score, employment_years}<br/>Extract RESULT_KEYS = {score,<br/>classification, confidence}
+
+    Note over Django: Compute differing_fields:<br/>for each input key, collect all<br/>values; flag key if values differ
+
+    Django-->>Browser: render comparison.html<br/>(comparison_data + differing_fields set)
+
+    Note over Browser: Render side-by-side cards.<br/>Input rows where key ∈ differing_fields<br/>rendered with warning badge colour.<br/>Result rows show real score/classification.
+
+    %% ── CSV export ────────────────────────────────────────────────────────────
+    User->>Browser: clicks "Export Comparison"
+    Browser->>Django: GET /flows/comparison/export/?ids=uuid1,uuid2[,uuid3]
+    Django->>DB: SELECT FlowExecution WHERE flow_run_id IN (...) AND triggered_by = user
+    DB-->>Django: execution rows
+
+    Note over Django: Build CSV in memory:<br/>Row 0 (header): field, exec_1_id, exec_2_id, …<br/>Rows 1–4 (inputs): income, age,<br/>  credit_score, employment_years<br/>Row 5: score<br/>Row 6: classification<br/>Row 7: confidence
+
+    Django-->>Browser: StreamingHttpResponse (text/csv)<br/>Content-Disposition: attachment;<br/>filename="comparison_<date>.csv"
+    Browser->>User: file download begins

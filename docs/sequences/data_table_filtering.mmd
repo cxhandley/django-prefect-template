@@ -1,0 +1,55 @@
+sequenceDiagram
+    actor User
+    participant Alpine as Alpine.js<br/>(client state)
+    participant HTMX
+    participant Django
+    participant DB as PostgreSQL
+
+    %% ── Initial page load ────────────────────────────────────────────────────
+    User->>Django: GET /flows/history/
+    Django->>DB: SELECT FlowExecution (unfiltered, default sort)
+    DB-->>Django: queryset
+    Note over Django: Builds table_config<br/>(active_filters=[], sort="-created_at")<br/>Paginates results
+    Django-->>User: Full page HTML<br/>(table.html with Alpine root)
+    Note over Alpine: Init:<br/>• Load hiddenCols from localStorage<br/>• filterRows = [] (no active filters)<br/>• selectedIds = new Set()
+
+    %% ── User opens filter panel and adds a filter ─────────────────────────────
+    User->>Alpine: clicks "Filters ▾"
+    Alpine-->>User: filtersOpen = true (dropdown visible)
+
+    User->>Alpine: clicks "Add filter"
+    Alpine-->>User: appends {field:'',op:'',value:''} to filterRows<br/>→ new filter row rendered
+
+    User->>Alpine: selects field="status", op="eq", value="COMPLETED"
+    Alpine-->>User: filterRows[0] updated (no server call yet)
+
+    User->>Alpine: clicks "Apply"
+    Note over Alpine: Builds URL:<br/>/flows/history/?f_field[]=status&f_op[]=eq<br/>&f_val[]=COMPLETED&sort=-created_at&page=1
+    Alpine->>HTMX: htmx.ajax('GET', url, {target:'#dt-history-body', pushUrl: url})
+
+    HTMX->>Django: GET /flows/history/?f_field[]=status&f_op[]=eq&f_val[]=COMPLETED<br/>HX-Request: true
+    Django->>DB: SELECT … WHERE status='COMPLETED' ORDER BY -created_at
+    DB-->>Django: filtered queryset
+    Note over Django: Rebuilds active_filters=[{field:'status',op:'eq',value:'COMPLETED'}]<br/>Paginates
+    Django-->>HTMX: Partial HTML (tbody rows + pagination + active chips)
+    HTMX-->>User: Swaps #dt-history-body, pushes URL to browser history
+    Note over Alpine: filtersOpen = false<br/>(closed by applyFilters())
+
+    %% ── User dismisses one filter chip ───────────────────────────────────────
+    User->>Alpine: clicks ✕ on "status = COMPLETED" chip
+    Note over Alpine: Removes filter from filterRows,<br/>calls applyFilters() with remaining filters
+    Alpine->>HTMX: htmx.ajax('GET', /flows/history/?sort=-created_at&page=1, ...)
+    HTMX->>Django: GET /flows/history/ (no filter params)
+    Django->>DB: SELECT … (unfiltered)
+    DB-->>Django: full queryset
+    Django-->>HTMX: Partial HTML (unfiltered table)
+    HTMX-->>User: Table updated, URL updated to /flows/history/
+
+    %% ── User clicks a sortable column header ─────────────────────────────────
+    User->>Alpine: clicks "Status ↕" column header
+    Note over Alpine: Toggles sort: "" → "status" → "-status" → ""<br/>Calls htmx.ajax with &sort=status
+    HTMX->>Django: GET /flows/history/?sort=status (+ any active filters)
+    Django->>DB: SELECT … ORDER BY status ASC
+    DB-->>Django: sorted queryset
+    Django-->>HTMX: Partial HTML
+    HTMX-->>User: Table updated, sort arrow changes to ↑

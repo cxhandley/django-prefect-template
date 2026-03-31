@@ -1,0 +1,26 @@
+{% comment %}
+  Bulk actions bar.
+  Shown when selectedCount > 0.
+  Actions are enabled/disabled based on min_select / max_select from config.
+{% endcomment %}
+<div x-show="selectedCount > 0"
+     x-transition
+     class="flex items-center gap-3 px-3 py-2 bg-primary/5 border border-primary/20 rounded-box"
+     style="display: none">
+    <span class="text-sm font-medium text-primary"
+          x-text="`${selectedCount} selected`"></span>
+    <div class="flex gap-2 flex-wrap">
+        <template x-for="action in bulkActions" :key="action.key">
+            <button @click="canAction(action.minSelect, action.maxSelect) && execAction(action)"
+                    :disabled="!canAction(action.minSelect, action.maxSelect)"
+                    :title="!canAction(action.minSelect, action.maxSelect) ? `Select ${action.minSelect}${action.maxSelect ? '–'+action.maxSelect : '+'} rows` : ''"
+                    :class="action.variant + (!canAction(action.minSelect, action.maxSelect) ? ' btn-disabled opacity-50' : '')"
+                    class="btn btn-sm"
+                    type="button"
+                    x-text="action.label"></button>
+        </template>
+    </div>
+    <button @click="selectedIds = []"
+            type="button"
+            class="btn btn-ghost btn-xs text-base-content/50 ml-auto">Clear selection</button>
+</div>

@@ -1,18 +1,53 @@
-<!-- HTMX partial: history table body + pagination -->
-<tbody id="history-table-body">
-    {% for execution in executions %}
-        <tr class="hover">
-            <td>
+{% comment %}
+  HTMX partial: history table tbody + tfoot.
+  Swapped into #dt-history-body on filter / sort / page changes.
+  data-row-ids is read by Alpine's pageRowIds getter for select-all logic.
+{% endcomment %}
+<tbody id="dt-history-body" data-row-ids="{{ page_row_ids_json|safe }}">
+    {% for execution in page_obj %}
+        <tr class="hover"
+            :class="isSelected('{{ execution.flow_run_id }}') ? 'bg-primary/5' : ''">
+            <!-- Checkbox -->
+            <td class="w-10">
                 <input type="checkbox"
-                       name="selected"
+                       class="checkbox checkbox-sm"
                        value="{{ execution.flow_run_id }}"
-                       class="checkbox checkbox-sm execution-checkbox" />
+                       :checked="isSelected('{{ execution.flow_run_id }}')"
+                       @change="toggleRow('{{ execution.flow_run_id }}')"
+                       aria-label="Select row" />
             </td>
-            <td class="text-sm">{{ execution.created_at|date:"M d, Y H:i" }}</td>
-            <td class="text-sm text-base-content/60">{{ execution.flow_name }}</td>
-            <td class="text-sm">-</td>
-            <td>{% include "core/components/ui/badge.html" with status=execution.status %}</td>
-            <td>
+            <!-- Date / Time (not hideable) -->
+            <td class="text-sm whitespace-nowrap">{{ execution.created_at|date:"M d, Y H:i" }}</td>
+            <!-- Input Summary (hideable) -->
+            <td x-show="isVisible('input_summary')"
+                class="text-sm text-base-content/70">
+                {% if execution.flow_name == "credit-prediction" and execution.parameters %}
+                    Income: {{ execution.parameters.income|default:"-" }},
+                    Age: {{ execution.parameters.age|default:"-" }},
+                    Credit: {{ execution.parameters.credit_score|default:"-" }},
+                    Emp: {{ execution.parameters.employment_years|default:"-" }} yrs
+                {% else %}
+                    {{ execution.flow_name }}
+                {% endif %}
+            </td>
+            <!-- Prediction / Classification (hideable) -->
+            <td x-show="isVisible('classification')" class="text-sm">
+                {% with cls=execution.parameters.classification %}
+                    {% if cls == "Approved" %}
+                        <span class="badge badge-success badge-sm">{{ cls }}</span>
+                    {% elif cls == "Review" %}
+                        <span class="badge badge-warning badge-sm">{{ cls }}</span>
+                    {% elif cls == "Declined" %}
+                        <span class="badge badge-error badge-sm">{{ cls }}</span>
+                    {% else %}
+                        <span class="text-base-content/30">—</span>
+                    {% endif %}
+                {% endwith %}
+            </td>
+            <!-- Status (hideable) -->
+            <td x-show="isVisible('status')">{% include "core/components/ui/badge.html" with status=execution.status %}</td>
+            <!-- Actions -->
+            <td class="w-16">
                 <a href="{% url 'flows:execution_detail' execution.flow_run_id %}"
                    class="btn btn-ghost btn-xs">View</a>
             </td>
@@ -20,7 +55,7 @@
     {% empty %}
         <tr>
             <td colspan="6">
-                {% include "core/components/ui/empty_state.html" with title="No executions found" message="Try adjusting your search or filters." %}
+                {% include "core/components/ui/empty_state.html" with title="No executions found" message="Try adjusting your filters." %}
             </td>
         </tr>
     {% endfor %}
@@ -28,7 +63,39 @@
 <tfoot>
     <tr>
         <td colspan="6">
-            {% include "core/components/ui/pagination.html" with page_obj=page_obj target_id="history-table-container" hx_url="/flows/history/" %}
+            {% if page_obj.has_other_pages %}
+                <div class="join flex justify-center py-3">
+                    {% if page_obj.has_previous %}
+                        <button hx-get="{% url 'flows:history' %}?{{ filter_query_string }}&page={{ page_obj.previous_page_number }}"
+                                hx-target="#dt-history-body"
+                                hx-swap="innerHTML"
+                                hx-push-url="true"
+                                class="join-item btn btn-sm">«</button>
+                    {% else %}
+                        <button class="join-item btn btn-sm btn-disabled">«</button>
+                    {% endif %}
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <button class="join-item btn btn-sm btn-active">{{ num }}</button>
+                        {% elif num >= page_obj.number|add:"-3" and num <= page_obj.number|add:"3" %}
+                            <button hx-get="{% url 'flows:history' %}?{{ filter_query_string }}&page={{ num }}"
+                                    hx-target="#dt-history-body"
+                                    hx-swap="innerHTML"
+                                    hx-push-url="true"
+                                    class="join-item btn btn-sm">{{ num }}</button>
+                        {% endif %}
+                    {% endfor %}
+                    {% if page_obj.has_next %}
+                        <button hx-get="{% url 'flows:history' %}?{{ filter_query_string }}&page={{ page_obj.next_page_number }}"
+                                hx-target="#dt-history-body"
+                                hx-swap="innerHTML"
+                                hx-push-url="true"
+                                class="join-item btn btn-sm">»</button>
+                    {% else %}
+                        <button class="join-item btn btn-sm btn-disabled">»</button>
+                    {% endif %}
+                </div>
+            {% endif %}
         </td>
     </tr>
 </tfoot>

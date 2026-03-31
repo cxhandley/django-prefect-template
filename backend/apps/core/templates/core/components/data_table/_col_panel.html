@@ -1,0 +1,29 @@
+{% comment %}
+  Column visibility dropdown panel.
+  Column list rendered server-side (Django for loop); toggle state is Alpine-driven
+  and persisted to localStorage — no server round-trip needed.
+{% endcomment %}
+<div x-show="colsOpen"
+     x-transition
+     @click.outside="colsOpen = false"
+     x-cloak
+     class="absolute left-0 top-full mt-1 z-30 bg-base-100 border border-base-200 rounded-box shadow-lg w-52 p-3 space-y-2">
+    <p class="text-xs font-semibold text-base-content/60 uppercase tracking-wide">Columns</p>
+    {% for col in table_config.columns %}
+        {% if col.hideable %}
+            <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox"
+                       class="checkbox checkbox-sm"
+                       :checked="isVisible('{{ col.key }}')"
+                       @change="toggleCol('{{ col.key }}')" />
+                <span class="text-sm">{{ col.label }}</span>
+            </label>
+        {% else %}
+            <label class="flex items-center gap-2 opacity-40 cursor-not-allowed"
+                   title="This column cannot be hidden">
+                <input type="checkbox" class="checkbox checkbox-sm" checked disabled />
+                <span class="text-sm">{{ col.label }}</span>
+            </label>
+        {% endif %}
+    {% endfor %}
+</div>
