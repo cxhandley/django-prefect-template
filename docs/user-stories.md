@@ -76,7 +76,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 **Acceptance Criteria:**
 - [x] User can delete an execution from the detail page
 - [x] Execution record is removed from the database
-- [ ] Associated S3 files are cleaned up on deletion
+- [x] Associated S3 files are cleaned up on deletion
 
 ---
 

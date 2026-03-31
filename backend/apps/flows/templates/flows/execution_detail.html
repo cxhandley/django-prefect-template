@@ -44,22 +44,38 @@
                         </button>
                     </form>
                 {% endif %}
-                <form method="post"
-                      action="{% url 'flows:delete_execution' execution.flow_run_id %}">
-                    {% csrf_token %}
-                    <button type="submit"
-                            class="btn btn-error btn-sm"
-                            onclick="return confirm('Delete this execution? This cannot be undone.')">
-                        <svg xmlns="http://www.w3.org/2000/svg"
-                             class="h-4 w-4"
-                             fill="none"
-                             viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete
-                    </button>
-                </form>
+                <button class="btn btn-error btn-sm"
+                        onclick="document.getElementById('delete_modal').showModal()">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-4 w-4"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete
+                </button>
+                <dialog id="delete_modal" class="modal">
+                    <div class="modal-box">
+                        <h3 class="font-bold text-lg">Delete Execution</h3>
+                        <p class="py-4">
+                            Are you sure you want to delete this execution? All associated S3 files will also be removed. This cannot be undone.
+                        </p>
+                        <div class="modal-action">
+                            <form method="dialog">
+                                <button class="btn">Cancel</button>
+                            </form>
+                            <form method="post"
+                                  action="{% url 'flows:delete_execution' execution.flow_run_id %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-error">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                    <form method="dialog" class="modal-backdrop">
+                        <button>close</button>
+                    </form>
+                </dialog>
                 <a href="{% url 'flows:history' %}" class="btn btn-ghost btn-sm">Back</a>
             </div>
         </div>

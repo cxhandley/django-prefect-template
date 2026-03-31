@@ -1,3 +1,4 @@
+import boto3
 import pytest
 from apps.flows.models import FlowExecution
 from django.contrib.auth import get_user_model
@@ -47,3 +48,34 @@ class TestFlowExecution:
     def test_celery_task_id_stored(self, flow_execution_factory):
         execution = flow_execution_factory(celery_task_id="abc-123-task")
         assert execution.celery_task_id == "abc-123-task"
+
+    def test_delete_removes_s3_objects(self, flow_execution_factory, mock_s3, settings):
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.put_object(Bucket="test-bucket", Key="raw/input.csv", Body=b"data")
+        s3.put_object(Bucket="test-bucket", Key="processed/output.parquet", Body=b"data")
+
+        execution = flow_execution_factory(
+            s3_input_path="raw/input.csv",
+            s3_output_path="processed/output.parquet",
+        )
+        execution.delete()
+
+        objects = s3.list_objects_v2(Bucket="test-bucket").get("Contents", [])
+        keys = [obj["Key"] for obj in objects]
+        assert "raw/input.csv" not in keys
+        assert "processed/output.parquet" not in keys
+        assert not FlowExecution.objects.filter(pk=execution.pk).exists()
+
+    def test_delete_idempotent_when_s3_objects_absent(self, flow_execution_factory, mock_s3):
+        execution = flow_execution_factory(
+            s3_input_path="raw/nonexistent.csv",
+            s3_output_path="processed/nonexistent.parquet",
+        )
+        # Should not raise even though S3 objects do not exist
+        execution.delete()
+        assert not FlowExecution.objects.filter(pk=execution.pk).exists()
+
+    def test_delete_with_no_s3_paths(self, flow_execution_factory, mock_s3):
+        execution = flow_execution_factory(s3_input_path="", s3_output_path="")
+        execution.delete()
+        assert not FlowExecution.objects.filter(pk=execution.pk).exists()

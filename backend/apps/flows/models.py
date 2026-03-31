@@ -4,6 +4,7 @@ Flow execution models.
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 from django.conf import settings
 from django.db import models
 
@@ -60,6 +61,32 @@ class FlowExecution(models.Model):
         if self.s3_output_path:
             return f"s3://{settings.DATA_LAKE_BUCKET}/{self.s3_output_path}"
         return None
+
+    def delete(self, *args, **kwargs):
+        """Delete execution record and clean up associated S3 objects."""
+        self._delete_s3_objects()
+        super().delete(*args, **kwargs)
+
+    def _delete_s3_objects(self):
+        """Remove input and output S3 objects. Safe to call when objects are absent."""
+        paths = [p for p in [self.s3_input_path, self.s3_output_path] if p]
+        if not paths:
+            return
+
+        s3_client = boto3.client(
+            "s3",
+            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+            config=Config(signature_version="s3v4"),
+        )
+
+        for path in paths:
+            try:
+                s3_client.delete_object(Bucket=settings.DATA_LAKE_BUCKET, Key=path)
+            except ClientError:
+                pass
 
     def generate_download_url(self, expires_in=3600):
         """Generate presigned S3 URL for direct download."""
