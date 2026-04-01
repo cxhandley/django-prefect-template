@@ -1,0 +1,35 @@
+{% extends "core/base_public.html" %}
+{% block title %}
+    Confirmation Link Invalid - Django Pipeline
+{% endblock title %}
+{% block public_content %}
+    <div class="flex items-center justify-center min-h-[70vh]">
+        <div class="card bg-base-100 shadow-xl border border-base-200 w-full max-w-md">
+            <div class="card-body text-center space-y-4">
+                <div class="flex justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-16 w-16 text-error"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold">Link {{ reason|default:"invalid" }}</h1>
+                <p class="text-base-content/70">
+                    {% if reason == "expired" %}
+                        This confirmation link has expired. Links are valid for 24 hours.
+                        Please sign up again to receive a new link.
+                    {% else %}
+                        This confirmation link is invalid. It may have already been used or
+                        the URL was entered incorrectly.
+                    {% endif %}
+                </p>
+                <div class="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+                    <a href="{% url 'accounts:signup' %}" class="btn btn-primary">Sign up again</a>
+                    <a href="{% url 'accounts:login' %}" class="btn btn-outline">Log in</a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock public_content %}

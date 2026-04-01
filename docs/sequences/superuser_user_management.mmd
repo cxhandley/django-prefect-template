@@ -1,0 +1,43 @@
+sequenceDiagram
+    actor Superuser
+    participant Browser
+    participant Django as Django (accounts views)
+    participant DB as PostgreSQL
+    participant Email as Email Backend
+
+    %% ── List users ──────────────────────────────────────────────
+    Superuser->>Browser: Navigate to /accounts/users/
+    Browser->>Django: GET /accounts/users/?active=&q=
+    Django->>Django: @user_passes_test(is_superuser) check
+    alt Not superuser
+        Django-->>Browser: 403 Forbidden
+    end
+    Django->>DB: User.objects.all() with optional filter (active/inactive, search)
+    DB-->>Django: QuerySet[User]
+    Django-->>Browser: 200 accounts/user_list.html\n(table: email, date joined, active, last login)
+
+    %% ── Activate / deactivate ────────────────────────────────────
+    Superuser->>Browser: Click toggle on a user row
+    Browser->>Django: POST /accounts/users/<id>/toggle-active/\n(HX-Request header)
+    Django->>Django: @user_passes_test(is_superuser) check
+    Django->>DB: user.is_active = not user.is_active; user.save()
+    DB-->>Django: OK
+    Django-->>Browser: 200 partial accounts/partials/user_row.html\n(HTMX swaps the row in-place)
+
+    %% ── Reset password ───────────────────────────────────────────
+    Superuser->>Browser: Click "Send Reset Email" for a user
+    Browser->>Django: POST /accounts/users/<id>/reset-password/
+    Django->>Django: @user_passes_test(is_superuser) check
+    Django->>DB: Fetch User by id
+    DB-->>Django: User
+    Django->>Django: Build PasswordResetForm for that email\nand call form.save() to trigger email
+    Django->>Email: Send password_reset.txt to user.email\n(same template as self-service reset)
+    Email-->>Django: OK
+    Django-->>Browser: 200 HX-Redirect or flash message\n("Reset email sent to <email>")
+
+    %% ── Filter by active status ──────────────────────────────────
+    Superuser->>Browser: Select "Inactive" in filter dropdown
+    Browser->>Django: GET /accounts/users/?active=false\n(HTMX partial table refresh)
+    Django->>DB: User.objects.filter(is_active=False)
+    DB-->>Django: QuerySet[User]
+    Django-->>Browser: 200 accounts/partials/user_table.html\n(HTMX swaps table body)
