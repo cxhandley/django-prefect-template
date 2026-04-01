@@ -16,18 +16,18 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [x] User can log in with credentials
 - [x] User can view and edit their basic profile
 - [x] User can reset a forgotten password
-- [ ] User receives a confirmation email on registration
+- [x] User receives a confirmation email on registration
 
-### US-1.2: Superuser Management `[ ]`
+### US-1.2: Superuser Management `[x]`
 **As a** superuser
 **I want to** manage user roles and permissions
 **So that** I can control who can access the system and features
 
 **Acceptance Criteria:**
-- [ ] Superuser can view all users in the system
-- [ ] Superuser can activate and deactivate users
-- [ ] Superuser can see user activity history
-- [ ] Superuser can reset user passwords
+- [x] Superuser can view all users in the system
+- [x] Superuser can activate and deactivate users
+- [x] Superuser can see user activity history
+- [x] Superuser can reset user passwords
 
 ---
 
@@ -225,7 +225,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 | Area | Status |
 |------|--------|
-| User registration & login | Complete (email confirmation not implemented) |
+| User registration & login | Complete (email confirmation implemented) |
 | File upload & pipeline execution | Complete |
 | Pipeline status polling | Complete |
 | View & download results | Complete |
@@ -235,4 +235,4 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 | Admin monitoring dashboard | Complete |
 | Input presets | Not started |
 | Email notifications | Not started |
-| Superuser management | Not started |
+| Superuser management | Complete |

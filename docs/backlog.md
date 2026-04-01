@@ -89,7 +89,7 @@ Prerequisite for any multi-user or admin work.
 
 ---
 
-### BL-006 · Superuser User Management UI `L`
+### ~~BL-006 · Superuser User Management UI~~ `L` ✓ Complete
 **User story:** US-1.2
 **Value:** Currently superusers must use Django Admin (`/admin/`) to manage users — there is no first-class UI.
 
@@ -106,7 +106,7 @@ Prerequisite for any multi-user or admin work.
 
 ---
 
-### BL-007 · Registration Email Confirmation `M`
+### ~~BL-007 · Registration Email Confirmation~~ `M` ✓ Complete
 **User story:** US-1.1
 **Value:** Prevents fake accounts; confirms email ownership before granting access.
 

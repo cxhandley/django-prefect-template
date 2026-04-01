@@ -1,0 +1,49 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Django as Django (accounts views)
+    participant Signing as django.core.signing
+    participant DB as PostgreSQL
+    participant Email as Email Backend
+
+    %% ── Registration ─────────────────────────────────────────────
+    User->>Browser: Fill in signup form (name, email, username, password)
+    Browser->>Django: POST /accounts/signup/
+    Django->>DB: Check email and username uniqueness
+    alt Duplicate email or username
+        Django-->>Browser: 200 signup form with errors
+    end
+    Django->>DB: User.objects.create_user(..., is_active=False)
+    Note over DB: User exists but cannot log in yet
+    Django->>Signing: TimestampSigner().sign(user.pk)\n→ opaque token (valid 24 h)
+    Django->>Email: Send confirm_email.txt\nwith /accounts/confirm-email/<token>/ link
+    Email-->>Django: OK
+    Django-->>Browser: 302 → /accounts/email-confirmation-sent/
+    Browser->>Django: GET /accounts/email-confirmation-sent/
+    Django-->>Browser: 200 accounts/email_confirmation_sent.html\n("Check your inbox")
+
+    %% ── Confirmation ─────────────────────────────────────────────
+    User->>Browser: Click confirmation link in email
+    Browser->>Django: GET /accounts/confirm-email/<token>/
+    Django->>Signing: TimestampSigner().unsign(token, max_age=86400)
+    alt Token valid (≤ 24 h, untampered)
+        Django->>DB: User.objects.get(pk=user_pk)\nuser.is_active = True; user.save()
+        Django-->>Browser: 302 → /accounts/login/?confirmed=1
+        Browser->>Django: GET /accounts/login/?confirmed=1
+        Django-->>Browser: 200 login.html with success banner\n("Email confirmed — you can now log in")
+    else Token expired or invalid
+        Django-->>Browser: 200 accounts/confirm_email.html\n(error state: "Link expired or invalid")
+        Note over Browser: Page shows link to resend confirmation
+    end
+
+    %% ── Login guard for unconfirmed accounts ─────────────────────
+    User->>Browser: Try to log in before confirming
+    Browser->>Django: POST /accounts/login/ (email + password)
+    Django->>DB: Get user by email; authenticate credentials
+    alt Credentials correct but is_active=False
+        Django-->>Browser: 200 login form\n(error: "Please confirm your email before logging in.")
+    else Credentials wrong
+        Django-->>Browser: 200 login form\n(error: "Invalid email or password.")
+    else Credentials correct and is_active=True
+        Django-->>Browser: 302 → /flows/dashboard/
+    end
