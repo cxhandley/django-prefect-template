@@ -1,0 +1,33 @@
+{% extends "core/base_public.html" %}
+{% block title %}
+    Check Your Email - Django Pipeline
+{% endblock title %}
+{% block public_content %}
+    <div class="flex items-center justify-center min-h-[70vh]">
+        <div class="card bg-base-100 shadow-xl border border-base-200 w-full max-w-md">
+            <div class="card-body text-center space-y-4">
+                <div class="flex justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-16 w-16 text-primary"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold">Check your inbox</h1>
+                <p class="text-base-content/70">
+                    We've sent a confirmation link to your email address. Click the link to activate
+                    your account.
+                </p>
+                <p class="text-sm text-base-content/50">The link expires in 24 hours.</p>
+                <div class="divider"></div>
+                <p class="text-sm text-base-content/60">
+                    Already confirmed?
+                    <a href="{% url 'accounts:login' %}"
+                       class="link link-primary font-semibold">Log in</a>
+                </p>
+            </div>
+        </div>
+    </div>
+{% endblock public_content %}

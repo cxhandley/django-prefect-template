@@ -3,6 +3,18 @@
     <h1 class="text-2xl font-bold">Login</h1>
     <p class="text-base-content/60 text-sm mt-1">Welcome back! Sign in to your account.</p>
 </div>
+{% if confirmed %}
+    <div class="alert alert-success text-sm mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg"
+             class="h-5 w-5 shrink-0"
+             fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <span>Email confirmed — you can now log in.</span>
+    </div>
+{% endif %}
 <!-- Non-field errors -->
 {% if form.non_field_errors %}
     <div class="alert alert-error text-sm">

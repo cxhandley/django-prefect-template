@@ -1,0 +1,42 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    User Management - Django Pipeline
+{% endblock title %}
+{% block dashboard_content %}
+    <div class="space-y-6">
+        <!-- Header -->
+        <div>
+            <h1 class="text-2xl font-bold">User Management</h1>
+            <p class="text-base-content/60 text-sm mt-1">Manage all registered users. You are signed in as a superuser.</p>
+        </div>
+        <!-- Filter bar -->
+        <div class="flex flex-wrap gap-3 items-center"
+             x-data="{ q: '{{ q|escapejs }}', active: '{{ active_filter|escapejs }}' }">
+            <input type="text"
+                   name="q"
+                   placeholder="Search by email or username…"
+                   x-model="q"
+                   class="input input-bordered input-sm w-64"
+                   hx-get="{% url 'accounts:user_list' %}"
+                   hx-target="#user-table-container"
+                   hx-swap="innerHTML"
+                   hx-trigger="input changed delay:400ms"
+                   :hx-vals="JSON.stringify({ q: q, active: active })" />
+            <div class="join">
+                <template x-for="[label, val] in [['All',''],['Active','true'],['Inactive','false']]"
+                          :key="val">
+                    <button class="btn btn-sm join-item"
+                            :class="active === val ? 'btn-primary' : 'btn-outline'"
+                            @click="active = val"
+                            hx-get="{% url 'accounts:user_list' %}"
+                            hx-target="#user-table-container"
+                            hx-swap="innerHTML"
+                            :hx-vals="JSON.stringify({ q: q, active: val })"
+                            x-text="label"></button>
+                </template>
+            </div>
+        </div>
+        <!-- Table -->
+        <div id="user-table-container">{% include "accounts/partials/user_table.html" %}</div>
+    </div>
+{% endblock dashboard_content %}

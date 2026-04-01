@@ -1,0 +1,11 @@
+Hi {{ user.first_name|default:user.username }},
+
+Thanks for signing up! Please confirm your email address by clicking the link below:
+
+  {{ confirm_url }}
+
+This link expires in 24 hours.
+
+If you did not create an account, you can safely ignore this email.
+
+— The Django Pipeline team
