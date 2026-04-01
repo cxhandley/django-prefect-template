@@ -1,0 +1,102 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    Admin Dashboard - Django Pipeline
+{% endblock title %}
+{% block dashboard_content %}
+    <div class="space-y-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold">Admin Dashboard</h1>
+                <p class="text-base-content/60 text-sm mt-1">System-wide usage metrics across all users.</p>
+            </div>
+            <a href="{% url 'flows:admin_executions' %}"
+               class="btn btn-outline btn-sm">View Execution Logs</a>
+        </div>
+        <!-- Stat cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {% include "core/components/ui/stat_card.html" with title="Total Executions" value=total %}
+            {% include "core/components/ui/stat_card.html" with title="Success Rate" value=success_rate %}
+            {% include "core/components/ui/stat_card.html" with title="Avg Run Time" value=avg_duration %}
+            {% include "core/components/ui/stat_card.html" with title="Executions (30d)" value=total_recent %}
+        </div>
+        <!-- Daily bar chart -->
+        <div class="card bg-base-100 border border-base-200 shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title text-base">Daily Executions — Last 30 Days</h2>
+                <div class="flex items-end gap-px h-24 mt-2">
+                    {% for entry in daily_counts %}
+                        <div class="flex-1 bg-primary/80 rounded-t hover:bg-primary transition-colors cursor-default"
+                             style="height: {% widthratio entry.count max_daily 100 %}%"
+                             title="{{ entry.day }}: {{ entry.count }}"></div>
+                    {% endfor %}
+                </div>
+                <div class="flex justify-between text-xs text-base-content/40 mt-1">
+                    <span>{{ chart_start }}</span>
+                    <span>{{ chart_end }}</span>
+                </div>
+            </div>
+        </div>
+        <!-- Breakdown tables -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- By user -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">By User — Last 30 Days</h2>
+                    {% if by_user %}
+                        <div class="overflow-x-auto">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th class="text-right">Executions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in by_user %}
+                                        <tr>
+                                            <td class="text-sm">{{ row.triggered_by__email|default:row.triggered_by__username }}</td>
+                                            <td class="text-right font-mono text-sm">{{ row.count }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-sm text-base-content/50">No executions in the last 30 days.</p>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- By flow type -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">By Flow Type — Last 30 Days</h2>
+                    {% if by_flow %}
+                        <div class="overflow-x-auto">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Flow</th>
+                                        <th class="text-right">Executions</th>
+                                        <th class="text-right">Success Rate</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in by_flow %}
+                                        <tr>
+                                            <td class="font-mono text-sm">{{ row.flow_name }}</td>
+                                            <td class="text-right text-sm">{{ row.count }}</td>
+                                            <td class="text-right text-sm">{{ row.success_rate }}%</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-sm text-base-content/50">No executions in the last 30 days.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock dashboard_content %}

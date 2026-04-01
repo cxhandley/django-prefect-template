@@ -12,6 +12,17 @@ urlpatterns = [
     path("settings/", views.settings, name="settings"),
     path("api/user-menu/", views.user_menu, name="user_menu"),
     path("api/logout/", views.logout_user, name="logout"),
+    # Email confirmation
+    path(
+        "email-confirmation-sent/",
+        views.email_confirmation_sent,
+        name="email_confirmation_sent",
+    ),
+    path("confirm-email/<str:token>/", views.confirm_email, name="confirm_email"),
+    # Superuser user management
+    path("users/", views.user_list, name="user_list"),
+    path("users/<int:user_id>/toggle-active/", views.user_toggle_active, name="user_toggle_active"),
+    path("users/<int:user_id>/reset-password/", views.user_send_reset, name="user_send_reset"),
     # Password change flow for logged-in users (form-based, no email)
     path(
         "password-change/",

@@ -1,0 +1,94 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    Execution Detail (Admin) - Django Pipeline
+{% endblock title %}
+{% block breadcrumbs %}
+    {% include "core/components/ui/breadcrumbs.html" with items=breadcrumbs %}
+{% endblock breadcrumbs %}
+{% block dashboard_content %}
+    <div class="max-w-3xl space-y-6">
+        <h1 class="text-2xl font-bold">Execution Detail</h1>
+        <!-- Meta card -->
+        <div class="card bg-base-100 border border-base-200 shadow-sm">
+            <div class="card-body space-y-4">
+                <h2 class="card-title text-base">Metadata</h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">User</span>
+                        <span>{{ execution.triggered_by.email }}</span>
+                        <span class="text-base-content/50 ml-1">({{ execution.triggered_by.username }})</span>
+                    </div>
+                    <div>
+                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Flow</span>
+                        <span class="font-mono">{{ execution.flow_name }}</span>
+                    </div>
+                    <div>
+                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Run ID</span>
+                        <span class="font-mono text-xs">{{ execution.flow_run_id }}</span>
+                    </div>
+                    <div>
+                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Status</span>
+                        {% if execution.status == "COMPLETED" %}
+                            <span class="badge badge-success badge-sm">{{ execution.status }}</span>
+                        {% elif execution.status == "FAILED" %}
+                            <span class="badge badge-error badge-sm">{{ execution.status }}</span>
+                        {% elif execution.status == "RUNNING" %}
+                            <span class="badge badge-info badge-sm">{{ execution.status }}</span>
+                        {% else %}
+                            <span class="badge badge-ghost badge-sm">{{ execution.status }}</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Started</span>
+                        <span>{{ execution.created_at|date:"Y-m-d H:i:s" }}</span>
+                    </div>
+                    <div>
+                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Completed</span>
+                        <span>{{ execution.completed_at|date:"Y-m-d H:i:s"|default:"—" }}</span>
+                    </div>
+                    {% if duration %}
+                        <div>
+                            <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Duration</span>
+                            <span>{{ duration }}s</span>
+                        </div>
+                    {% endif %}
+                    <div>
+                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Celery Task ID</span>
+                        {% if execution.celery_task_id %}
+                            <span class="font-mono text-xs">{{ execution.celery_task_id }}</span>
+                            <a href="{{ flower_url }}task/{{ execution.celery_task_id }}"
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               class="link link-primary text-xs ml-2">Flower ↗</a>
+                        {% else %}
+                            <span class="text-base-content/40">—</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Parameters / inputs -->
+        {% if execution.parameters %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">Parameters (inputs)</h2>
+                    <pre class="bg-base-200 rounded p-4 text-xs overflow-x-auto">{{ execution.parameters|pprint }}</pre>
+                </div>
+            </div>
+        {% endif %}
+        <!-- Error message -->
+        {% if execution.error_message %}
+            <div class="card bg-base-100 border border-error shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base text-error">Error Message</h2>
+                    <pre class="text-error text-xs whitespace-pre-wrap break-words">{{ execution.error_message }}</pre>
+                </div>
+            </div>
+        {% endif %}
+        <!-- Back link -->
+        <div>
+            <a href="{% url 'flows:admin_executions' %}"
+               class="btn btn-ghost btn-sm">← Back to Execution Logs</a>
+        </div>
+    </div>
+{% endblock dashboard_content %}

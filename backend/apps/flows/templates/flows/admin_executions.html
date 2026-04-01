@@ -1,0 +1,74 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    Execution Logs - Django Pipeline
+{% endblock title %}
+{% block breadcrumbs %}
+    {% include "core/components/ui/breadcrumbs.html" with items=breadcrumbs %}
+{% endblock breadcrumbs %}
+{% block dashboard_content %}
+    <div class="space-y-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold">Execution Logs</h1>
+                <p class="text-base-content/60 text-sm mt-1">All executions across all users.</p>
+            </div>
+            <a href="{% url 'flows:admin_dashboard' %}" class="btn btn-ghost btn-sm">← Admin Dashboard</a>
+        </div>
+        <!-- Filter bar -->
+        <div class="flex flex-wrap gap-3 items-end"
+             x-data="{ user_q: '{{ user_q|escapejs }}', status_q: '{{ status_q|escapejs }}', date_from: '{{ date_from|escapejs }}', date_to: '{{ date_to|escapejs }}' }">
+            <div class="form-control">
+                <label class="label label-text text-xs">User (email / username)</label>
+                <input type="text"
+                       placeholder="Search user…"
+                       x-model="user_q"
+                       class="input input-bordered input-sm w-52"
+                       hx-get="{% url 'flows:admin_executions' %}"
+                       hx-target="#admin-exec-container"
+                       hx-swap="innerHTML"
+                       hx-trigger="input changed delay:400ms"
+                       :hx-vals="JSON.stringify({ user: user_q, status: status_q, date_from: date_from, date_to: date_to })" />
+            </div>
+            <div class="form-control">
+                <label class="label label-text text-xs">Status</label>
+                <select class="select select-bordered select-sm"
+                        x-model="status_q"
+                        hx-get="{% url 'flows:admin_executions' %}"
+                        hx-target="#admin-exec-container"
+                        hx-swap="innerHTML"
+                        hx-trigger="change"
+                        :hx-vals="JSON.stringify({ user: user_q, status: status_q, date_from: date_from, date_to: date_to })">
+                    <option value="">All statuses</option>
+                    {% for s in status_choices %}
+                        <option value="{{ s }}" {% if s == status_q %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label label-text text-xs">Date from</label>
+                <input type="date"
+                       class="input input-bordered input-sm"
+                       x-model="date_from"
+                       hx-get="{% url 'flows:admin_executions' %}"
+                       hx-target="#admin-exec-container"
+                       hx-swap="innerHTML"
+                       hx-trigger="change"
+                       :hx-vals="JSON.stringify({ user: user_q, status: status_q, date_from: date_from, date_to: date_to })" />
+            </div>
+            <div class="form-control">
+                <label class="label label-text text-xs">Date to</label>
+                <input type="date"
+                       class="input input-bordered input-sm"
+                       x-model="date_to"
+                       hx-get="{% url 'flows:admin_executions' %}"
+                       hx-target="#admin-exec-container"
+                       hx-swap="innerHTML"
+                       hx-trigger="change"
+                       :hx-vals="JSON.stringify({ user: user_q, status: status_q, date_from: date_from, date_to: date_to })" />
+            </div>
+        </div>
+        <!-- Table -->
+        <div id="admin-exec-container">{% include "flows/partials/admin_executions_table.html" %}</div>
+    </div>
+{% endblock dashboard_content %}

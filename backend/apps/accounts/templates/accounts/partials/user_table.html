@@ -1,0 +1,23 @@
+{% load humanize %}
+{% if users %}
+    <div class="overflow-x-auto">
+        <table class="table table-zebra w-full">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Date Joined</th>
+                    <th>Last Login</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="user-table-body">
+                {% for u in users %}
+                    {% include "accounts/partials/user_row.html" with u=u current_user=request.user %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    {% include "core/components/ui/empty_state.html" with title="No users found" message="Try adjusting your search or filter." %}
+{% endif %}

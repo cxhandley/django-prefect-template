@@ -1,0 +1,43 @@
+sequenceDiagram
+    actor Staff
+    participant Browser
+    participant Django as Django (flows views)
+    participant DB as PostgreSQL
+
+    %% ── Dashboard ────────────────────────────────────────────────
+    Staff->>Browser: Navigate to /flows/admin/dashboard/
+    Browser->>Django: GET /flows/admin/dashboard/
+    Django->>Django: @staff_member_required check
+    alt Not staff
+        Django-->>Browser: 302 → /accounts/login/?next=…
+    end
+
+    Django->>DB: FlowExecution.objects.all() — last 30 days\n  aggregate: count, success rate, avg duration
+    Django->>DB: GROUP BY triggered_by → executions per user (30d)
+    Django->>DB: GROUP BY flow_name → executions per flow type (30d)
+    Django->>DB: GROUP BY DATE(created_at) → daily counts (30d)
+    DB-->>Django: aggregated results
+    Django-->>Browser: 200 flows/admin_dashboard.html\n(stat cards · SVG bar chart · breakdown tables · log link)
+
+    %% ── Execution log viewer ─────────────────────────────────────
+    Staff->>Browser: Click "View All Execution Logs" or navigate directly
+    Browser->>Django: GET /flows/admin/executions/?user=&status=&date_from=&date_to=
+    Django->>Django: @staff_member_required check
+    Django->>DB: FlowExecution.objects.select_related("triggered_by")\n  .filter(optional user/status/date filters)\n  .order_by("-created_at")
+    DB-->>Django: paginated QuerySet
+    Django-->>Browser: 200 flows/admin_executions.html\n(filter bar · paginated table · breadcrumbs)
+
+    %% ── HTMX filter refresh ──────────────────────────────────────
+    Staff->>Browser: Change filter (user, status, date range)
+    Browser->>Django: GET /flows/admin/executions/?… (HX-Request header)
+    Django->>DB: filtered + paginated query
+    DB-->>Django: QuerySet
+    Django-->>Browser: 200 flows/partials/admin_executions_table.html\n(HTMX swaps table body)
+
+    %% ── Execution detail ─────────────────────────────────────────
+    Staff->>Browser: Click [View] on any execution row
+    Browser->>Django: GET /flows/admin/executions/<uuid>/
+    Django->>Django: @staff_member_required check
+    Django->>DB: FlowExecution.objects.select_related("triggered_by").get(flow_run_id=uuid)
+    DB-->>Django: FlowExecution
+    Django-->>Browser: 200 flows/admin_execution_detail.html\n(user · parameters · error · celery task ID · Flower link)

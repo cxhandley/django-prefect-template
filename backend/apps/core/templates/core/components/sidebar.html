@@ -1,6 +1,6 @@
 <!-- Sidebar component for dashboard pages
      Parameters: active_page (string) - highlights current nav item
-     Values: "dashboard", "predictions", "history" -->
+     Values: "dashboard", "predictions", "history", "user_management", "admin_dashboard" -->
 <ul class="menu bg-base-200 min-h-full w-64 p-4 pt-20">
     <li class="menu-title">
         <span>Navigation</span>
@@ -44,4 +44,37 @@
             History
         </a>
     </li>
+    {% if request.user.is_superuser or request.user.is_staff %}
+        <li class="menu-title mt-4">
+            <span>Admin</span>
+        </li>
+        {% if request.user.is_superuser %}
+            <li>
+                <a href="{% url 'accounts:user_list' %}"
+                   class="{% if active_page == 'user_management' %}active{% endif %}">
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-5 w-5"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                    User Management
+                </a>
+            </li>
+        {% endif %}
+        <li>
+            <a href="{% url 'flows:admin_dashboard' %}"
+               class="{% if active_page == 'admin_dashboard' %}active{% endif %}">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="h-5 w-5"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Monitoring
+            </a>
+        </li>
+    {% endif %}
 </ul>

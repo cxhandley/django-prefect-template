@@ -140,27 +140,27 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
-## Epic 5: Admin Monitoring `[ ]`
+## Epic 5: Admin Monitoring `[x]`
 
-### US-5.1: Usage Dashboard `[ ]`
+### US-5.1: Usage Dashboard `[x]`
 **As an** admin
 **I want to** see how the system is being used
 **So that** I can understand demand and identify issues
 
 **Acceptance Criteria:**
-- [ ] Admin dashboard shows: total executions, success rate, average run time
-- [ ] Breakdown by user and by pipeline type
-- [ ] Charts show execution trends over time
+- [x] Admin dashboard shows: total executions, success rate, average run time
+- [x] Breakdown by user and by pipeline type
+- [x] Charts show execution trends over time
 
-### US-5.2: View All Execution Logs `[ ]`
+### US-5.2: View All Execution Logs `[x]`
 **As an** admin
 **I want to** see detailed logs from all executions
 **So that** I can troubleshoot failures and optimise performance
 
 **Acceptance Criteria:**
-- [ ] Admin can view logs for any user's execution
-- [ ] Logs filterable by user, date range, and status
-- [ ] Error messages and stack traces visible
+- [x] Admin can view logs for any user's execution
+- [x] Logs filterable by user, date range, and status
+- [x] Error messages and stack traces visible
 
 ---
 
@@ -232,7 +232,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 | Credit prediction form & scoring | Complete |
 | Execution history & detail | Complete |
 | Execution comparison | Partial |
-| Admin monitoring dashboard | Not started |
+| Admin monitoring dashboard | Complete |
 | Input presets | Not started |
 | Email notifications | Not started |
 | Superuser management | Not started |
