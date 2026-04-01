@@ -12,7 +12,7 @@
     {% include "core/components/data_table/table.html" %}
 {% endcomment %}
 <div id="dt-{{ table_config.table_id }}-root"
-     x-data="dataTable({{ table_config_json|safe }})"
+     x-data='dataTable({{ table_config_json|safe }})'
      x-init="init()"
      class="space-y-3">
     <!-- ── TOOLBAR ─────────────────────────────────────────────────────────── -->
