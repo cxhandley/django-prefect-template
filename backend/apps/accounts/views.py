@@ -35,11 +35,14 @@ def login_user(request):
         if form.is_valid():
             email = form.cleaned_data["email"]
             password = form.cleaned_data["password"]
-            try:
-                user_obj = User.objects.get(email=email)
-                user = authenticate(request, username=user_obj.username, password=password)
-            except User.DoesNotExist:
-                user = None
+            user_obj = User.objects.filter(email=email, is_active=True).first()
+            if user_obj is None:
+                user_obj = User.objects.filter(email=email).first()
+            user = (
+                authenticate(request, username=user_obj.username, password=password)
+                if user_obj
+                else None
+            )
 
             if user is not None:
                 login(request, user)
@@ -48,16 +51,13 @@ def login_user(request):
                 return redirect("flows:dashboard")
             else:
                 # Distinguish unconfirmed accounts from wrong credentials
-                try:
-                    unconfirmed = User.objects.get(email=email, is_active=False)
-                    if unconfirmed.check_password(password):
-                        form.add_error(
-                            None,
-                            "Please confirm your email address before logging in.",
-                        )
-                    else:
-                        form.add_error(None, "Invalid email or password.")
-                except User.DoesNotExist:
+                unconfirmed = User.objects.filter(email=email, is_active=False).first()
+                if unconfirmed and unconfirmed.check_password(password):
+                    form.add_error(
+                        None,
+                        "Please confirm your email address before logging in.",
+                    )
+                else:
                     form.add_error(None, "Invalid email or password.")
     else:
         form = LoginForm()

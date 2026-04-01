@@ -1,0 +1,58 @@
+{% load humanize %}
+{% if page_obj.object_list %}
+    <div class="overflow-x-auto">
+        <table class="table table-zebra w-full text-sm">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Flow</th>
+                    <th>Status</th>
+                    <th>Started</th>
+                    <th>Duration</th>
+                    <th>Error</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="admin-exec-table-body">
+                {% for ex in page_obj %}
+                    {% with duration=None %}
+                        <tr>
+                            <td>
+                                <div class="font-medium">{{ ex.triggered_by.email }}</div>
+                                <div class="text-xs text-base-content/50">{{ ex.triggered_by.username }}</div>
+                            </td>
+                            <td class="font-mono">{{ ex.flow_name }}</td>
+                            <td>
+                                {% if ex.status == "COMPLETED" %}
+                                    <span class="badge badge-success badge-sm">{{ ex.status }}</span>
+                                {% elif ex.status == "FAILED" %}
+                                    <span class="badge badge-error badge-sm">{{ ex.status }}</span>
+                                {% elif ex.status == "RUNNING" %}
+                                    <span class="badge badge-info badge-sm">{{ ex.status }}</span>
+                                {% else %}
+                                    <span class="badge badge-ghost badge-sm">{{ ex.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-base-content/70">{{ ex.created_at|date:"Y-m-d H:i" }}</td>
+                            <td class="text-base-content/70">
+                                {% if ex.completed_at and ex.created_at %}
+                                    {{ ex.completed_at|timeuntil:ex.created_at }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td class="max-w-xs truncate text-error text-xs">{{ ex.error_message|default:"—"|truncatechars:60 }}</td>
+                            <td>
+                                <a href="{% url 'flows:admin_execution_detail' ex.flow_run_id %}"
+                                   class="btn btn-xs btn-outline">View</a>
+                            </td>
+                        </tr>
+                    {% endwith %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include "core/components/ui/pagination.html" %}
+{% else %}
+    {% include "core/components/ui/empty_state.html" with title="No executions found" message="Try adjusting the filters." %}
+{% endif %}

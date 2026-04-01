@@ -25,4 +25,12 @@ urlpatterns = [
         views.download_results,
         name="download_results",
     ),
+    # Admin monitoring (staff-only)
+    path("admin/dashboard/", views.admin_dashboard, name="admin_dashboard"),
+    path("admin/executions/", views.admin_executions, name="admin_executions"),
+    path(
+        "admin/executions/<uuid:run_id>/",
+        views.admin_execution_detail,
+        name="admin_execution_detail",
+    ),
 ]

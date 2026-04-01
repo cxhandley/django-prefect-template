@@ -11,10 +11,13 @@ from apps.core.mixins import (
     get_filtered_queryset,
 )
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
+from django.db.models import Count, Q
+from django.db.models.functions import TruncDate
 from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -686,3 +689,159 @@ def delete_execution(request, run_id):
     execution.delete()
 
     return redirect("flows:history")
+
+
+# ── Admin views (staff only) ──────────────────────────────────────────────────
+
+
+@staff_member_required(login_url="/accounts/login/")
+@require_http_methods(["GET"])
+def admin_dashboard(request):
+    """Staff-only monitoring dashboard with system-wide usage stats."""
+    now = timezone.now()
+    thirty_days_ago = now - datetime.timedelta(days=30)
+
+    all_executions = FlowExecution.objects.all()
+    recent = all_executions.filter(created_at__gte=thirty_days_ago)
+
+    total = all_executions.count()
+    total_recent = recent.count()
+
+    completed = all_executions.filter(status="COMPLETED")
+    success_rate = round(completed.count() / total * 100, 1) if total else 0
+
+    # Average runtime for completed executions that have both timestamps
+    avg_duration = None
+    durations = [
+        (ex.completed_at - ex.created_at).total_seconds()
+        for ex in completed.exclude(completed_at__isnull=True)
+        if ex.completed_at and ex.created_at
+    ]
+    if durations:
+        avg_duration = round(sum(durations) / len(durations), 1)
+
+    # Breakdown by user (last 30 days)
+    by_user = (
+        recent.values("triggered_by__email", "triggered_by__username")
+        .annotate(count=Count("id"))
+        .order_by("-count")[:10]
+    )
+
+    # Breakdown by flow type (last 30 days) with success rate per type
+    by_flow = []
+    for row in recent.values("flow_name").annotate(count=Count("id")).order_by("-count"):
+        flow_name = row["flow_name"]
+        flow_completed = recent.filter(flow_name=flow_name, status="COMPLETED").count()
+        flow_rate = round(flow_completed / row["count"] * 100) if row["count"] else 0
+        by_flow.append({"flow_name": flow_name, "count": row["count"], "success_rate": flow_rate})
+
+    # Daily counts for the last 30 days (for the bar chart)
+    daily_raw = (
+        recent.annotate(day=TruncDate("created_at"))
+        .values("day")
+        .annotate(count=Count("id"))
+        .order_by("day")
+    )
+    daily_map = {row["day"]: row["count"] for row in daily_raw}
+    daily_counts = []
+    for i in range(30):
+        day = (now - datetime.timedelta(days=29 - i)).date()
+        daily_counts.append({"day": day, "count": daily_map.get(day, 0)})
+
+    max_daily = max((d["count"] for d in daily_counts), default=1) or 1
+
+    chart_start = daily_counts[0]["day"] if daily_counts else None
+    chart_end = daily_counts[-1]["day"] if daily_counts else None
+
+    context = {
+        "active_page": "admin_dashboard",
+        "total": total,
+        "total_recent": total_recent,
+        "success_rate": f"{success_rate}%",
+        "avg_duration": f"{avg_duration}s" if avg_duration is not None else "—",
+        "by_user": by_user,
+        "by_flow": by_flow,
+        "daily_counts": daily_counts,
+        "max_daily": max_daily,
+        "chart_start": chart_start,
+        "chart_end": chart_end,
+    }
+    return render(request, "flows/admin_dashboard.html", context)
+
+
+@staff_member_required(login_url="/accounts/login/")
+@require_http_methods(["GET"])
+def admin_executions(request):
+    """Staff-only execution log viewer with filters across all users."""
+    qs = FlowExecution.objects.select_related("triggered_by").order_by("-created_at")
+
+    user_q = request.GET.get("user", "").strip()
+    status_q = request.GET.get("status", "").strip()
+    date_from = request.GET.get("date_from", "").strip()
+    date_to = request.GET.get("date_to", "").strip()
+
+    if user_q:
+        qs = qs.filter(
+            Q(triggered_by__email__icontains=user_q) | Q(triggered_by__username__icontains=user_q)
+        )
+    if status_q:
+        qs = qs.filter(status=status_q)
+    if date_from:
+        try:
+            qs = qs.filter(created_at__date__gte=datetime.date.fromisoformat(date_from))
+        except ValueError:
+            pass
+    if date_to:
+        try:
+            qs = qs.filter(created_at__date__lte=datetime.date.fromisoformat(date_to))
+        except ValueError:
+            pass
+
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get("page", 1))
+
+    context = {
+        "active_page": "admin_dashboard",
+        "page_obj": page_obj,
+        "user_q": user_q,
+        "status_q": status_q,
+        "date_from": date_from,
+        "date_to": date_to,
+        "status_choices": ["COMPLETED", "FAILED", "RUNNING", "PENDING"],
+        "breadcrumbs": [
+            {"name": "Admin Dashboard", "url": "/flows/admin/dashboard/"},
+            {"name": "Execution Logs"},
+        ],
+    }
+
+    if request.headers.get("HX-Request"):
+        return render(request, "flows/partials/admin_executions_table.html", context)
+    return render(request, "flows/admin_executions.html", context)
+
+
+@staff_member_required(login_url="/accounts/login/")
+@require_http_methods(["GET"])
+def admin_execution_detail(request, run_id):
+    """Staff-only execution detail — can view any user's execution."""
+    execution = get_object_or_404(
+        FlowExecution.objects.select_related("triggered_by"), flow_run_id=run_id
+    )
+
+    duration = None
+    if execution.completed_at and execution.created_at:
+        duration = round((execution.completed_at - execution.created_at).total_seconds(), 2)
+
+    flower_url = getattr(settings, "FLOWER_URL", "/flower/")
+
+    context = {
+        "active_page": "admin_dashboard",
+        "execution": execution,
+        "duration": duration,
+        "flower_url": flower_url,
+        "breadcrumbs": [
+            {"name": "Admin Dashboard", "url": "/flows/admin/dashboard/"},
+            {"name": "Execution Logs", "url": "/flows/admin/executions/"},
+            {"name": f"Execution #{str(execution.flow_run_id)[:8]}"},
+        ],
+    }
+    return render(request, "flows/admin_execution_detail.html", context)

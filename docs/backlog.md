@@ -130,7 +130,7 @@ Requires Tier 2 access control to be meaningful in a multi-user environment.
 
 ---
 
-### BL-008 · Admin Monitoring Dashboard `L`
+### ~~BL-008 · Admin Monitoring Dashboard~~ `L` ✓ Complete
 **User story:** US-5.1
 **Value:** Admins have no visibility into system health or usage trends without querying the database directly.
 
@@ -148,7 +148,7 @@ Requires Tier 2 access control to be meaningful in a multi-user environment.
 
 ---
 
-### BL-009 · Admin Execution Log Viewer `M`
+### ~~BL-009 · Admin Execution Log Viewer~~ `M` ✓ Complete
 **User story:** US-5.2
 **Value:** When a user reports a failed execution, admins currently have no UI to inspect it — they must check Celery/Flower or the database.
 
@@ -227,10 +227,10 @@ Valuable but not blocking any core workflow.
 | ~~BL-003~~ | ~~Presigned download URLs~~ | 1 | S | — |
 | ~~BL-004~~ | ~~Export history as CSV~~ | 1 | S | — |
 | BL-005 | Prediction comparison detail | 1 | M | — |
-| ~~BL-006~~ | ~~Superuser user management UI~~ | 2 | L | — |
-| ~~BL-007~~ | ~~Registration email confirmation~~ | 2 | M | BL-001 |
-| BL-008 | Admin monitoring dashboard | 3 | L | BL-006 |
-| BL-009 | Admin execution log viewer | 3 | M | BL-008 |
+| BL-006 | Superuser user management UI | 2 | L | — |
+| BL-007 | Registration email confirmation | 2 | M | BL-001 |
+| ~~BL-008~~ | ~~Admin monitoring dashboard~~ | 3 | L | BL-006 |
+| ~~BL-009~~ | ~~Admin execution log viewer~~ | 3 | M | BL-008 |
 | BL-010 | Input presets | 4 | L | — |
 | BL-011 | Email notifications for failures | 4 | M | BL-001 |
 | BL-012 | Retry failed execution | 4 | S | — |
