@@ -15,6 +15,28 @@
                         {% include "core/components/ui/form_input.html" with name="last_name" label="Last Name" type="text" value=user.last_name %}
                     </div>
                 </div>
+                <!-- Notification Preferences -->
+                <div class="border-t border-base-200 pt-8">
+                    <h2 class="text-lg font-semibold mb-4">Notifications</h2>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="form-control">
+                            <label class="label cursor-pointer justify-start gap-4">
+                                <input type="checkbox"
+                                       name="notify_on_failure"
+                                       class="checkbox checkbox-primary"
+                                       {% if profile.notify_on_failure %}checked{% endif %} />
+                                <span class="label-text">
+                                    Email me when an execution fails
+                                    <span class="block text-xs text-base-content/50 mt-0.5">
+                                        Sent only once per execution after all retries are exhausted.
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm mt-4">Save Preferences</button>
+                    </form>
+                </div>
                 <!-- Security Settings -->
                 <div class="border-t border-base-200 pt-8">
                     <h2 class="text-lg font-semibold mb-4">Security</h2>
@@ -29,6 +51,12 @@
                     <h2 class="text-lg font-semibold mb-4">API Keys</h2>
                     <p class="text-sm text-base-content/60 mb-4">Manage your API keys for programmatic access.</p>
                     <button class="btn btn-primary btn-sm">Generate New Key</button>
+                </div>
+                <!-- Saved Presets -->
+                <div class="border-t border-base-200 pt-8">
+                    <h2 class="text-lg font-semibold mb-1">Saved Prediction Presets</h2>
+                    <p class="text-sm text-base-content/60 mb-4">Manage your saved prediction input presets.</p>
+                    <div id="preset-list">{% include "flows/partials/preset_list.html" with presets=request.user.input_presets.all %}</div>
                 </div>
                 <!-- Danger Zone -->
                 <div class="border-t border-error/30 pt-8">

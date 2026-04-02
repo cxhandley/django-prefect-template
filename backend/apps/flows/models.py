@@ -9,6 +9,26 @@ from django.conf import settings
 from django.db import models
 
 
+class InputPreset(models.Model):
+    """A named set of prediction input values saved by a user for quick reuse."""
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="input_presets",
+    )
+    name = models.CharField(max_length=100)
+    input_values = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        unique_together = [("user", "name")]
+
+    def __str__(self):
+        return f"{self.name} ({self.user.email})"
+
+
 class FlowExecution(models.Model):
     """
     Stores metadata about flow executions.

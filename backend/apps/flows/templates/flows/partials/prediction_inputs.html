@@ -1,0 +1,4 @@
+{% include "core/components/ui/form_input.html" with name="income" label="Annual Income ($)" type="number" placeholder="75000" min=0 max=10000000 step=1000 help_text="Gross annual income in dollars" required=True value=values.income %}
+{% include "core/components/ui/form_input.html" with name="age" label="Age" type="number" placeholder="35" min=18 max=120 step=1 help_text="Must be 18 or older" required=True value=values.age %}
+{% include "core/components/ui/form_input.html" with name="credit_score" label="Credit Score" type="number" placeholder="720" min=300 max=850 step=1 help_text="FICO score (300–850)" required=True value=values.credit_score %}
+{% include "core/components/ui/form_input.html" with name="employment_years" label="Employment Years" type="number" placeholder="8" min=0 max=60 step=0.5 help_text="Years in current or most recent role" required=True value=values.employment_years %}

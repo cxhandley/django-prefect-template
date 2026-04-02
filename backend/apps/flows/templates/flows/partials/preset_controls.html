@@ -1,0 +1,22 @@
+{% if presets %}
+    <div class="flex items-center gap-2">
+        <select id="preset-select"
+                class="select select-bordered select-sm"
+                hx-get="{% url 'flows:load_preset' %}"
+                hx-target="#prediction-inputs"
+                hx-swap="innerHTML"
+                hx-trigger="change"
+                name="preset_id">
+            <option value="">
+                {% if saved_name %}
+                    Saved "{{ saved_name }}" ✓
+                {% else %}
+                    Load a preset…
+                {% endif %}
+            </option>
+            {% for preset in presets %}<option value="{{ preset.id }}">{{ preset.name }}</option>{% endfor %}
+        </select>
+    </div>
+{% else %}
+    <span class="text-sm text-base-content/50">No saved presets yet.</span>
+{% endif %}

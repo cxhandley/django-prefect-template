@@ -1,0 +1,27 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Django as Django (views.py)
+    participant DB as PostgreSQL
+
+    %% ── Save a preset ─────────────────────────────────────────────────────────
+    User->>Browser: Fill prediction form, click "Save as Preset"
+    Browser->>Browser: JS copies field values into modal hidden inputs
+    Browser->>Browser: Open save-preset modal
+    User->>Browser: Enter preset name, click Save
+    Browser->>Django: POST /flows/presets/save/ (preset_name + field values)
+    Django->>DB: INSERT InputPreset (user, name, input_values)
+    Django-->>Browser: 200 + HX-Trigger: presets-updated + toast message
+
+    %% ── Load a preset ─────────────────────────────────────────────────────────
+    User->>Browser: Select preset from dropdown
+    Browser->>Django: GET /flows/presets/load/?preset_id=<id>
+    Django->>DB: SELECT InputPreset WHERE id=<id> AND user=request.user
+    Django-->>Browser: HTMX partial — prediction-inputs grid with pre-filled values
+    Browser->>Browser: Swap #prediction-inputs with pre-filled fields
+
+    %% ── Delete a preset ───────────────────────────────────────────────────────
+    User->>Browser: Click Delete on a preset row (Settings page)
+    Browser->>Django: POST /flows/presets/<id>/delete/
+    Django->>DB: DELETE InputPreset WHERE id=<id> AND user=request.user
+    Django-->>Browser: HTMX partial — updated presets list

@@ -50,3 +50,21 @@ sequenceDiagram
     Browser->>Django: GET /flows/{run_id}/results/
     Django->>S3: DuckDB query output.parquet (preview 100 rows)
     Django-->>Browser: Results table + summary stats
+
+    %% ── Failure + email notification branch ──────────────────────────────────
+    note over Celery: On terminal failure (retries exhausted)
+    Celery->>DB: Update FlowExecution (status=FAILED, error_message)
+    Celery->>DB: SELECT UserProfile WHERE user=triggered_by
+    alt notify_on_failure = True
+        Celery->>Celery: build execution detail URL
+        Celery-->>User: send_mail — failure notification email
+    end
+
+    %% ── Retry branch ─────────────────────────────────────────────────────────
+    note over User: User sees FAILED status on detail page
+    User->>Browser: Click "Retry"
+    Browser->>Django: POST /flows/execution/{run_id}/retry/
+    Django->>DB: SELECT original FlowExecution
+    Django->>DB: INSERT new FlowExecution (new UUID, same params/s3_path)
+    Django->>Celery: run_pipeline_task.delay() / run_prediction_task.delay()
+    Django-->>Browser: Redirect → new execution detail page

@@ -221,6 +221,42 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
+## Epic 7: User Experience Enhancements
+
+### US-7.1: Save and Reuse Prediction Inputs `[ ]`
+**As a** power user
+**I want to** save my prediction inputs as a named preset and reload them later
+**So that** I don't have to re-enter the same values for recurring predictions
+
+**Acceptance Criteria:**
+- [ ] User can click "Save as Preset" on the prediction form to name and save current inputs
+- [ ] User can select a saved preset from a dropdown to pre-fill the prediction form
+- [ ] User can view, rename, and delete their presets from the Settings page
+- [ ] Presets are private to each user
+
+### US-7.2: Email Notification for Failed Executions `[ ]`
+**As a** user
+**I want to** receive an email when my pipeline or prediction fails
+**So that** I know a long-running job has failed without having to check the history page
+
+**Acceptance Criteria:**
+- [ ] User receives an email when an execution reaches terminal FAILED status
+- [ ] Email contains: flow name, run ID, error message, and a link to the execution detail page
+- [ ] User can opt out of failure notifications via a toggle in Settings
+- [ ] Notification is only sent once per execution (terminal failure, not on each retry)
+
+### US-7.3: Retry Failed Execution `[ ]`
+**As a** user
+**I want to** retry a failed execution with the same parameters
+**So that** I don't have to re-enter inputs to re-run a transient failure
+
+**Acceptance Criteria:**
+- [ ] A "Retry" button appears on the execution detail page when status is FAILED
+- [ ] Clicking Retry creates a new execution with the same flow name, inputs, and S3 path
+- [ ] The new execution is dispatched immediately and user is redirected to its detail page
+
+---
+
 ## MVP Scope Summary
 
 | Area | Status |
@@ -234,5 +270,6 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 | Execution comparison | Partial |
 | Admin monitoring dashboard | Complete |
 | Input presets | Not started |
-| Email notifications | Not started |
+| Email notifications for failures | Not started |
+| Retry failed execution | Not started |
 | Superuser management | Complete |

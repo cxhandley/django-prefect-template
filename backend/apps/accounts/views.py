@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from .forms import LoginForm, SignupForm
+from .models import UserProfile
 from .services import send_confirmation_email
 
 User = get_user_model()
@@ -160,10 +161,17 @@ def profile(request):
 
 
 @login_required
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "POST"])
 def settings(request):
-    """User settings page"""
-    return render(request, "accounts/settings.html", {"user": request.user})
+    """User settings page — GET renders, POST updates notify_on_failure."""
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        profile.notify_on_failure = request.POST.get("notify_on_failure") == "on"
+        profile.save(update_fields=["notify_on_failure"])
+        return redirect("accounts:settings")
+
+    return render(request, "accounts/settings.html", {"user": request.user, "profile": profile})
 
 
 # ── superuser views ───────────────────────────────────────────────────────────

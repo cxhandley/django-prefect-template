@@ -180,6 +180,9 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TIMEZONE = "UTC"
 
+# Site URL — used in email links (no trailing slash)
+SITE_URL = env("SITE_URL", default="http://localhost:8000")
+
 # Notebooks / doit pipeline
 NOTEBOOKS_DIR = BASE_DIR.parent / env("NOTEBOOKS_DIR", default="notebooks")
 NOTEBOOK_OUTPUT_DIR = BASE_DIR.parent / env("NOTEBOOK_OUTPUT_DIR", default="data/notebook_outputs")

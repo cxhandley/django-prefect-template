@@ -14,18 +14,22 @@
                 <p class="text-base-content/60 text-sm mt-1">ID: {{ execution.flow_run_id }}</p>
             </div>
             <div class="flex gap-2">
-                <button class="btn btn-primary btn-sm"
-                        hx-post="{% url 'flows:upload_and_process' %}"
-                        hx-confirm="Rerun this prediction with the same parameters?">
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         class="h-4 w-4"
-                         fill="none"
-                         viewBox="0 0 24 24"
-                         stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Rerun
-                </button>
+                {% if execution.status == "FAILED" %}
+                    <form method="post"
+                          action="{% url 'flows:retry_execution' execution.flow_run_id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="h-4 w-4"
+                                 fill="none"
+                                 viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Retry
+                        </button>
+                    </form>
+                {% endif %}
                 {% if execution.status == "RUNNING" or execution.status == "PENDING" %}
                     <form method="post"
                           action="{% url 'flows:stop_execution' execution.flow_run_id %}">

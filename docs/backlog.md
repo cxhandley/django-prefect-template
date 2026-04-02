@@ -170,7 +170,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-010 · Input Presets (Save & Reuse Prediction Inputs) `L`
+### ~~BL-010 · Input Presets (Save & Reuse Prediction Inputs)~~ `L` ✓ Complete
 **User story:** US-5.2 (original backlog)
 **Value:** Power users who run many predictions with similar inputs must re-enter values each time.
 
@@ -188,7 +188,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-011 · Email Notifications for Failed Executions `M`
+### ~~BL-011 · Email Notifications for Failed Executions~~ `M` ✓ Complete
 **User story:** US-7.2 (original backlog)
 **Value:** Users don't know a long-running pipeline has failed unless they check the history page.
 
@@ -205,7 +205,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-012 · Retry Failed Execution `S`
+### ~~BL-012 · Retry Failed Execution~~ `S` ✓ Complete
 **User story:** US-4.3 (original backlog)
 **Value:** Users must re-enter all inputs to re-run a failed prediction; retrying with the same parameters requires a button, not a form.
 
@@ -231,6 +231,6 @@ Valuable but not blocking any core workflow.
 | BL-007 | Registration email confirmation | 2 | M | BL-001 |
 | ~~BL-008~~ | ~~Admin monitoring dashboard~~ | 3 | L | BL-006 |
 | ~~BL-009~~ | ~~Admin execution log viewer~~ | 3 | M | BL-008 |
-| BL-010 | Input presets | 4 | L | — |
-| BL-011 | Email notifications for failures | 4 | M | BL-001 |
-| BL-012 | Retry failed execution | 4 | S | — |
+| ~~BL-010~~ | ~~Input presets~~ | 4 | L | — |
+| ~~BL-011~~ | ~~Email notifications for failures~~ | 4 | M | BL-001 |
+| ~~BL-012~~ | ~~Retry failed execution~~ | 4 | S | — |

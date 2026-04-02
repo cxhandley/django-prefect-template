@@ -139,3 +139,61 @@ def test_run_prediction_task_failure(flow_execution_factory, user, mocker):
     execution.refresh_from_db()
     assert execution.status == "FAILED"
     assert "prediction failed" in execution.error_message
+
+
+# ============================================================================
+# BL-011 — _send_failure_notification unit tests
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_send_failure_notification_sends_email(user, mocker, settings):
+    """Email is sent to user when notify_on_failure=True."""
+    import uuid
+
+    from apps.accounts.models import UserProfile
+    from apps.flows.tasks import _send_failure_notification
+
+    UserProfile.objects.get_or_create(user=user, defaults={"notify_on_failure": True})
+    settings.SITE_URL = "http://testserver"
+    mock_send = mocker.patch("apps.flows.tasks.send_mail")
+
+    run_id = uuid.uuid4()
+    _send_failure_notification(run_id, user.id, "pipeline", "Something broke")
+
+    assert mock_send.called
+    call_kwargs = mock_send.call_args[1]
+    assert user.email in call_kwargs["recipient_list"]
+    assert "pipeline" in call_kwargs["subject"]
+
+
+@pytest.mark.django_db
+def test_send_failure_notification_respects_opt_out(user, mocker, settings):
+    """No email when notify_on_failure=False."""
+    import uuid
+
+    from apps.accounts.models import UserProfile
+    from apps.flows.tasks import _send_failure_notification
+
+    UserProfile.objects.update_or_create(user=user, defaults={"notify_on_failure": False})
+    settings.SITE_URL = "http://testserver"
+    mock_send = mocker.patch("apps.flows.tasks.send_mail")
+
+    run_id = uuid.uuid4()
+    _send_failure_notification(run_id, user.id, "pipeline", "Something broke")
+
+    assert not mock_send.called
+
+
+@pytest.mark.django_db
+def test_send_failure_notification_silent_for_missing_user(mocker, settings):
+    """No exception raised when user_id does not exist."""
+    import uuid
+
+    from apps.flows.tasks import _send_failure_notification
+
+    settings.SITE_URL = "http://testserver"
+    mocker.patch("apps.flows.tasks.send_mail")
+
+    # Should not raise even if user does not exist
+    _send_failure_notification(uuid.uuid4(), user_id=99999, flow_name="pipeline", error="err")

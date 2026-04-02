@@ -33,13 +33,27 @@ erDiagram
         datetime completed_at
     }
 
+    USER_PROFILE {
+        int id PK
+        int user_id FK "OneToOne → USER"
+        boolean notify_on_failure "default true"
+    }
+
+    INPUT_PRESET {
+        int id PK
+        int user_id FK "references USER"
+        string name "user-defined label"
+        json input_values "prediction field values"
+        datetime created_at
+    }
+
     USER ||--o{ FLOW_EXECUTION : "triggers"
+    USER ||--|| USER_PROFILE : "has"
+    USER ||--o{ INPUT_PRESET : "owns"
 
     %% ============================================
     %% NOT YET IMPLEMENTED — planned for future epics
     %% ============================================
 
-    %% INPUT_PRESET — save & reuse prediction inputs (Epic 5)
     %% EXECUTION_COMPARISON — persist named comparisons (Epic 4)
-    %% NOTIFICATION — in-app and email alerts (Epic 7)
     %% ADMIN_ACTION_LOG — audit trail for admin actions (Epic 5)

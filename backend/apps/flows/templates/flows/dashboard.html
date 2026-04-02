@@ -37,7 +37,11 @@
         <!-- Make a Prediction -->
         <div class="card bg-base-100 border border-base-200 shadow-sm">
             <div class="card-body">
-                <h2 class="card-title text-lg">Make a Prediction</h2>
+                <div class="flex items-center justify-between">
+                    <h2 class="card-title text-lg">Make a Prediction</h2>
+                    <!-- Preset controls -->
+                    <div id="preset-controls">{% include "flows/partials/preset_controls.html" with presets=presets %}</div>
+                </div>
                 <form id="prediction-form"
                       novalidate
                       hx-post="{% url 'flows:run_prediction' %}"
@@ -47,11 +51,8 @@
                       hx-disabled-elt="find button[type=submit]"
                       class="mt-4">
                     {% csrf_token %}
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {% include "core/components/ui/form_input.html" with name="income" label="Annual Income ($)" type="number" placeholder="75000" min=0 max=10000000 step=1000 help_text="Gross annual income in dollars" required=True %}
-                        {% include "core/components/ui/form_input.html" with name="age" label="Age" type="number" placeholder="35" min=18 max=120 step=1 help_text="Must be 18 or older" required=True %}
-                        {% include "core/components/ui/form_input.html" with name="credit_score" label="Credit Score" type="number" placeholder="720" min=300 max=850 step=1 help_text="FICO score (300–850)" required=True %}
-                        {% include "core/components/ui/form_input.html" with name="employment_years" label="Employment Years" type="number" placeholder="8" min=0 max=60 step=0.5 help_text="Years in current or most recent role" required=True %}
+                    <div id="prediction-inputs" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {% include "flows/partials/prediction_inputs.html" %}
                     </div>
                     <div class="flex gap-3 mt-6">
                         <button type="submit" class="btn btn-primary">
@@ -64,6 +65,9 @@
                             </svg>
                             Run Prediction
                         </button>
+                        <button type="button"
+                                id="btn-save-preset"
+                                class="btn btn-outline btn-sm self-center">Save as Preset</button>
                     </div>
                     <span id="prediction-loading"
                           class="loading loading-spinner loading-md htmx-indicator mt-4"></span>
@@ -71,6 +75,46 @@
                 </form>
             </div>
         </div>
+        <!-- Save Preset Modal -->
+        <dialog id="save_preset_modal" class="modal">
+            <div class="modal-box">
+                <h3 class="font-bold text-lg">Save as Preset</h3>
+                <p class="text-sm text-base-content/60 mt-1">Give this set of inputs a name so you can reload them later.</p>
+                <div id="save-preset-result">
+                    <form id="save-preset-form"
+                          hx-post="{% url 'flows:save_preset' %}"
+                          hx-target="#preset-controls"
+                          hx-swap="innerHTML"
+                          hx-on::after-request="if(event.detail.successful){ document.getElementById('save_preset_modal').close(); }">
+                        {% csrf_token %}
+                        <input type="hidden" name="income" id="preset-income" />
+                        <input type="hidden" name="age" id="preset-age" />
+                        <input type="hidden" name="credit_score" id="preset-credit_score" />
+                        <input type="hidden" name="employment_years" id="preset-employment_years" />
+                        <div class="form-control mt-4">
+                            <label class="label" for="id_preset_name">
+                                <span class="label-text text-sm font-medium">Preset Name</span>
+                            </label>
+                            <input type="text"
+                                   id="id_preset_name"
+                                   name="preset_name"
+                                   class="input input-bordered w-full"
+                                   placeholder="e.g. High-income applicant"
+                                   required />
+                        </div>
+                        <div class="modal-action">
+                            <button type="button"
+                                    class="btn btn-ghost"
+                                    onclick="document.getElementById('save_preset_modal').close()">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop">
+                <button>close</button>
+            </form>
+        </dialog>
         <!-- Recent Executions -->
         <div class="card bg-base-100 border border-base-200 shadow-sm">
             <div class="card-body">
@@ -116,6 +160,18 @@
     </div>
 {% endblock dashboard_content %}
 {% block extra_js %}
+    <script>
+    // Copy prediction form values into the save-preset modal hidden fields
+    document.getElementById('btn-save-preset').addEventListener('click', function () {
+        var form = document.getElementById('prediction-form');
+        ['income', 'age', 'credit_score', 'employment_years'].forEach(function (name) {
+            var input = form.querySelector('[name="' + name + '"]');
+            var hidden = document.getElementById('preset-' + name);
+            if (input && hidden) hidden.value = input.value;
+        });
+        document.getElementById('save_preset_modal').showModal();
+    });
+    </script>
     <script>
     (function () {
         function setFieldError(form, name, message) {
