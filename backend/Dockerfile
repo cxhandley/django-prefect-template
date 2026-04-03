@@ -1,18 +1,18 @@
 # ── Stage 1: Build frontend assets ───────────────────────────────────────────
 FROM node:20-alpine AS frontend-build
 
-WORKDIR /frontend
+WORKDIR /build
 
-# Create output directories (sibling to /frontend, so /static/dist, /static/vendor)
-RUN mkdir -p /static/dist /static/vendor
+COPY frontend/package.json frontend/
+RUN cd frontend && npm install
 
-COPY frontend/package.json ./
-RUN npm install
-
-COPY frontend/ .
+# Copy Django templates so Tailwind can scan them for class names
+# (main.css uses @source "../../apps" which resolves to /build/apps)
+COPY apps/ apps/
+COPY frontend/ frontend/
 
 # Outputs: /static/dist/main.css and /static/vendor/htmx.min.js
-RUN npm run build
+RUN cd frontend && npm run build
 
 # ── Stage 2: Django application ───────────────────────────────────────────────
 FROM python:3.13-slim
@@ -43,8 +43,8 @@ RUN if [ -n "$INSTALL_EXTRAS" ]; then \
 COPY . .
 
 # Copy compiled frontend assets from stage 1
-COPY --from=frontend-build /static/dist/ /app/static/dist/
-COPY --from=frontend-build /static/vendor/ /app/static/vendor/
+COPY --from=frontend-build /build/static/dist/ /app/static/dist/
+COPY --from=frontend-build /build/static/vendor/ /app/static/vendor/
 
 EXPOSE 8000
 
