@@ -191,6 +191,35 @@ function dataTable(config) {
             return op !== 'empty' && op !== 'not_empty';
         },
 
+        // ── Low-level page loader ──────────────────────────────────────────
+        _loadPage(url) {
+            var self = this;
+            var tbody = document.querySelector(self.hxTarget);
+            if (!tbody) return;
+            fetch(url, { headers: { 'HX-Request': 'true' } })
+                .then(function(r) { return r.text(); })
+                .then(function(html) {
+                    // Parse in table context so <tbody>/<tfoot> are valid
+                    var tmp = document.createElement('table');
+                    tmp.innerHTML = html;
+                    var newTbody = tmp.querySelector('tbody');
+                    var newTfoot = tmp.querySelector('tfoot');
+                    if (newTbody) {
+                        tbody.innerHTML = newTbody.innerHTML;
+                        if (newTbody.dataset.rowIds) {
+                            tbody.dataset.rowIds = newTbody.dataset.rowIds;
+                        }
+                        htmx.process(tbody);
+                    }
+                    var oldTfoot = tbody.nextElementSibling;
+                    if (newTfoot && oldTfoot && oldTfoot.tagName === 'TFOOT') {
+                        oldTfoot.innerHTML = newTfoot.innerHTML;
+                        htmx.process(oldTfoot);
+                    }
+                });
+            history.pushState({}, '', url);
+        },
+
         // ── Filter apply / clear ───────────────────────────────────────────
         applyFilters() {
             const params = new URLSearchParams();
@@ -214,30 +243,22 @@ function dataTable(config) {
             } else {
                 localStorage.removeItem(`dt_${this.tableId}_filters`);
             }
-            var tbody = document.querySelector(this.hxTarget);
-            if (!tbody) return;
-            fetch(url, { headers: { 'HX-Request': 'true' } })
-                .then(function(r) { return r.text(); })
-                .then(function(html) {
-                    // Parse in table context so <tbody>/<tfoot> are handled correctly
-                    var tmp = document.createElement('table');
-                    tmp.innerHTML = html;
-                    var newTbody = tmp.querySelector('tbody');
-                    var newTfoot = tmp.querySelector('tfoot');
-                    if (newTbody) {
-                        tbody.innerHTML = newTbody.innerHTML;
-                        if (newTbody.dataset.rowIds) {
-                            tbody.dataset.rowIds = newTbody.dataset.rowIds;
-                        }
-                        htmx.process(tbody);
-                    }
-                    var oldTfoot = tbody.nextElementSibling;
-                    if (newTfoot && oldTfoot && oldTfoot.tagName === 'TFOOT') {
-                        oldTfoot.innerHTML = newTfoot.innerHTML;
-                        htmx.process(oldTfoot);
-                    }
-                });
-            history.pushState({}, '', url);
+            this._loadPage(url);
+        },
+
+        // ── Pagination ─────────────────────────────────────────────────────
+        goToPage(n) {
+            const params = new URLSearchParams();
+            this.activeFilters.forEach(row => {
+                if (row.field && row.op) {
+                    params.append('f_field[]', row.field);
+                    params.append('f_op[]', row.op);
+                    params.append('f_val[]', row.value || '');
+                }
+            });
+            if (this.currentSort) params.set('sort', this.currentSort);
+            params.set('page', n);
+            this._loadPage(`${this.hxUrl}?${params.toString()}`);
         },
         clearFilters() {
             this.filterRows = [];

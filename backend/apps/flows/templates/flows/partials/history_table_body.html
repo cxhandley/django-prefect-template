@@ -68,10 +68,7 @@
             {% if page_obj.has_other_pages %}
                 <div class="join flex justify-center py-3">
                     {% if page_obj.has_previous %}
-                        <button hx-get="{% url 'flows:history' %}?{{ filter_query_string }}&page={{ page_obj.previous_page_number }}"
-                                hx-target="#dt-history-body"
-                                hx-swap="innerHTML"
-                                hx-push-url="true"
+                        <button @click="goToPage({{ page_obj.previous_page_number }})"
                                 class="join-item btn btn-sm">«</button>
                     {% else %}
                         <button class="join-item btn btn-sm btn-disabled">«</button>
@@ -80,18 +77,11 @@
                         {% if page_obj.number == num %}
                             <button class="join-item btn btn-sm btn-active">{{ num }}</button>
                         {% elif num >= page_obj.number|add:"-3" and num <= page_obj.number|add:"3" %}
-                            <button hx-get="{% url 'flows:history' %}?{{ filter_query_string }}&page={{ num }}"
-                                    hx-target="#dt-history-body"
-                                    hx-swap="innerHTML"
-                                    hx-push-url="true"
-                                    class="join-item btn btn-sm">{{ num }}</button>
+                            <button @click="goToPage({{ num }})" class="join-item btn btn-sm">{{ num }}</button>
                         {% endif %}
                     {% endfor %}
                     {% if page_obj.has_next %}
-                        <button hx-get="{% url 'flows:history' %}?{{ filter_query_string }}&page={{ page_obj.next_page_number }}"
-                                hx-target="#dt-history-body"
-                                hx-swap="innerHTML"
-                                hx-push-url="true"
+                        <button @click="goToPage({{ page_obj.next_page_number }})"
                                 class="join-item btn btn-sm">»</button>
                     {% else %}
                         <button class="join-item btn btn-sm btn-disabled">»</button>
