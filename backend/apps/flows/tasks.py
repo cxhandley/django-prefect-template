@@ -6,6 +6,7 @@ import uuid
 
 from config.celery import app
 from django.conf import settings
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -14,8 +15,8 @@ from django.utils import timezone
 from .runner import PipelineRunner
 
 
-def _send_failure_notification(run_id: uuid.UUID, user_id: int, flow_name: str, error: str):
-    """Send a failure email to the user if they have notifications enabled."""
+def _get_user_and_profile(user_id: int):
+    """Return (user, profile) or (None, None) if user not found."""
     from apps.accounts.models import UserProfile
     from django.contrib.auth import get_user_model
 
@@ -23,39 +24,91 @@ def _send_failure_notification(run_id: uuid.UUID, user_id: int, flow_name: str, 
     try:
         user = User.objects.get(pk=user_id)
     except User.DoesNotExist:
+        return None, None
+
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    return user, profile
+
+
+def _create_in_app_notification(user, notification_type: str, message: str, execution=None):
+    """Create a Notification record and invalidate the unread-count cache."""
+    from apps.accounts.models import Notification
+
+    Notification.objects.create(
+        user=user,
+        notification_type=notification_type,
+        message=message,
+        related_execution=execution,
+    )
+    cache.delete(f"notification_count_{user.pk}")
+
+
+def _send_failure_notification(run_id: uuid.UUID, user_id: int, flow_name: str, error: str):
+    """Notify the user (in-app and/or email) that an execution failed."""
+    from apps.flows.models import FlowExecution
+
+    user, profile = _get_user_and_profile(user_id)
+    if user is None or not profile.notify_on_failure:
         return
 
-    try:
-        notify = user.profile.notify_on_failure
-    except UserProfile.DoesNotExist:
-        notify = True
+    execution = FlowExecution.objects.filter(flow_run_id=run_id).first()
+    message = f"Execution of '{flow_name}' failed. Error: {error[:200] if error else 'No details.'}"
 
-    if not notify:
+    if profile.notify_in_app:
+        _create_in_app_notification(user, "EXECUTION_FAILED", message, execution)
+
+    if profile.notify_via_email:
+        site_url = settings.SITE_URL
+        detail_path = reverse("flows:execution_detail", kwargs={"run_id": run_id})
+        settings_path = reverse("accounts:settings")
+        body = render_to_string(
+            "flows/email/execution_failed.txt",
+            {
+                "first_name": user.first_name or user.username,
+                "flow_name": flow_name,
+                "run_id": str(run_id),
+                "error_message": error[:500] if error else "No details available.",
+                "detail_url": f"{site_url}{detail_path}",
+                "settings_url": f"{site_url}{settings_path}",
+            },
+        )
+        send_mail(
+            subject=f"Execution failed: {flow_name} ({str(run_id)[:8]})",
+            message=body,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,
+        )
+
+
+def _send_success_notification(run_id: uuid.UUID, user_id: int, flow_name: str):
+    """Notify the user (in-app and/or email) that an execution completed successfully."""
+    from apps.flows.models import FlowExecution
+
+    user, profile = _get_user_and_profile(user_id)
+    if user is None or not profile.notify_on_success:
         return
 
-    site_url = settings.SITE_URL
-    detail_path = reverse("flows:execution_detail", kwargs={"run_id": run_id})
-    settings_path = reverse("accounts:settings")
+    execution = FlowExecution.objects.filter(flow_run_id=run_id).first()
+    message = f"Execution of '{flow_name}' completed successfully."
 
-    body = render_to_string(
-        "flows/email/execution_failed.txt",
-        {
-            "first_name": user.first_name or user.username,
-            "flow_name": flow_name,
-            "run_id": str(run_id),
-            "error_message": error[:500] if error else "No details available.",
-            "detail_url": f"{site_url}{detail_path}",
-            "settings_url": f"{site_url}{settings_path}",
-        },
-    )
+    if profile.notify_in_app:
+        _create_in_app_notification(user, "EXECUTION_COMPLETED", message, execution)
 
-    send_mail(
-        subject=f"Execution failed: {flow_name} ({str(run_id)[:8]})",
-        message=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
-        fail_silently=True,
-    )
+    if profile.notify_via_email:
+        site_url = settings.SITE_URL
+        detail_path = reverse("flows:execution_detail", kwargs={"run_id": run_id})
+        send_mail(
+            subject=f"Execution completed: {flow_name} ({str(run_id)[:8]})",
+            message=(
+                f"Hi {user.first_name or user.username},\n\n"
+                f"Your execution of '{flow_name}' completed successfully.\n\n"
+                f"View results: {site_url}{detail_path}\n"
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=True,
+        )
 
 
 @app.task(bind=True, max_retries=2, default_retry_delay=30)
@@ -95,6 +148,7 @@ def run_pipeline_task(
             error_message="",
         )
 
+        _send_success_notification(run_id, user_id, "pipeline")
         return metadata
 
     except Exception as exc:
@@ -157,6 +211,7 @@ def run_prediction_task(
             parameters=updated_params,
         )
 
+        _send_success_notification(run_id, user_id, "predict_pipeline")
         return metadata
 
     except Exception as exc:

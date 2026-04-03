@@ -1,0 +1,55 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    Notifications - Django Prefect ML
+{% endblock title %}
+{% block dashboard_content %}
+    <div class="max-w-3xl">
+        <div class="flex items-center justify-between mb-6">
+            <h1 class="text-2xl font-bold">Notifications</h1>
+            {% if page_obj.object_list %}
+                <form method="post"
+                      action="{% url 'accounts:notifications_mark_all_read' %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline btn-sm">Mark all as read</button>
+                </form>
+            {% endif %}
+        </div>
+        <div class="space-y-2">
+            {% for notif in page_obj %}
+                <a href="{% url 'accounts:notification_read' pk=notif.pk %}"
+                   class="flex items-start gap-3 p-4 rounded-lg border border-base-200 hover:bg-base-200/50 transition-colors {% if not notif.is_read %}bg-base-200/30 border-primary/20{% else %}bg-base-100{% endif %}">
+                    {% if notif.notification_type == "EXECUTION_FAILED" %}
+                        <span class="text-error text-lg leading-none mt-0.5">✕</span>
+                    {% elif notif.notification_type == "EXECUTION_COMPLETED" %}
+                        <span class="text-success text-lg leading-none mt-0.5">✓</span>
+                    {% else %}
+                        <span class="text-info text-lg leading-none mt-0.5">ℹ</span>
+                    {% endif %}
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm {% if not notif.is_read %}font-semibold{% endif %}">{{ notif.message }}</p>
+                        <p class="text-xs text-base-content/50 mt-1">{{ notif.created_at|timesince }} ago</p>
+                    </div>
+                    {% if not notif.is_read %}<span class="badge badge-primary badge-xs self-center">New</span>{% endif %}
+                </a>
+            {% empty %}
+                <div class="text-center py-16 text-base-content/50">
+                    <p class="text-lg">No notifications yet.</p>
+                    <p class="text-sm mt-1">You'll see alerts here when your executions complete or fail.</p>
+                </div>
+            {% endfor %}
+        </div>
+        {% if page_obj.has_other_pages %}
+            <div class="flex justify-center gap-2 mt-8">
+                {% if page_obj.has_previous %}
+                    <a href="?page={{ page_obj.previous_page_number }}"
+                       class="btn btn-outline btn-sm">Previous</a>
+                {% endif %}
+                <span class="btn btn-ghost btn-sm no-animation">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?page={{ page_obj.next_page_number }}"
+                       class="btn btn-outline btn-sm">Next</a>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+{% endblock dashboard_content %}

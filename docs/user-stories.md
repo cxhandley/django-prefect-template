@@ -285,6 +285,56 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
+---
+
+## Epic 8: Notification Management (BL-019)
+
+### US-8.1: In-App Notification Centre `[ ]`
+**As a** user
+**I want to** see in-app notifications when my executions complete or fail
+**So that** I know the outcome without checking email or the history page
+
+**Acceptance Criteria:**
+- [ ] A bell icon in the navbar shows a badge with the count of unread notifications
+- [ ] Clicking the bell opens a dropdown showing up to 5 recent notifications
+- [ ] Each notification links to the related execution detail page
+- [ ] A "View all" link navigates to a full notification list page at `/accounts/notifications/`
+- [ ] The full list page shows all notifications, newest first, with a "Mark all as read" action
+- [ ] Individual notifications can be marked as read by clicking them
+- [ ] The unread badge disappears when all notifications are read
+
+### US-8.2: Notification Preferences `[ ]`
+**As a** user
+**I want to** control how I am notified about execution outcomes
+**So that** I only receive the notifications I care about through the channels I prefer
+
+**Acceptance Criteria:**
+- [ ] Settings page shows four toggles: "Notify on failure", "Notify on success", "In-app notifications", "Email notifications"
+- [ ] Each toggle persists independently; changes take effect on next execution
+- [ ] When "In-app notifications" is off, no Notification records are created
+- [ ] When "Email notifications" is off, no emails are sent
+- [ ] Notification on success is opt-in (default off); notification on failure is opt-in (default on)
+
+---
+
+## Epic 9: Feature Flags (BL-020)
+
+### US-9.1: Feature Flag Administration `[ ]`
+**As an** admin
+**I want to** toggle features on or off per user or by percentage rollout
+**So that** I can safely release new features incrementally without a code deploy
+
+**Acceptance Criteria:**
+- [ ] Flags are managed entirely through Django Admin (`/admin/`)
+- [ ] Each flag has: name (slug), description, global enabled toggle, rollout percentage (0–100), and an optional explicit user list
+- [ ] Flag resolution order: explicit user list → rollout percentage → global toggle
+- [ ] Rollout percentage uses deterministic hashing so a given user always gets the same result
+- [ ] A `{% flag "name" %}...{% endflag %}` template tag conditionally renders content
+- [ ] A `@require_flag("name")` view decorator returns 404 when the flag is off for that user
+- [ ] Flag lookups are cached (Redis, 5-minute TTL) with cache invalidation on admin save
+
+---
+
 ## MVP Scope Summary
 
 | Area | Status |

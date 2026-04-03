@@ -1,0 +1,66 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Django as Django (views/tasks)
+    participant Celery as Celery Worker
+    participant DB as PostgreSQL
+    participant Cache as Redis Cache
+    participant Email as Email Backend
+
+    %% ── Execution fails → notification created ────────────────────────────────
+    Celery->>Celery: run_pipeline_task / run_prediction_task raises after max retries
+    Celery->>DB: UPDATE FlowExecution SET status='FAILED'
+    Celery->>DB: SELECT UserProfile WHERE user_id=<id>
+    alt notify_on_failure is True
+        alt notify_in_app is True
+            Celery->>DB: INSERT Notification (type=EXECUTION_FAILED, is_read=False)
+            Celery->>Cache: DELETE notification_count_<user_id>
+        end
+        alt notify_via_email is True
+            Celery->>Email: send_mail (execution_failed.txt)
+        end
+    end
+
+    %% ── Execution succeeds → notification created ─────────────────────────────
+    Celery->>DB: UPDATE FlowExecution SET status='COMPLETED'
+    Celery->>DB: SELECT UserProfile WHERE user_id=<id>
+    alt notify_on_success is True
+        alt notify_in_app is True
+            Celery->>DB: INSERT Notification (type=EXECUTION_COMPLETED, is_read=False)
+            Celery->>Cache: DELETE notification_count_<user_id>
+        end
+        alt notify_via_email is True
+            Celery->>Email: send_mail (execution_completed.txt)
+        end
+    end
+
+    %% ── User loads any page → badge count ────────────────────────────────────
+    User->>Browser: Navigate to any dashboard page
+    Browser->>Django: GET /flows/dashboard/ (or any page)
+    Django->>Cache: GET notification_count_<user_id>
+    alt cache miss
+        Django->>DB: COUNT Notification WHERE user=<user> AND is_read=False
+        Django->>Cache: SET notification_count_<user_id> TTL=60s
+    end
+    Django-->>Browser: Render page with unread_notification_count in context
+    Browser->>Browser: Navbar bell badge shows count (hidden if 0)
+
+    %% ── User views notifications page ────────────────────────────────────────
+    User->>Browser: Click bell → "View all" link
+    Browser->>Django: GET /accounts/notifications/
+    Django->>DB: SELECT Notification WHERE user=<user> ORDER BY -created_at
+    Django-->>Browser: Render notifications.html (paginated list)
+
+    %% ── User marks all as read ────────────────────────────────────────────────
+    User->>Browser: Click "Mark all as read"
+    Browser->>Django: POST /accounts/notifications/mark-all-read/
+    Django->>DB: UPDATE Notification SET is_read=True WHERE user=<user>
+    Django->>Cache: DELETE notification_count_<user_id>
+    Django-->>Browser: Redirect → GET /accounts/notifications/
+
+    %% ── User clicks individual notification ──────────────────────────────────
+    User->>Browser: Click a notification row
+    Browser->>Django: GET /accounts/notifications/<id>/read/
+    Django->>DB: UPDATE Notification SET is_read=True WHERE id=<id>
+    Django->>Cache: DELETE notification_count_<user_id>
+    Django-->>Browser: Redirect → execution detail page (or notifications list)

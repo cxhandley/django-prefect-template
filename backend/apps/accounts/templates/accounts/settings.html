@@ -17,22 +17,61 @@
                 </div>
                 <!-- Notification Preferences -->
                 <div class="border-t border-base-200 pt-8">
-                    <h2 class="text-lg font-semibold mb-4">Notifications</h2>
+                    <h2 class="text-lg font-semibold mb-1">Notifications</h2>
+                    <p class="text-sm text-base-content/60 mb-4">Control when and how you are notified about execution outcomes.</p>
                     <form method="post">
                         {% csrf_token %}
-                        <div class="form-control">
-                            <label class="label cursor-pointer justify-start gap-4">
-                                <input type="checkbox"
-                                       name="notify_on_failure"
-                                       class="checkbox checkbox-primary"
-                                       {% if profile.notify_on_failure %}checked{% endif %} />
-                                <span class="label-text">
-                                    Email me when an execution fails
-                                    <span class="block text-xs text-base-content/50 mt-0.5">
-                                        Sent only once per execution after all retries are exhausted.
+                        <div class="space-y-3">
+                            <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Events</p>
+                            <div class="form-control">
+                                <label class="label cursor-pointer justify-start gap-4">
+                                    <input type="checkbox"
+                                           name="notify_on_failure"
+                                           class="checkbox checkbox-primary"
+                                           {% if profile.notify_on_failure %}checked{% endif %} />
+                                    <span class="label-text">
+                                        Notify me when an execution fails
+                                        <span class="block text-xs text-base-content/50 mt-0.5">Sent once after all retries are exhausted.</span>
                                     </span>
-                                </span>
-                            </label>
+                                </label>
+                            </div>
+                            <div class="form-control">
+                                <label class="label cursor-pointer justify-start gap-4">
+                                    <input type="checkbox"
+                                           name="notify_on_success"
+                                           class="checkbox checkbox-primary"
+                                           {% if profile.notify_on_success %}checked{% endif %} />
+                                    <span class="label-text">
+                                        Notify me when an execution succeeds
+                                        <span class="block text-xs text-base-content/50 mt-0.5">Off by default — useful for long-running pipelines.</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50 pt-2">Channels</p>
+                            <div class="form-control">
+                                <label class="label cursor-pointer justify-start gap-4">
+                                    <input type="checkbox"
+                                           name="notify_in_app"
+                                           class="checkbox checkbox-primary"
+                                           {% if profile.notify_in_app %}checked{% endif %} />
+                                    <span class="label-text">
+                                        Show in-app notifications
+                                        <span class="block text-xs text-base-content/50 mt-0.5">Appears in the bell icon in the top nav.</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="form-control">
+                                <label class="label cursor-pointer justify-start gap-4">
+                                    <input type="checkbox"
+                                           name="notify_via_email"
+                                           class="checkbox checkbox-primary"
+                                           {% if profile.notify_via_email %}checked{% endif %} />
+                                    <span class="label-text">
+                                        Send email notifications
+                                        <span class="block text-xs text-base-content/50 mt-0.5">Emails are sent to {{ user.email }}.</span>
+                                    </span>
+                                </label>
+                            </div>
                         </div>
                         <button type="submit" class="btn btn-primary btn-sm mt-4">Save Preferences</button>
                     </form>
