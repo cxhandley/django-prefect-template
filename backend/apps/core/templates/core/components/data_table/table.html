@@ -191,7 +191,30 @@ function dataTable(config) {
                 .filter(r => r.field && r.op)
                 .map(r => ({ ...r }));
             this.filtersOpen = false;
-            htmx.ajax('GET', url, { target: this.hxTarget, swap: 'innerHTML', pushUrl: url });
+            var tbody = document.querySelector(this.hxTarget);
+            if (!tbody) return;
+            fetch(url, { headers: { 'HX-Request': 'true' } })
+                .then(function(r) { return r.text(); })
+                .then(function(html) {
+                    // Parse in table context so <tbody>/<tfoot> are handled correctly
+                    var tmp = document.createElement('table');
+                    tmp.innerHTML = html;
+                    var newTbody = tmp.querySelector('tbody');
+                    var newTfoot = tmp.querySelector('tfoot');
+                    if (newTbody) {
+                        tbody.innerHTML = newTbody.innerHTML;
+                        if (newTbody.dataset.rowIds) {
+                            tbody.dataset.rowIds = newTbody.dataset.rowIds;
+                        }
+                        htmx.process(tbody);
+                    }
+                    var oldTfoot = tbody.nextElementSibling;
+                    if (newTfoot && oldTfoot && oldTfoot.tagName === 'TFOOT') {
+                        oldTfoot.innerHTML = newTfoot.innerHTML;
+                        htmx.process(oldTfoot);
+                    }
+                });
+            history.pushState({}, '', url);
         },
         clearFilters() {
             this.filterRows = [];
