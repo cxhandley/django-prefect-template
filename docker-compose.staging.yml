@@ -1,0 +1,80 @@
+services:
+  # ─── Traefik reverse proxy (SSL termination via Let's Encrypt) ────────────
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/traefik.yml:ro
+      - ./traefik/acme.json:/acme.json
+    networks:
+      - app-network
+
+  # ─── Django web server (staging overrides) ────────────────────────────────
+  web:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.staging
+    env_file:
+      - .env.staging
+    # No host port binding — Traefik routes via label
+    ports: []
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.web.rule=Host(`${STAGING_HOST}`)"
+      - "traefik.http.routers.web.entrypoints=websecure"
+      - "traefik.http.routers.web.tls.certresolver=letsencrypt"
+      - "traefik.http.services.web.loadbalancer.server.port=8000"
+    networks:
+      - app-network
+
+  # ─── Celery worker (staging overrides) ────────────────────────────────────
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.staging
+    env_file:
+      - .env.staging
+    networks:
+      - app-network
+
+  # ─── Flower (Celery monitor — internal only, no Traefik label) ────────────
+  flower:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.staging
+    env_file:
+      - .env.staging
+    # Flower is NOT exposed via Traefik in staging — use SSH tunnel to access
+    ports: []
+    networks:
+      - app-network
+
+  # ─── RustFS (S3-compatible storage — internal only) ───────────────────────
+  rustfs:
+    ports: []
+    networks:
+      - app-network
+
+  # ─── Mailhog (dev only — disabled in staging) ─────────────────────────────
+  mailhog:
+    profiles:
+      - dev-only
+
+  # ─── Dev container (not used in staging) ──────────────────────────────────
+  devcontainer:
+    profiles:
+      - dev-only

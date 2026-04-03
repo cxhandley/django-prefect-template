@@ -1,0 +1,46 @@
+# Traefik v3 static configuration
+# For dynamic config (routing rules), Traefik reads Docker labels automatically.
+#
+# Usage:
+#   1. Copy this file to the server at /opt/app/traefik/traefik.yml
+#   2. Create /opt/app/traefik/acme.json (chmod 600) before first start
+#   3. Set LETSENCRYPT_EMAIL in .env.staging
+#
+# See docs/deployment/staging.md for full setup instructions.
+
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ":443"
+
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      # Override via TRAEFIK_CERTIFICATESRESOLVERS_LETSENCRYPT_ACME_EMAIL env var
+      email: ops@example.com
+      storage: /acme.json
+      httpChallenge:
+        entryPoint: web
+
+providers:
+  docker:
+    exposedByDefault: false
+
+# Disable Traefik dashboard in staging (enable via separate router label if needed)
+api:
+  dashboard: false
+  insecure: false
+
+# Access logs help with debugging SSL issuance and routing issues
+accessLog: {}
+
+log:
+  level: INFO

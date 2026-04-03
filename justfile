@@ -15,9 +15,23 @@ default:
 # Complete first-time setup: start services, create S3 buckets, run migrations
 setup:
     @echo "Setting up project..."
+    just frontend-build
     just setup-rustfs
     just migrate
     @echo "Setup complete!"
+
+
+# ============================================================================
+# Frontend Build  (run inside devcontainer — Node.js 20 is pre-installed)
+# ============================================================================
+
+# Build Tailwind CSS + vendor HTMX (one-shot)
+frontend-build:
+    cd backend/frontend && npm install && npm run build
+
+# Watch Tailwind CSS for live rebuild during development
+frontend-watch:
+    cd backend/frontend && npm run watch
 
 
 # ============================================================================

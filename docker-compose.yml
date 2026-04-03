@@ -51,6 +51,17 @@ services:
     networks:
       - app-network
 
+  # ─── Frontend asset build (one-shot: compiles Tailwind CSS + vendors HTMX) ──
+  frontend-build:
+    image: node:20-alpine
+    working_dir: /frontend
+    volumes:
+      - ./backend/frontend:/frontend
+      - ./backend/static/dist:/static/dist
+      - ./backend/static/vendor:/static/vendor
+    command: sh -c "npm install && npm run build"
+    restart: "no"
+
   # ─── Django web server ──────────────────────────────────────────────────────
   web:
     build:
@@ -81,6 +92,8 @@ services:
         condition: service_healthy
       rustfs:
         condition: service_healthy
+      frontend-build:
+        condition: service_completed_successfully
     networks:
       - app-network
 
