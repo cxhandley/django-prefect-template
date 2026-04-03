@@ -257,6 +257,34 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
+### US-T4: Local Frontend Asset Build `[x]`
+**As a** developer
+**I want** all CSS and JavaScript served from locally-built static files
+**So that** the application has no CDN dependencies at runtime and benefits from tree-shaking and cache-busting
+
+**Acceptance Criteria:**
+- [x] Tailwind CSS + DaisyUI compiled to `backend/static/dist/main.css` via Tailwind CLI
+- [x] HTMX vendored to `backend/static/vendor/htmx.min.js` via npm build step
+- [x] CDN `<link>` and `<script>` tags replaced with `{% static %}` references in `base.html`
+- [x] `django-compressor` installed with `COMPRESS_OFFLINE=True` for staging/prod
+- [x] Multi-stage Dockerfile builds frontend assets before collecting static files
+- [x] `frontend-build` Docker service available in `docker-compose.yml`
+- [x] `just frontend-build` command documented for local dev
+
+### US-T5: Staging Environment `[x]`
+**As a** developer
+**I want** a shared staging environment on EC2 with SSL
+**So that** the team can test deployments and demo features before production
+
+**Acceptance Criteria:**
+- [x] `docker-compose.staging.yml` defines Traefik service with Let's Encrypt SSL
+- [x] `backend/config/settings/staging.py` sets `DEBUG=False`, WhiteNoise, HSTS
+- [x] `traefik/traefik.yml` configures HTTP→HTTPS redirect and ACME HTTP challenge
+- [x] All services (web, celery-worker, Redis, PostgreSQL, RustFS) start correctly
+- [x] EC2 provisioning and initial deploy steps documented in `docs/deployment/staging.md`
+
+---
+
 ## MVP Scope Summary
 
 | Area | Status |

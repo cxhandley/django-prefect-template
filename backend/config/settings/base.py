@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     # Third party
     "storages",
+    "compressor",
     # Local apps
     "apps.core",
     "apps.accounts",
@@ -126,6 +127,16 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
+
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    "compressor.finders.CompressorFinder",
+]
+
+# django-compressor — disabled in development (COMPRESS_ENABLED defaults to not DEBUG)
+COMPRESS_OFFLINE = False
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"

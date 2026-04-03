@@ -1,3 +1,20 @@
+# ── Stage 1: Build frontend assets ───────────────────────────────────────────
+FROM node:20-alpine AS frontend-build
+
+WORKDIR /frontend
+
+# Create output directories (sibling to /frontend, so /static/dist, /static/vendor)
+RUN mkdir -p /static/dist /static/vendor
+
+COPY frontend/package.json ./
+RUN npm install
+
+COPY frontend/ .
+
+# Outputs: /static/dist/main.css and /static/vendor/htmx.min.js
+RUN npm run build
+
+# ── Stage 2: Django application ───────────────────────────────────────────────
 FROM python:3.13-slim
 
 RUN apt-get update && apt-get install -y \
@@ -24,6 +41,10 @@ RUN if [ -n "$INSTALL_EXTRAS" ]; then \
     fi
 
 COPY . .
+
+# Copy compiled frontend assets from stage 1
+COPY --from=frontend-build /static/dist/ /app/static/dist/
+COPY --from=frontend-build /static/vendor/ /app/static/vendor/
 
 EXPOSE 8000
 
