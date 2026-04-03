@@ -122,7 +122,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [x] User can download their full execution history as CSV
 - [x] Failed executions show error messages
 
-### US-4.2: Compare Multiple Executions `[~]`
+### US-4.2: Compare Multiple Executions `[x]`
 **As a** user
 **I want to** compare two or three executions side-by-side
 **So that** I can understand how different inputs affect the output
@@ -130,13 +130,13 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 **Acceptance Criteria:**
 - [x] User can select executions and navigate to a comparison view
 - [x] Page displays execution metadata side-by-side
-- [ ] Prediction input values (income, age, credit score, employment years) displayed per execution
-- [ ] Score, classification, and confidence read from `FlowExecution.parameters` (no mocks)
-- [ ] Input fields that differ across executions are visually highlighted (distinct badge colour)
-- [ ] User can export comparison as CSV via a dedicated endpoint
-- [ ] History page shows input summary per row so user can pick meaningful predictions to compare
-- [ ] Comparison page shows "No predictions yet" empty state with CTA to dashboard when user has 0 predictions
-- [ ] Comparison page shows "Need at least 2 predictions" state with warning alert and dual CTAs when fewer than 2 IDs are resolved
+- [x] Prediction input values (income, age, credit score, employment years) displayed per execution
+- [x] Score, classification, and confidence read from `FlowExecution.parameters` (no mocks)
+- [x] Input fields that differ across executions are visually highlighted (distinct badge colour)
+- [x] User can export comparison as CSV via a dedicated endpoint
+- [x] History page shows input summary per row so user can pick meaningful predictions to compare
+- [x] Comparison page shows "No predictions yet" empty state with CTA to dashboard when user has 0 predictions
+- [x] Comparison page shows "Need at least 2 predictions" state with warning alert and dual CTAs when fewer than 2 IDs are resolved
 
 ---
 
@@ -267,9 +267,9 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 | View & download results | Complete |
 | Credit prediction form & scoring | Complete |
 | Execution history & detail | Complete |
-| Execution comparison | Partial |
+| Execution comparison | Complete |
 | Admin monitoring dashboard | Complete |
-| Input presets | Not started |
-| Email notifications for failures | Not started |
-| Retry failed execution | Not started |
+| Input presets | Complete |
+| Email notifications for failures | Complete |
+| Retry failed execution | Complete |
 | Superuser management | Complete |
