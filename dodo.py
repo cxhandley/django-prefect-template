@@ -26,6 +26,7 @@ PIPELINE_PARAMS environment variable (JSON):
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import papermill as pm
@@ -55,6 +56,7 @@ def _run_notebook(step_name: str, params: dict, run_id: str) -> None:
         parameters=params,
         kernel_name="python3",
         progress_bar=False,
+        stdout_file=sys.stdout,
     )
 
 

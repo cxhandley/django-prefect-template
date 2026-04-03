@@ -773,6 +773,27 @@ def admin_dashboard(request):
 
 
 @login_required
+@require_http_methods(["GET"])
+def prediction_compare_options(request):
+    """Return a partial listing completed predictions the user can compare against."""
+    exclude_id = request.GET.get("exclude", "").strip()
+    qs = (
+        FlowExecution.objects.filter(
+            triggered_by=request.user,
+            flow_name="credit-prediction",
+            status="COMPLETED",
+        )
+        .exclude(flow_run_id=exclude_id)
+        .order_by("-created_at")[:20]
+    )
+    return render(
+        request,
+        "flows/partials/prediction_compare_options.html",
+        {"executions": qs, "current_run_id": exclude_id},
+    )
+
+
+@login_required
 @require_http_methods(["POST"])
 def save_preset(request):
     """Save current prediction form values as a named preset."""

@@ -19,6 +19,11 @@ urlpatterns = [
     path("upload-and-process/", views.upload_and_process, name="upload_and_process"),
     path("run-prediction/", views.run_prediction, name="run_prediction"),
     path("prediction-status/<uuid:run_id>/", views.prediction_status, name="prediction_status"),
+    path(
+        "prediction-compare-options/",
+        views.prediction_compare_options,
+        name="prediction_compare_options",
+    ),
     path("status/<uuid:run_id>/", views.flow_status, name="flow_status"),
     path("results/<uuid:run_id>/", views.view_flow_results, name="view_flow_results"),
     path(
