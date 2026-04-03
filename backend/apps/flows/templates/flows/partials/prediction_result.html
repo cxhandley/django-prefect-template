@@ -1,5 +1,4 @@
-<div id="prediction-result"
-     class="space-y-4 p-4 bg-base-100 border border-base-200 rounded-lg">
+<div class="space-y-4 p-4 bg-base-100 border border-base-200 rounded-lg">
     <div class="flex items-center justify-between">
         <span class="text-base-content/60 text-sm">Score</span>
         <span class="text-2xl font-bold text-primary">{{ score }}</span>
@@ -23,8 +22,34 @@
                   value="{{ confidence }}"
                   max="100"></progress>
     </div>
-    <div class="pt-2 border-t border-base-200">
+    <div class="flex gap-2 pt-2 border-t border-base-200">
         <a href="{% url 'flows:execution_detail' run_id %}"
            class="btn btn-ghost btn-sm">View Full Details →</a>
+        <button type="button"
+                class="btn btn-outline btn-sm"
+                data-compare-modal="{{ run_id }}"
+                data-compare-url="{% url 'flows:prediction_compare_options' %}?exclude={{ run_id }}">
+            Compare with Another
+        </button>
     </div>
 </div>
+<!-- Compare modal -->
+<dialog id="compare_modal_{{ run_id|slice:':8' }}" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Compare Predictions</h3>
+        <p class="text-sm text-base-content/60 mt-1">
+            Select another completed prediction to compare side-by-side with this one.
+        </p>
+        <div id="compare-options-{{ run_id|slice:':8' }}" class="mt-4">
+            <span class="loading loading-spinner loading-sm"></span>
+        </div>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn btn-ghost btn-sm">Cancel</button>
+            </form>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>

@@ -1,0 +1,23 @@
+{% if presets %}
+    <ul class="space-y-2" id="preset-list">
+        {% for preset in presets %}
+            <li class="flex items-center justify-between py-2 border-b border-base-200 last:border-0">
+                <div>
+                    <span class="font-medium text-sm">{{ preset.name }}</span>
+                    <span class="text-xs text-base-content/50 ml-2">{{ preset.created_at|date:"M d, Y" }}</span>
+                </div>
+                <form method="post"
+                      action="{% url 'flows:delete_preset' preset.id %}"
+                      hx-post="{% url 'flows:delete_preset' preset.id %}"
+                      hx-target="#preset-list"
+                      hx-swap="outerHTML"
+                      hx-confirm="Delete preset '{{ preset.name }}'?">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost btn-xs text-error">Delete</button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="text-sm text-base-content/50">No saved presets.</p>
+{% endif %}

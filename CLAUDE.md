@@ -108,6 +108,37 @@ Profile: `django`. Key rules to follow:
   {% endblock dashboard_content %}
   ```
 
+## HTMX
+
+The project uses **HTMX 1.9.10** (loaded from CDN in `core/base.html`).
+
+### Known bug — 1.9.10 polling with `outerHTML` swap
+
+HTMX 1.9.10 has a bug where polling via `hx-trigger="every Ns"` combined with `hx-swap="outerHTML"` crashes with:
+
+> `Cannot read properties of null (reading 'htmx-internal-data')`
+
+This happens because after the element is replaced, HTMX's settle phase tries to access the now-removed element. **Workaround**: replace HTMX polling with a plain `setInterval` + `fetch()` loop (see `prediction_running.html`).
+
+### Scripts injected via `innerHTML` do not execute
+
+When content is injected via plain JS `element.innerHTML = html`, any `<script>` tags in the HTML are **not executed** by the browser (security restriction). This means:
+- HTMX `hx-*` attributes in innerHTML-injected content won't be bound (HTMX won't process them)
+- Named functions defined in injected `<script>` blocks won't be available
+
+**Workaround**: use delegated event listeners registered in `base.html` (which always runs), and communicate intent via `data-*` attributes on the injected elements. See the `[data-compare-modal]` click handler in `base.html` for an example.
+
+### Upgrading to HTMX 2.x
+
+HTMX 2.0 is the current stable release. The 1.9.10 polling bug is fixed in 2.x. Migration impact for this project is **low**:
+
+- `hx-get`, `hx-post`, `hx-target`, `hx-swap`, `hx-trigger`, `hx-boost`, `hx-push-url` — **no changes needed**
+- `htmx.config.selfRequestsOnly` now defaults to `true` — confirm all HTMX requests target the same origin (they do)
+- DELETE requests send params in the URL instead of the request body — check any `hx-delete` usage
+- `hx-on` attribute syntax changed (only if used)
+
+To upgrade, update the CDN script tag in `core/base.html` from `htmx.org@1.9.10` to `htmx.org@2.0.4` (or latest 2.x).
+
 ## Notebooks
 
 Notebooks in `notebooks/steps/` are executed by papermill via doit. They must have `kernelspec` and `language_info` in their metadata — papermill requires this to determine the kernel language. The `nbstripout` hook strips cell outputs but preserves this metadata.

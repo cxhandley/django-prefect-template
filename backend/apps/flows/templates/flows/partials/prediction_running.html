@@ -1,11 +1,32 @@
-<div id="prediction-result"
-     hx-get="{% url 'flows:prediction_status' run_id %}"
-     hx-trigger="every 2s"
-     hx-swap="outerHTML"
-     class="flex items-center gap-4 p-4 bg-base-200 rounded-lg">
+<div class="flex items-center gap-4 p-4 bg-base-200 rounded-lg"
+     data-polling="true">
     <span class="loading loading-spinner loading-md text-primary"></span>
     <div>
         <p class="font-medium">Running prediction…</p>
         <p class="text-sm text-base-content/60">This usually takes 15-30 seconds.</p>
+        <a href="{% url 'flows:execution_detail' run_id %}"
+           class="text-xs text-primary underline mt-1 block">View execution details →</a>
     </div>
 </div>
+<script>
+(function () {
+    var container = document.getElementById('prediction-result');
+    var interval = setInterval(function () {
+        if (!document.body.contains(container)) {
+            clearInterval(interval);
+            return;
+        }
+        fetch('{% url 'flows:prediction_status' run_id %}', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                container.innerHTML = html;
+                if (!container.querySelector('[data-polling]')) {
+                    clearInterval(interval);
+                }
+            })
+            .catch(function () { clearInterval(interval); });
+    }, 2000);
+}());
+</script>

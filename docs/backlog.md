@@ -70,7 +70,7 @@ These close gaps in already-delivered epics. Low risk, small scope.
 
 ---
 
-### BL-005 · Prediction Comparison — Input & Score Detail `M`
+### ~~BL-005 · Prediction Comparison — Input & Score Detail~~ `M` ✓ Complete
 **User story:** US-4.2
 **Value:** The comparison page exists but only shows metadata; the key value is seeing how different inputs produced different scores.
 
@@ -170,7 +170,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-010 · Input Presets (Save & Reuse Prediction Inputs) `L`
+### ~~BL-010 · Input Presets (Save & Reuse Prediction Inputs)~~ `L` ✓ Complete
 **User story:** US-5.2 (original backlog)
 **Value:** Power users who run many predictions with similar inputs must re-enter values each time.
 
@@ -188,7 +188,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-011 · Email Notifications for Failed Executions `M`
+### ~~BL-011 · Email Notifications for Failed Executions~~ `M` ✓ Complete
 **User story:** US-7.2 (original backlog)
 **Value:** Users don't know a long-running pipeline has failed unless they check the history page.
 
@@ -205,7 +205,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-012 · Retry Failed Execution `S`
+### ~~BL-012 · Retry Failed Execution~~ `S` ✓ Complete
 **User story:** US-4.3 (original backlog)
 **Value:** Users must re-enter all inputs to re-run a failed prediction; retrying with the same parameters requires a button, not a form.
 
@@ -218,6 +218,124 @@ Valuable but not blocking any core workflow.
 
 ---
 
+---
+
+## Tier 4 (continued) — User Experience Enhancements
+
+---
+
+### BL-014 · UI Polish — Button Padding, Spacing & Visual Consistency `S`
+
+**Value:** Several UI elements have inconsistent padding and margins, making the interface feel unfinished. Fixing these increases perceived quality without touching any backend logic.
+
+**Known issues to address:**
+- Prediction form action buttons (`Run Prediction`, `Save as Preset`) have inconsistent padding vs adjacent controls
+- Spacing between form field labels and inputs varies across pages
+- Badge and tag sizing is inconsistent in history and comparison tables
+- Mobile viewport: sidebar collapse leaves content partially obscured on small screens
+
+**Scope:**
+- Audit all pages with browser DevTools at 1280px and 375px (mobile)
+- Apply consistent DaisyUI spacing utilities (`gap-*`, `p-*`, `space-y-*`)
+- No new components — fix existing templates only
+- No backend changes
+
+**No new wireframe needed** — reference existing DaisyUI spacing guidelines.
+
+---
+
+### BL-015 · Prediction Form UX — Disable During Run & Fix Cancel Behaviour `S`
+
+**Value:** The prediction form stays active while a prediction is running, allowing duplicate submissions. Closing the "Compare with Another" modal also gives the visual impression the prediction is restarting.
+
+**Known issues:**
+1. **Form stays active during run** — After clicking "Run Prediction", the form inputs and button remain enabled. The user can click again and trigger a second parallel prediction. The form should be visually disabled (greyed out, button shows spinner) until a result or error is shown.
+2. **Compare modal cancel flicker** — Closing the Compare Predictions modal briefly makes the result area appear to reset or re-render. Investigate whether the `<dialog>` close event is bubbling to anything that triggers a re-fetch or DOM update.
+
+**Scope:**
+- On form submit, disable all inputs and replace button text with a spinner via JS (no HTMX)
+- Re-enable the form if an error is returned
+- Debug the cancel-flicker: check for event listeners on the dialog `close` event or the `#prediction-result` container that trigger unintended re-renders
+
+**No new model or diagram needed.**
+
+---
+
+## Tier 5 — Technical Debt & Infrastructure
+
+---
+
+### BL-013 · Migrate HTMX from 1.9.10 to 2.x `S`
+
+**Value:** HTMX 1.9.10 has a known bug with `outerHTML` polling (crashes with `Cannot read properties of null (reading 'htmx-internal-data')`). Version 2.x fixes this. The upgrade is low-effort for this project.
+
+**Scope:**
+- Update the CDN script tag in `core/base.html` from `htmx.org@1.9.10` to `htmx.org@2.0.4` (or latest 2.x)
+- Verify `hx-delete` usage — in 2.x, DELETE requests send params in the URL instead of the request body
+- Confirm no `hx-on` attribute syntax is in use (syntax changed in 2.x)
+- Smoke-test all HTMX interactions: history filters/pagination, upload flow, preset load/delete, admin execution list
+- `htmx.config.selfRequestsOnly` now defaults to `true` — all requests are same-origin so no change needed
+
+**No new model, wireframe, or diagram needed.** See `CLAUDE.md` for full migration notes.
+
+---
+
+### BL-016 · Frontend Asset Pipeline — Tailwind Build + django-compressor `M`
+
+**Value:** CSS and JS are currently loaded from CDN at runtime. A local build step removes CDN dependencies, enables tree-shaking (smaller Tailwind output), and adds cache-busting via django-compressor.
+
+**Scope:**
+- Add `package.json` with Tailwind CSS CLI build script (`npm run build` / `npm run watch`)
+- Replace CDN `<link>` for Tailwind/DaisyUI with compiled `static/dist/main.css`
+- Vendor HTMX (download `htmx.min.js` to `static/vendor/`), reference via `{% static %}`
+- Install and configure `django-compressor` (`COMPRESS_OFFLINE=True` for staging/prod)
+- Add a `frontend-build` Docker service (Node image) that runs before `collectstatic`
+- Update `Dockerfile` and CI to run `npm ci && npm run build` before `python manage.py collectstatic`
+
+**Docs:** See `docs/deployment/frontend-pipeline.md` for full approach and config snippets.
+
+**Depends on:** Nothing, but should be done before BL-017/BL-018 (staging/prod) so static files are handled correctly at deploy time.
+
+---
+
+### BL-017 · Staging Environment — Docker on EC2 with Traefik SSL `L`
+
+**Value:** There is currently no shared staging environment. Developers test against localhost only. A staging environment enables pre-production testing, stakeholder demos, and smoke-testing deployments before production.
+
+**Scope:**
+- Create `docker-compose.staging.yml` (Traefik service + label overrides for Django/Flower)
+- Create `backend/config/settings/staging.py` (DEBUG=False, WhiteNoise, HSTS)
+- Create `traefik/traefik.yml` (Let's Encrypt ACME via HTTP challenge)
+- Document EC2 provisioning steps and initial deploy procedure
+- Add `DJANGO_SETTINGS_MODULE=config.settings.staging` to staging env
+- Verify all services (web, celery-worker, Redis, PostgreSQL, RustFS) start correctly
+- Verify SSL certificate issuance and HTTPS redirect
+
+**Docs:** See `docs/deployment/staging.md` for full architecture and config.
+
+**Depends on:** BL-016 (frontend pipeline should be in place so `collectstatic` works correctly).
+
+---
+
+### BL-018 · Production Environment — Docker Compose/Swarm + PostgreSQL Backups `XL`
+
+**Value:** No production deployment exists. This item covers the full production infrastructure: multi-replica web/worker services, automated PostgreSQL backups to S3, health checks, and a CI/CD deploy pipeline.
+
+**Scope:**
+- Create `backend/config/settings/production.py` (full security headers, structured JSON logging)
+- Create `docker-stack.yml` (Swarm-compatible, with `deploy:` keys for replicas and restart policy)
+- Add `pg-backup` service (scheduled `pg_dump` → S3 via cron on manager node)
+- Add `GET /health/` endpoint in `core/views.py` (used by load balancer health checks)
+- Document Docker Swarm init and node join procedure
+- Set up GitHub Actions deploy workflow (build image → push to GHCR → `docker service update`)
+- Test backup restore on staging before go-live
+
+**Docs:** See `docs/deployment/production.md` for full architecture, Swarm config, backup options, and CI/CD sketch.
+
+**Depends on:** BL-017 (staging must be proven stable first).
+
+---
+
 ## Backlog Summary
 
 | ID | Title | Tier | Effort | Depends on |
@@ -226,11 +344,17 @@ Valuable but not blocking any core workflow.
 | ~~BL-002~~ | ~~S3 cleanup on delete~~ | 1 | S | — |
 | ~~BL-003~~ | ~~Presigned download URLs~~ | 1 | S | — |
 | ~~BL-004~~ | ~~Export history as CSV~~ | 1 | S | — |
-| BL-005 | Prediction comparison detail | 1 | M | — |
-| BL-006 | Superuser user management UI | 2 | L | — |
-| BL-007 | Registration email confirmation | 2 | M | BL-001 |
+| ~~BL-005~~ | ~~Prediction comparison detail~~ | 1 | M | — |
+| ~~BL-006~~ | ~~Superuser user management UI~~ | 2 | L | — |
+| ~~BL-007~~ | ~~Registration email confirmation~~ | 2 | M | BL-001 |
 | ~~BL-008~~ | ~~Admin monitoring dashboard~~ | 3 | L | BL-006 |
 | ~~BL-009~~ | ~~Admin execution log viewer~~ | 3 | M | BL-008 |
-| BL-010 | Input presets | 4 | L | — |
-| BL-011 | Email notifications for failures | 4 | M | BL-001 |
-| BL-012 | Retry failed execution | 4 | S | — |
+| ~~BL-010~~ | ~~Input presets~~ | 4 | L | — |
+| ~~BL-011~~ | ~~Email notifications for failures~~ | 4 | M | BL-001 |
+| ~~BL-012~~ | ~~Retry failed execution~~ | 4 | S | — |
+| BL-013 | Migrate HTMX 1.9.10 → 2.x | 5 | S | — |
+| BL-014 | UI polish — buttons, spacing, consistency | 4 | S | — |
+| BL-015 | Prediction form UX — disable during run, fix cancel flicker | 4 | S | — |
+| BL-016 | Frontend asset pipeline (Tailwind build + compressor) | 5 | M | — |
+| BL-017 | Staging environment (EC2 + Traefik SSL) | 5 | L | BL-016 |
+| BL-018 | Production environment (Swarm + PG backups) | 5 | XL | BL-017 |

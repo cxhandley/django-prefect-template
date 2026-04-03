@@ -24,7 +24,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from .models import FlowExecution
+from .models import FlowExecution, InputPreset
 from .services.datalake import DataLakeAnalytics
 from .tasks import run_pipeline_task, run_prediction_task
 
@@ -138,6 +138,8 @@ def dashboard(request):
     # Get the most recent running execution as active prediction
     active_prediction = executions.filter(status="RUNNING").first()
 
+    presets = InputPreset.objects.filter(user=request.user)
+
     context = {
         "user": request.user,
         "active_page": "dashboard",
@@ -146,6 +148,7 @@ def dashboard(request):
         "avg_duration": f"{avg_duration}s",
         "success_rate": f"{success_rate}%",
         "recent_executions": executions[:5],
+        "presets": presets,
     }
     return render(request, "flows/dashboard.html", context)
 
@@ -769,6 +772,88 @@ def admin_dashboard(request):
     return render(request, "flows/admin_dashboard.html", context)
 
 
+@login_required
+@require_http_methods(["GET"])
+def prediction_compare_options(request):
+    """Return a partial listing completed predictions the user can compare against."""
+    exclude_id = request.GET.get("exclude", "").strip()
+    qs = (
+        FlowExecution.objects.filter(
+            triggered_by=request.user,
+            flow_name="credit-prediction",
+            status="COMPLETED",
+        )
+        .exclude(flow_run_id=exclude_id)
+        .order_by("-created_at")[:20]
+    )
+    return render(
+        request,
+        "flows/partials/prediction_compare_options.html",
+        {"executions": qs, "current_run_id": exclude_id},
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def save_preset(request):
+    """Save current prediction form values as a named preset."""
+    name = request.POST.get("preset_name", "").strip()
+    if not name:
+        return render(
+            request,
+            "flows/partials/preset_save_error.html",
+            {"error": "Preset name is required."},
+        )
+
+    input_values = {
+        field: request.POST.get(field, "")
+        for field in ("income", "age", "credit_score", "employment_years")
+        if request.POST.get(field, "").strip()
+    }
+
+    preset, created = InputPreset.objects.get_or_create(
+        user=request.user,
+        name=name,
+        defaults={"input_values": input_values},
+    )
+    if not created:
+        preset.input_values = input_values
+        preset.save(update_fields=["input_values"])
+
+    presets = InputPreset.objects.filter(user=request.user)
+    return render(
+        request,
+        "flows/partials/preset_controls.html",
+        {"presets": presets, "saved_name": name},
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def load_preset(request):
+    """Return pre-filled prediction inputs partial for a selected preset."""
+    preset_id = request.GET.get("preset_id", "").strip()
+    if not preset_id:
+        return render(request, "flows/partials/prediction_inputs.html", {"values": {}})
+
+    preset = get_object_or_404(InputPreset, pk=preset_id, user=request.user)
+    return render(
+        request,
+        "flows/partials/prediction_inputs.html",
+        {"values": preset.input_values},
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def delete_preset(request, preset_id):
+    """Delete a preset and return the updated preset list partial."""
+    preset = get_object_or_404(InputPreset, pk=preset_id, user=request.user)
+    preset.delete()
+    presets = InputPreset.objects.filter(user=request.user)
+    return render(request, "flows/partials/preset_list.html", {"presets": presets})
+
+
 @staff_member_required(login_url="/accounts/login/")
 @require_http_methods(["GET"])
 def admin_executions(request):
@@ -817,6 +902,51 @@ def admin_executions(request):
     if request.headers.get("HX-Request"):
         return render(request, "flows/partials/admin_executions_table.html", context)
     return render(request, "flows/admin_executions.html", context)
+
+
+@login_required
+@require_http_methods(["POST"])
+def retry_execution(request, run_id):
+    """Clone a FAILED execution and dispatch the same task with original parameters."""
+    original = get_object_or_404(FlowExecution, flow_run_id=run_id, triggered_by=request.user)
+
+    if original.status != "FAILED":
+        return redirect("flows:execution_detail", run_id=run_id)
+
+    # Strip result fields — only carry forward input parameters
+    input_params = {
+        k: v
+        for k, v in original.parameters.items()
+        if k not in ("score", "classification", "confidence")
+    }
+
+    new_run_id = uuid.uuid4()
+    new_execution = FlowExecution.objects.create(
+        flow_run_id=new_run_id,
+        flow_name=original.flow_name,
+        triggered_by=request.user,
+        s3_input_path=original.s3_input_path,
+        parameters=input_params,
+        status="PENDING",
+    )
+
+    if original.flow_name == "predict_pipeline":
+        task = run_prediction_task.delay(
+            flow_run_id=str(new_run_id),
+            input_s3_path=original.s3_input_path,
+            user_id=request.user.id,
+        )
+    else:
+        task = run_pipeline_task.delay(
+            flow_run_id=str(new_run_id),
+            input_s3_path=original.s3_input_path,
+            user_id=request.user.id,
+        )
+
+    new_execution.celery_task_id = task.id
+    new_execution.save(update_fields=["celery_task_id"])
+
+    return redirect("flows:execution_detail", run_id=new_run_id)
 
 
 @staff_member_required(login_url="/accounts/login/")

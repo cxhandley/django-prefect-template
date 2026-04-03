@@ -1,0 +1,19 @@
+Hi {{ first_name }},
+
+Your execution has failed and will not be retried automatically.
+
+Flow:      {{ flow_name }}
+Run ID:    {{ run_id }}
+Error:     {{ error_message }}
+
+View the full details here:
+{{ detail_url }}
+
+You can retry this execution with the same inputs from the detail page.
+
+If you no longer want to receive these notifications, turn off "Email me on failure"
+in your account settings:
+{{ settings_url }}
+
+---
+Django Pipeline & Prediction Platform
