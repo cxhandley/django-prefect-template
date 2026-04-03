@@ -100,9 +100,26 @@ function dataTable(config) {
         currentSort: config.sortField || '',
 
         init() {
-            const stored = localStorage.getItem(`dt_${this.tableId}_cols`);
-            if (stored) {
-                try { this.hiddenCols = JSON.parse(stored); } catch (e) {}
+            // Restore column visibility
+            const storedCols = localStorage.getItem(`dt_${this.tableId}_cols`);
+            if (storedCols) {
+                try { this.hiddenCols = JSON.parse(storedCols); } catch (e) {}
+            }
+
+            // Restore filters from localStorage only when the page loaded with
+            // no URL-supplied filters (i.e. bare /history/ visit).
+            if (this.activeFilters.length === 0) {
+                const storedFilters = localStorage.getItem(`dt_${this.tableId}_filters`);
+                if (storedFilters) {
+                    try {
+                        const parsed = JSON.parse(storedFilters);
+                        if (parsed.length > 0) {
+                            this.activeFilters = parsed;
+                            this.filterRows = JSON.parse(JSON.stringify(parsed));
+                            this.$nextTick(() => this.applyFilters());
+                        }
+                    } catch (e) {}
+                }
             }
         },
 
@@ -191,6 +208,12 @@ function dataTable(config) {
                 .filter(r => r.field && r.op)
                 .map(r => ({ ...r }));
             this.filtersOpen = false;
+            // Persist current filters so they survive page reloads
+            if (this.activeFilters.length > 0) {
+                localStorage.setItem(`dt_${this.tableId}_filters`, JSON.stringify(this.activeFilters));
+            } else {
+                localStorage.removeItem(`dt_${this.tableId}_filters`);
+            }
             var tbody = document.querySelector(this.hxTarget);
             if (!tbody) return;
             fetch(url, { headers: { 'HX-Request': 'true' } })
