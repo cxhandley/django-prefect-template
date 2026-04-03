@@ -224,7 +224,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-014 · UI Polish — Button Padding, Spacing & Visual Consistency `S`
+### ~~BL-014 · UI Polish — Button Padding, Spacing & Visual Consistency~~ `S` ✓ Complete
 
 **Value:** Several UI elements have inconsistent padding and margins, making the interface feel unfinished. Fixing these increases perceived quality without touching any backend logic.
 
@@ -244,7 +244,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-015 · Prediction Form UX — Disable During Run & Fix Cancel Behaviour `S`
+### ~~BL-015 · Prediction Form UX — Disable During Run & Fix Cancel Behaviour~~ `S` ✓ Complete
 
 **Value:** The prediction form stays active while a prediction is running, allowing duplicate submissions. Closing the "Compare with Another" modal also gives the visual impression the prediction is restarting.
 
@@ -265,7 +265,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-013 · Migrate HTMX from 1.9.10 to 2.x `S`
+### ~~BL-013 · Migrate HTMX from 1.9.10 to 2.x~~ `S` ✓ Complete
 
 **Value:** HTMX 1.9.10 has a known bug with `outerHTML` polling (crashes with `Cannot read properties of null (reading 'htmx-internal-data')`). Version 2.x fixes this. The upgrade is low-effort for this project.
 
@@ -352,9 +352,9 @@ Valuable but not blocking any core workflow.
 | ~~BL-010~~ | ~~Input presets~~ | 4 | L | — |
 | ~~BL-011~~ | ~~Email notifications for failures~~ | 4 | M | BL-001 |
 | ~~BL-012~~ | ~~Retry failed execution~~ | 4 | S | — |
-| BL-013 | Migrate HTMX 1.9.10 → 2.x | 5 | S | — |
-| BL-014 | UI polish — buttons, spacing, consistency | 4 | S | — |
-| BL-015 | Prediction form UX — disable during run, fix cancel flicker | 4 | S | — |
+| ~~BL-013~~ | ~~Migrate HTMX 1.9.10 → 2.x~~ | 5 | S | — |
+| ~~BL-014~~ | ~~UI polish — buttons, spacing, consistency~~ | 4 | S | — |
+| ~~BL-015~~ | ~~Prediction form UX — disable during run, fix cancel flicker~~ | 4 | S | — |
 | BL-016 | Frontend asset pipeline (Tailwind build + compressor) | 5 | M | — |
 | BL-017 | Staging environment (EC2 + Traefik SSL) | 5 | L | BL-016 |
 | BL-018 | Production environment (Swarm + PG backups) | 5 | XL | BL-017 |

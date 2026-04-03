@@ -24,9 +24,13 @@
                 container.innerHTML = html;
                 if (!container.querySelector('[data-polling]')) {
                     clearInterval(interval);
+                    if (window.__enablePredictionForm) { window.__enablePredictionForm(); }
                 }
             })
-            .catch(function () { clearInterval(interval); });
+            .catch(function () {
+                clearInterval(interval);
+                if (window.__enablePredictionForm) { window.__enablePredictionForm(); }
+            });
     }, 2000);
 }());
 </script>

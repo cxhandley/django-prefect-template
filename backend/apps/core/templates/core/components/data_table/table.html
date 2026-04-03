@@ -100,9 +100,26 @@ function dataTable(config) {
         currentSort: config.sortField || '',
 
         init() {
-            const stored = localStorage.getItem(`dt_${this.tableId}_cols`);
-            if (stored) {
-                try { this.hiddenCols = JSON.parse(stored); } catch (e) {}
+            // Restore column visibility
+            const storedCols = localStorage.getItem(`dt_${this.tableId}_cols`);
+            if (storedCols) {
+                try { this.hiddenCols = JSON.parse(storedCols); } catch (e) {}
+            }
+
+            // Restore filters from localStorage only when the page loaded with
+            // no URL-supplied filters (i.e. bare /history/ visit).
+            if (this.activeFilters.length === 0) {
+                const storedFilters = localStorage.getItem(`dt_${this.tableId}_filters`);
+                if (storedFilters) {
+                    try {
+                        const parsed = JSON.parse(storedFilters);
+                        if (parsed.length > 0) {
+                            this.activeFilters = parsed;
+                            this.filterRows = JSON.parse(JSON.stringify(parsed));
+                            this.$nextTick(() => this.applyFilters());
+                        }
+                    } catch (e) {}
+                }
             }
         },
 
@@ -191,7 +208,36 @@ function dataTable(config) {
                 .filter(r => r.field && r.op)
                 .map(r => ({ ...r }));
             this.filtersOpen = false;
-            htmx.ajax('GET', url, { target: this.hxTarget, swap: 'innerHTML', pushUrl: url });
+            // Persist current filters so they survive page reloads
+            if (this.activeFilters.length > 0) {
+                localStorage.setItem(`dt_${this.tableId}_filters`, JSON.stringify(this.activeFilters));
+            } else {
+                localStorage.removeItem(`dt_${this.tableId}_filters`);
+            }
+            var tbody = document.querySelector(this.hxTarget);
+            if (!tbody) return;
+            fetch(url, { headers: { 'HX-Request': 'true' } })
+                .then(function(r) { return r.text(); })
+                .then(function(html) {
+                    // Parse in table context so <tbody>/<tfoot> are handled correctly
+                    var tmp = document.createElement('table');
+                    tmp.innerHTML = html;
+                    var newTbody = tmp.querySelector('tbody');
+                    var newTfoot = tmp.querySelector('tfoot');
+                    if (newTbody) {
+                        tbody.innerHTML = newTbody.innerHTML;
+                        if (newTbody.dataset.rowIds) {
+                            tbody.dataset.rowIds = newTbody.dataset.rowIds;
+                        }
+                        htmx.process(tbody);
+                    }
+                    var oldTfoot = tbody.nextElementSibling;
+                    if (newTfoot && oldTfoot && oldTfoot.tagName === 'TFOOT') {
+                        oldTfoot.innerHTML = newTfoot.innerHTML;
+                        htmx.process(oldTfoot);
+                    }
+                });
+            history.pushState({}, '', url);
         },
         clearFilters() {
             this.filterRows = [];

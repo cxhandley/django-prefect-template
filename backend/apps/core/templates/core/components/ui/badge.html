@@ -1,7 +1,7 @@
 <!-- Badge component
-     Parameters: status (string: COMPLETED/SUCCESS/RUNNING/FAILED/PENDING), text (optional override) -->
+     Parameters: status (string: COMPLETED/SUCCESS/RUNNING/FAILED/PENDING), text (optional override), size (optional, e.g. "badge-sm") -->
 {% if status == "COMPLETED" or status == "SUCCESS" %}
-    <span class="badge badge-success gap-1">
+    <span class="badge badge-success {{ size }} gap-1">
         <svg xmlns="http://www.w3.org/2000/svg"
              class="h-3 w-3"
              fill="none"
@@ -12,12 +12,12 @@
         {{ text|default:status }}
     </span>
 {% elif status == "RUNNING" %}
-    <span class="badge badge-info gap-1">
+    <span class="badge badge-info {{ size }} gap-1">
         <span class="loading loading-spinner loading-xs"></span>
         {{ text|default:"Running" }}
     </span>
 {% elif status == "FAILED" %}
-    <span class="badge badge-error gap-1">
+    <span class="badge badge-error {{ size }} gap-1">
         <svg xmlns="http://www.w3.org/2000/svg"
              class="h-3 w-3"
              fill="none"
@@ -28,7 +28,7 @@
         {{ text|default:"Failed" }}
     </span>
 {% elif status == "PENDING" %}
-    <span class="badge badge-warning gap-1">{{ text|default:"Pending" }}</span>
+    <span class="badge badge-warning {{ size }} gap-1">{{ text|default:"Pending" }}</span>
 {% else %}
-    <span class="badge gap-1">{{ text|default:status }}</span>
+    <span class="badge {{ size }} gap-1">{{ text|default:status }}</span>
 {% endif %}

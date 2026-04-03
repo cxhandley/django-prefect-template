@@ -79,7 +79,7 @@
                             <!-- Execution Header -->
                             <div class="flex items-center justify-between">
                                 <h3 class="card-title text-base">Execution #{{ forloop.counter }}</h3>
-                                {% include "core/components/ui/badge.html" with status=item.execution.status %}
+                                {% include "core/components/ui/badge.html" with status=item.execution.status size="badge-sm" %}
                             </div>
                             <p class="text-xs text-base-content/50 font-mono">{{ item.execution.flow_run_id|truncatechars:20 }}</p>
                             <p class="text-xs text-base-content/50">{{ item.execution.created_at|date:"M d, Y H:i" }}</p>
