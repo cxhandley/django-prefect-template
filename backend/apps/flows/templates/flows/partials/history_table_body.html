@@ -45,7 +45,9 @@
                 {% endwith %}
             </td>
             <!-- Status (hideable) -->
-            <td x-show="isVisible('status')">{% include "core/components/ui/badge.html" with status=execution.status %}</td>
+            <td x-show="isVisible('status')">
+                {% include "core/components/ui/badge.html" with status=execution.status size="badge-sm" %}
+            </td>
             <!-- Actions -->
             <td class="w-16">
                 <a href="{% url 'flows:execution_detail' execution.flow_run_id %}"

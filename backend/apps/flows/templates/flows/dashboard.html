@@ -65,9 +65,7 @@
                             </svg>
                             Run Prediction
                         </button>
-                        <button type="button"
-                                id="btn-save-preset"
-                                class="btn btn-outline btn-sm self-center">Save as Preset</button>
+                        <button type="button" id="btn-save-preset" class="btn btn-outline">Save as Preset</button>
                     </div>
                     <span id="prediction-loading"
                           class="loading loading-spinner loading-md htmx-indicator mt-4"></span>
@@ -160,6 +158,46 @@
     </div>
 {% endblock dashboard_content %}
 {% block extra_js %}
+    <script>
+    (function () {
+        var form = document.getElementById('prediction-form');
+        var submitBtn = form.querySelector('button[type="submit"]');
+        var originalBtnHTML = submitBtn.innerHTML;
+
+        function disableForm() {
+            form.querySelectorAll('input, button').forEach(function (el) { el.disabled = true; });
+            submitBtn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Running\u2026';
+        }
+
+        window.__enablePredictionForm = function () {
+            form.querySelectorAll('input, button').forEach(function (el) { el.disabled = false; });
+            submitBtn.innerHTML = originalBtnHTML;
+        };
+
+        document.addEventListener('htmx:beforeRequest', function (event) {
+            if (event.detail.elt === form) {
+                disableForm();
+            }
+        });
+
+        // Network / send error — re-enable immediately
+        document.addEventListener('htmx:sendError', function (event) {
+            if (event.detail.elt === form) {
+                window.__enablePredictionForm();
+            }
+        });
+
+        // After the HTMX swap: if the result is already final (error partial,
+        // no data-polling), re-enable the form right away.
+        document.addEventListener('htmx:afterSwap', function (event) {
+            if (event.detail.target && event.detail.target.id === 'prediction-result') {
+                if (!event.detail.target.querySelector('[data-polling]')) {
+                    window.__enablePredictionForm();
+                }
+            }
+        });
+    }());
+    </script>
     <script>
     // Copy prediction form values into the save-preset modal hidden fields
     document.getElementById('btn-save-preset').addEventListener('click', function () {

@@ -11,12 +11,12 @@
 {% block content %}
     <div class="drawer lg:drawer-open min-h-screen">
         <input id="dashboard-drawer" type="checkbox" class="drawer-toggle" />
-        <div class="drawer-content">
+        <div class="drawer-content flex flex-col min-w-0">
             <!-- Breadcrumbs -->
             {% block breadcrumbs %}
             {% endblock breadcrumbs %}
             <!-- Dashboard page content -->
-            <div class="p-6 pt-8">
+            <div class="p-4 sm:p-6 pt-8">
                 {% block dashboard_content %}
                 {% endblock dashboard_content %}
             </div>
