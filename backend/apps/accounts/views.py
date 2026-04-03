@@ -2,13 +2,15 @@ from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm
 from django.contrib.auth.tokens import default_token_generator
+from django.core.cache import cache
+from django.core.paginator import Paginator
 from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from .forms import LoginForm, SignupForm
-from .models import UserProfile
+from .models import Notification, UserProfile
 from .services import send_confirmation_email
 
 User = get_user_model()
@@ -168,7 +170,17 @@ def settings(request):
 
     if request.method == "POST":
         profile.notify_on_failure = request.POST.get("notify_on_failure") == "on"
-        profile.save(update_fields=["notify_on_failure"])
+        profile.notify_on_success = request.POST.get("notify_on_success") == "on"
+        profile.notify_in_app = request.POST.get("notify_in_app") == "on"
+        profile.notify_via_email = request.POST.get("notify_via_email") == "on"
+        profile.save(
+            update_fields=[
+                "notify_on_failure",
+                "notify_on_success",
+                "notify_in_app",
+                "notify_via_email",
+            ]
+        )
         return redirect("accounts:settings")
 
     return render(request, "accounts/settings.html", {"user": request.user, "profile": profile})
@@ -244,4 +256,55 @@ def user_send_reset(request, user_id):
         request,
         "accounts/partials/user_row.html",
         {"u": target_user, "current_user": request.user, "reset_sent": True},
+    )
+
+
+# ── notification views ────────────────────────────────────────────────────────
+
+
+@login_required
+@require_http_methods(["GET"])
+def notifications(request):
+    """Full notification list page, newest first, paginated."""
+    qs = Notification.objects.filter(user=request.user).select_related("related_execution")
+    paginator = Paginator(qs, 20)
+    page = paginator.get_page(request.GET.get("page"))
+    return render(
+        request,
+        "accounts/notifications.html",
+        {"page_obj": page, "active_page": "notifications"},
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def notification_read(request, pk):
+    """Mark a single notification as read, then redirect to its execution or the list."""
+    notif = get_object_or_404(Notification, pk=pk, user=request.user)
+    if not notif.is_read:
+        notif.is_read = True
+        notif.save(update_fields=["is_read"])
+        cache.delete(f"notification_count_{request.user.pk}")
+
+    if notif.related_execution:
+        return redirect("flows:execution_detail", run_id=notif.related_execution.flow_run_id)
+    return redirect("accounts:notifications")
+
+
+@login_required
+@require_http_methods(["POST"])
+def notifications_mark_all_read(request):
+    """Mark all unread notifications as read."""
+    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    cache.delete(f"notification_count_{request.user.pk}")
+    return redirect("accounts:notifications")
+
+
+@login_required
+@require_http_methods(["GET"])
+def notifications_dropdown(request):
+    """HTMX partial: latest 5 notifications for the navbar dropdown."""
+    recent = Notification.objects.filter(user=request.user).select_related("related_execution")[:5]
+    return render(
+        request, "accounts/partials/notification_dropdown.html", {"notifications": recent}
     )

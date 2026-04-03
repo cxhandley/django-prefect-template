@@ -12,6 +12,17 @@ urlpatterns = [
     path("settings/", views.settings, name="settings"),
     path("api/user-menu/", views.user_menu, name="user_menu"),
     path("api/logout/", views.logout_user, name="logout"),
+    path(
+        "api/notifications/dropdown/", views.notifications_dropdown, name="notifications_dropdown"
+    ),
+    # Notifications
+    path("notifications/", views.notifications, name="notifications"),
+    path("notifications/<int:pk>/read/", views.notification_read, name="notification_read"),
+    path(
+        "notifications/mark-all-read/",
+        views.notifications_mark_all_read,
+        name="notifications_mark_all_read",
+    ),
     # Email confirmation
     path(
         "email-confirmation-sent/",

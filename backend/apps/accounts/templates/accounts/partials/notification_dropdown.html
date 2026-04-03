@@ -1,0 +1,28 @@
+<!-- accounts/partials/notification_dropdown.html -->
+<li class="menu-title">
+    <span>Notifications</span>
+</li>
+{% for notif in notifications %}
+    <li>
+        <a href="{% url 'accounts:notification_read' pk=notif.pk %}"
+           class="flex items-start gap-2 {% if not notif.is_read %}font-semibold bg-base-200/50{% endif %}">
+            {% if notif.notification_type == "EXECUTION_FAILED" %}
+                <span class="text-error mt-0.5">✕</span>
+            {% else %}
+                <span class="text-success mt-0.5">✓</span>
+            {% endif %}
+            <span class="flex-1 text-sm leading-tight">
+                {{ notif.message|truncatechars:60 }}
+                <span class="block text-xs text-base-content/50 font-normal mt-0.5">{{ notif.created_at|timesince }} ago</span>
+            </span>
+        </a>
+    </li>
+{% empty %}
+    <li>
+        <span class="text-sm text-base-content/50 px-2">No notifications yet.</span>
+    </li>
+{% endfor %}
+<li class="border-t border-base-200 mt-1 pt-1">
+    <a href="{% url 'accounts:notifications' %}"
+       class="text-sm text-primary">View all notifications</a>
+</li>

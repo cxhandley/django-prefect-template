@@ -1,0 +1,201 @@
+{
+  "type": "excalidraw",
+  "version": 2,
+  "source": "https://excalidraw.com",
+  "elements": [
+    {
+      "id": "navbar-bell",
+      "type": "rectangle",
+      "x": 900, "y": 20, "width": 44, "height": 44,
+      "strokeColor": "#1971c2", "backgroundColor": "#e7f5ff",
+      "fillStyle": "solid", "roundness": {"type": 3},
+      "label": {"text": "🔔 3", "fontSize": 14}
+    },
+    {
+      "id": "dropdown-panel",
+      "type": "rectangle",
+      "x": 780, "y": 70, "width": 280, "height": 220,
+      "strokeColor": "#868e96", "backgroundColor": "#ffffff",
+      "fillStyle": "solid", "roundness": {"type": 3}
+    },
+    {
+      "id": "dropdown-title",
+      "type": "text",
+      "x": 795, "y": 82,
+      "text": "Notifications",
+      "fontSize": 13, "fontFamily": 1
+    },
+    {
+      "id": "notif-row-1",
+      "type": "rectangle",
+      "x": 790, "y": 104, "width": 260, "height": 46,
+      "strokeColor": "#dee2e6", "backgroundColor": "#fff9db",
+      "fillStyle": "solid"
+    },
+    {
+      "id": "notif-row-1-text",
+      "type": "text",
+      "x": 798, "y": 110,
+      "text": "❌ Pipeline failed — 2 min ago",
+      "fontSize": 11, "fontFamily": 1
+    },
+    {
+      "id": "notif-row-2",
+      "type": "rectangle",
+      "x": 790, "y": 154, "width": 260, "height": 46,
+      "strokeColor": "#dee2e6", "backgroundColor": "#ebfbee",
+      "fillStyle": "solid"
+    },
+    {
+      "id": "notif-row-2-text",
+      "type": "text",
+      "x": 798, "y": 160,
+      "text": "✅ Prediction completed — 10 min ago",
+      "fontSize": 11, "fontFamily": 1
+    },
+    {
+      "id": "notif-row-3",
+      "type": "rectangle",
+      "x": 790, "y": 204, "width": 260, "height": 46,
+      "strokeColor": "#dee2e6", "backgroundColor": "#ffffff",
+      "fillStyle": "solid"
+    },
+    {
+      "id": "notif-row-3-text",
+      "type": "text",
+      "x": 798, "y": 216,
+      "text": "✅ Pipeline completed — 1 hr ago (read)",
+      "fontSize": 11, "fontFamily": 1
+    },
+    {
+      "id": "view-all-link",
+      "type": "text",
+      "x": 795, "y": 264,
+      "text": "View all notifications →",
+      "fontSize": 11, "fontFamily": 1, "strokeColor": "#1971c2"
+    },
+    {
+      "id": "full-page-label",
+      "type": "text",
+      "x": 100, "y": 340,
+      "text": "Full notification list page  /accounts/notifications/",
+      "fontSize": 14, "fontFamily": 1
+    },
+    {
+      "id": "full-page-frame",
+      "type": "rectangle",
+      "x": 100, "y": 360, "width": 760, "height": 400,
+      "strokeColor": "#868e96", "backgroundColor": "#f8f9fa",
+      "fillStyle": "solid", "roundness": {"type": 3}
+    },
+    {
+      "id": "page-header",
+      "type": "text",
+      "x": 120, "y": 376,
+      "text": "Notifications                    [Mark all as read]",
+      "fontSize": 16, "fontFamily": 1
+    },
+    {
+      "id": "page-row-1",
+      "type": "rectangle",
+      "x": 110, "y": 406, "width": 740, "height": 52,
+      "strokeColor": "#dee2e6", "backgroundColor": "#fff9db",
+      "fillStyle": "solid"
+    },
+    {
+      "id": "page-row-1-text",
+      "type": "text",
+      "x": 120, "y": 416,
+      "text": "UNREAD  ❌  Pipeline 'data-processing' failed — run abc123  (2 min ago)",
+      "fontSize": 11, "fontFamily": 1
+    },
+    {
+      "id": "page-row-2",
+      "type": "rectangle",
+      "x": 110, "y": 462, "width": 740, "height": 52,
+      "strokeColor": "#dee2e6", "backgroundColor": "#ebfbee",
+      "fillStyle": "solid"
+    },
+    {
+      "id": "page-row-2-text",
+      "type": "text",
+      "x": 120, "y": 472,
+      "text": "UNREAD  ✅  Prediction completed — run def456  (10 min ago)",
+      "fontSize": 11, "fontFamily": 1
+    },
+    {
+      "id": "page-row-3",
+      "type": "rectangle",
+      "x": 110, "y": 518, "width": 740, "height": 52,
+      "strokeColor": "#dee2e6", "backgroundColor": "#ffffff",
+      "fillStyle": "solid"
+    },
+    {
+      "id": "page-row-3-text",
+      "type": "text",
+      "x": 120, "y": 528,
+      "text": "READ    ✅  Pipeline completed — run ghi789  (1 hr ago)",
+      "fontSize": 11, "fontFamily": 1
+    },
+    {
+      "id": "settings-label",
+      "type": "text",
+      "x": 100, "y": 780,
+      "text": "Settings page — Notification preferences section",
+      "fontSize": 14, "fontFamily": 1
+    },
+    {
+      "id": "settings-frame",
+      "type": "rectangle",
+      "x": 100, "y": 800, "width": 500, "height": 180,
+      "strokeColor": "#868e96", "backgroundColor": "#f8f9fa",
+      "fillStyle": "solid", "roundness": {"type": 3}
+    },
+    {
+      "id": "settings-toggle-1",
+      "type": "text",
+      "x": 120, "y": 820,
+      "text": "☑  Email me when an execution fails",
+      "fontSize": 12, "fontFamily": 1
+    },
+    {
+      "id": "settings-toggle-2",
+      "type": "text",
+      "x": 120, "y": 845,
+      "text": "☐  Email me when an execution succeeds",
+      "fontSize": 12, "fontFamily": 1
+    },
+    {
+      "id": "settings-toggle-3",
+      "type": "text",
+      "x": 120, "y": 870,
+      "text": "☑  Show in-app notifications",
+      "fontSize": 12, "fontFamily": 1
+    },
+    {
+      "id": "settings-toggle-4",
+      "type": "text",
+      "x": 120, "y": 895,
+      "text": "☑  Send email notifications",
+      "fontSize": 12, "fontFamily": 1
+    },
+    {
+      "id": "settings-save-btn",
+      "type": "rectangle",
+      "x": 120, "y": 930, "width": 130, "height": 34,
+      "strokeColor": "#1971c2", "backgroundColor": "#1971c2",
+      "fillStyle": "solid", "roundness": {"type": 3}
+    },
+    {
+      "id": "settings-save-text",
+      "type": "text",
+      "x": 140, "y": 940,
+      "text": "Save Preferences",
+      "fontSize": 12, "fontFamily": 1, "strokeColor": "#ffffff"
+    }
+  ],
+  "appState": {
+    "gridSize": null,
+    "viewBackgroundColor": "#ffffff"
+  }
+}

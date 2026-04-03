@@ -37,6 +37,9 @@ erDiagram
         int id PK
         int user_id FK "OneToOne → USER"
         boolean notify_on_failure "default true"
+        boolean notify_on_success "default false"
+        boolean notify_in_app "default true"
+        boolean notify_via_email "default true"
     }
 
     INPUT_PRESET {
@@ -47,9 +50,36 @@ erDiagram
         datetime created_at
     }
 
+    NOTIFICATION {
+        int id PK
+        int user_id FK "references USER"
+        string notification_type "EXECUTION_FAILED|EXECUTION_COMPLETED|SYSTEM"
+        text message
+        int related_execution_id FK "nullable → FLOW_EXECUTION"
+        boolean is_read "default false"
+        datetime created_at
+    }
+
+    FEATURE_FLAG {
+        int id PK
+        string name UK "slug"
+        text description
+        boolean is_enabled "global on/off fallback"
+        smallint rollout_percentage "0–100; 0 = disabled"
+    }
+
+    FEATURE_FLAG_USERS {
+        int featureflag_id FK
+        int user_id FK
+    }
+
     USER ||--o{ FLOW_EXECUTION : "triggers"
     USER ||--|| USER_PROFILE : "has"
     USER ||--o{ INPUT_PRESET : "owns"
+    USER ||--o{ NOTIFICATION : "receives"
+    FLOW_EXECUTION |o--o{ NOTIFICATION : "referenced by"
+    FEATURE_FLAG ||--o{ FEATURE_FLAG_USERS : "enabled for"
+    USER ||--o{ FEATURE_FLAG_USERS : "included in"
 
     %% ============================================
     %% NOT YET IMPLEMENTED — planned for future epics
