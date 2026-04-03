@@ -317,6 +317,50 @@ Valuable but not blocking any core workflow.
 
 ---
 
+### BL-019 · Notification Management — In-App Notification Centre & Preferences `M`
+
+**User story:** US-7.2 (extends BL-011)
+**Value:** Email-only notifications (BL-011) miss users who don't monitor their inbox. An in-app notification centre surfaces run completions, failures, and system messages without requiring email, and a preferences page lets users control which channels they want.
+
+**Scope:**
+- New model: `Notification` (user FK, `notification_type` choices, `message`, `related_execution` FK nullable, `is_read` bool, `created_at`)
+- Migration required
+- In-app notification bell icon in `core/base.html` navbar — badge shows unread count (HTMX polling or SSE)
+- Notification list page: `accounts/notifications.html` — mark individual or all as read
+- Notification preferences page (extend `accounts/settings.html`): per-channel toggles (`notify_on_failure`, `notify_on_success`, `notify_in_app`, `notify_via_email`)
+- Celery tasks that currently send email (BL-011) also create a `Notification` record when `notify_in_app` is enabled
+
+**Depends on:** BL-011
+
+**Docs required before starting:**
+- Update `docs/data-model.mmd` to add `Notification` and update `UserProfile`
+- Wireframe: `notification_centre.excalidraw`
+- Sequence diagram: `docs/sequences/notifications.mmd`
+
+---
+
+### BL-020 · Feature Flags — Per-User & Environment Toggle System `M`
+
+**Value:** Before production, there is no mechanism to gradually roll out new features, run A/B tests, or disable functionality per environment without a code deploy. A lightweight feature-flag system removes this risk and enables confident incremental releases.
+
+**Scope:**
+- New model: `FeatureFlag` (name slug, description, `is_enabled` bool, `rollout_percentage` 0–100 integer, `enabled_for_users` M2M nullable)
+- Flag resolution order (first match wins):
+  1. `enabled_for_users` — if user is explicitly listed, flag is on regardless of other settings
+  2. `rollout_percentage` — if > 0, deterministically hash `user.id + flag.name` to decide inclusion (stable per-user, no random drift on re-check)
+  3. `is_enabled` — global on/off fallback
+- Migration required
+- Register model in Django Admin — managed entirely via `/admin/`; no custom UI needed
+- Template tag `{% flag "flag-name" %}...{% endflag %}` for conditional rendering in templates
+- View decorator `@require_flag("flag-name")` returning 404 when flag is off
+- Seed migration with a small set of initial flags (e.g. `notifications`, `input-presets`) so existing features can be wrapped without breaking them
+- No third-party dependency — implement with the new model and a simple cache layer (`django.core.cache`)
+
+**Docs required before starting:**
+- Update `docs/data-model.mmd` to add `FeatureFlag`
+
+---
+
 ### BL-018 · Production Environment — Docker Compose/Swarm + PostgreSQL Backups `XL`
 
 **Value:** No production deployment exists. This item covers the full production infrastructure: multi-replica web/worker services, automated PostgreSQL backups to S3, health checks, and a CI/CD deploy pipeline.
@@ -332,7 +376,7 @@ Valuable but not blocking any core workflow.
 
 **Docs:** See `docs/deployment/production.md` for full architecture, Swarm config, backup options, and CI/CD sketch.
 
-**Depends on:** BL-017 (staging must be proven stable first).
+**Depends on:** BL-017 (staging must be proven stable first), BL-019 (notification system should be in place before prod traffic), BL-020 (feature flags needed to gate rollout).
 
 ---
 
@@ -357,4 +401,6 @@ Valuable but not blocking any core workflow.
 | ~~BL-015~~ | ~~Prediction form UX — disable during run, fix cancel flicker~~ | 4 | S | — |
 | ~~BL-016~~ | ~~Frontend asset pipeline (Tailwind build + compressor)~~ | 5 | M | — |
 | ~~BL-017~~ | ~~Staging environment (EC2 + Traefik SSL)~~ | 5 | L | BL-016 |
-| BL-018 | Production environment (Swarm + PG backups) | 5 | XL | BL-017 |
+| BL-019 | Notification management (in-app centre + preferences) | 4 | M | BL-011 |
+| BL-020 | Feature flags (per-user & environment toggles) | 5 | M | — |
+| BL-018 | Production environment (Swarm + PG backups) | 5 | XL | BL-017, BL-019, BL-020 |
