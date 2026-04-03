@@ -56,6 +56,19 @@ Add tests before marking the user story complete:
 - `test_services.py` — service layer unit tests
 - Target ≥ 90% coverage on new code
 
+## Python dependencies
+
+Python packages are managed with `uv`. After pulling changes that add or update entries in
+`backend/pyproject.toml`, sync the dev virtualenv so the new packages are available:
+
+```bash
+uv sync --group dev
+```
+
+Run this from the workspace root inside the devcontainer. If you skip this step and a new package
+appears in `INSTALLED_APPS` (e.g. `compressor`), pytest will fail with
+`ModuleNotFoundError: No module named '<package>'`.
+
 ## Pre-commit
 
 Pre-commit hooks run automatically on `git commit`. Always ensure they pass before committing.
