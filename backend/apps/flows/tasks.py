@@ -148,9 +148,6 @@ def run_pipeline_task(
             error_message="",
         )
 
-        _send_success_notification(run_id, user_id, "pipeline")
-        return metadata
-
     except Exception as exc:
         error_str = str(exc)[:2000]
         FlowExecution.objects.filter(flow_run_id=run_id).update(
@@ -160,6 +157,9 @@ def run_pipeline_task(
         if self.request.retries >= self.max_retries:
             _send_failure_notification(run_id, user_id, "pipeline", error_str)
         raise self.retry(exc=exc) from exc
+
+    _send_success_notification(run_id, user_id, "pipeline")
+    return metadata
 
 
 @app.task(bind=True, max_retries=2, default_retry_delay=30)
@@ -211,9 +211,6 @@ def run_prediction_task(
             parameters=updated_params,
         )
 
-        _send_success_notification(run_id, user_id, "predict_pipeline")
-        return metadata
-
     except Exception as exc:
         error_str = str(exc)[:2000]
         FlowExecution.objects.filter(flow_run_id=run_id).update(
@@ -223,3 +220,6 @@ def run_prediction_task(
         if self.request.retries >= self.max_retries:
             _send_failure_notification(run_id, user_id, "predict_pipeline", error_str)
         raise self.retry(exc=exc) from exc
+
+    _send_success_notification(run_id, user_id, "predict_pipeline")
+    return metadata
