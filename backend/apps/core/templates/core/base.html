@@ -146,28 +146,47 @@
                 event.detail.headers["X-CSRFToken"] = csrfToken;
             }
         });
-        </script>
-        {% if user.is_authenticated %}
-            <!-- Logout confirmation modal -->
-            <dialog id="logout_modal" class="modal">
-                <div class="modal-box">
-                    <h3 class="font-bold text-lg">Sign Out</h3>
-                    <p class="py-4">Are you sure you want to sign out of your account?</p>
-                    <div class="modal-action">
-                        <form method="dialog">
-                            <button class="btn btn-ghost">Cancel</button>
-                        </form>
-                        <button hx-post="{% url 'accounts:logout' %}"
-                                hx-trigger="click"
-                                class="btn btn-error">Sign Out</button>
-                    </div>
-                </div>
-                <form method="dialog" class="modal-backdrop">
-                    <button>close</button>
-                </form>
-            </dialog>
-        {% endif %}
-        {% block extra_js %}
-        {% endblock extra_js %}
-    </body>
+
+        // Delegated handler for compare-prediction modal buttons.
+        // Uses a delegated listener here because the button is injected via
+        // innerHTML (plain fetch), so inline <script> tags in that partial
+        // are not executed by the browser.
+        document.addEventListener("click", function(e) {
+            var btn = e.target.closest("[data-compare-modal]");
+            if (!btn) return;
+            var runId = btn.dataset.compareModal;
+            var url = btn.dataset.compareUrl;
+            var shortId = runId.slice(0, 8);
+            var modal = document.getElementById("compare_modal_" + shortId);
+            var target = document.getElementById("compare-options-" + shortId);
+            if (!modal || !target) return;
+            target.innerHTML = '<span class="loading loading-spinner loading-sm"></span>';
+            modal.showModal();
+            fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+                .then(function(r) { return r.text(); })
+                .then(function(html) { target.innerHTML = html; })
+                .catch(function() { target.innerHTML = '<p class="text-sm text-error">Failed to load options.</p>'; });
+        });
+</script>
+{% if user.is_authenticated %}
+<!-- Logout confirmation modal -->
+<dialog id="logout_modal" class="modal">
+<div class="modal-box">
+<h3 class="font-bold text-lg">Sign Out</h3>
+<p class="py-4">Are you sure you want to sign out of your account?</p>
+<div class="modal-action">
+<form method="dialog">
+<button class="btn btn-ghost">Cancel</button>
+</form>
+<button hx-post="{% url 'accounts:logout' %}" hx-trigger="click" class="btn btn-error">Sign Out</button>
+</div>
+</div>
+<form method="dialog" class="modal-backdrop">
+<button>close</button>
+</form>
+</dialog>
+{% endif %}
+{% block extra_js %}
+{% endblock extra_js %}
+</body>
 </html>

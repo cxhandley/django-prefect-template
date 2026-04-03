@@ -218,6 +218,27 @@ Valuable but not blocking any core workflow.
 
 ---
 
+---
+
+## Tier 5 — Technical Debt & Infrastructure
+
+---
+
+### BL-013 · Migrate HTMX from 1.9.10 to 2.x `S`
+
+**Value:** HTMX 1.9.10 has a known bug with `outerHTML` polling (crashes with `Cannot read properties of null (reading 'htmx-internal-data')`). Version 2.x fixes this. The upgrade is low-effort for this project.
+
+**Scope:**
+- Update the CDN script tag in `core/base.html` from `htmx.org@1.9.10` to `htmx.org@2.0.4` (or latest 2.x)
+- Verify `hx-delete` usage — in 2.x, DELETE requests send params in the URL instead of the request body
+- Confirm no `hx-on` attribute syntax is in use (syntax changed in 2.x)
+- Smoke-test all HTMX interactions: history filters/pagination, upload flow, preset load/delete, admin execution list
+- `htmx.config.selfRequestsOnly` now defaults to `true` — all requests are same-origin so no change needed
+
+**No new model, wireframe, or diagram needed.** See `CLAUDE.md` for full migration notes.
+
+---
+
 ## Backlog Summary
 
 | ID | Title | Tier | Effort | Depends on |
@@ -234,3 +255,4 @@ Valuable but not blocking any core workflow.
 | ~~BL-010~~ | ~~Input presets~~ | 4 | L | — |
 | ~~BL-011~~ | ~~Email notifications for failures~~ | 4 | M | BL-001 |
 | ~~BL-012~~ | ~~Retry failed execution~~ | 4 | S | — |
+| BL-013 | Migrate HTMX 1.9.10 → 2.x | 5 | S | — |

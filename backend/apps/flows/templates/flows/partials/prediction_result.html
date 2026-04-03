@@ -27,7 +27,10 @@
            class="btn btn-ghost btn-sm">View Full Details →</a>
         <button type="button"
                 class="btn btn-outline btn-sm"
-                onclick="openCompareModal('{{ run_id }}', '{{ run_id|slice:':8' }}')">Compare with Another</button>
+                data-compare-modal="{{ run_id }}"
+                data-compare-url="{% url 'flows:prediction_compare_options' %}?exclude={{ run_id }}">
+            Compare with Another
+        </button>
     </div>
 </div>
 <!-- Compare modal -->
@@ -50,19 +53,3 @@
         <button>close</button>
     </form>
 </dialog>
-<script>
-function openCompareModal(runId, shortId) {
-    var modal = document.getElementById('compare_modal_' + shortId);
-    var target = document.getElementById('compare-options-' + shortId);
-    target.innerHTML = '<span class="loading loading-spinner loading-sm"></span>';
-    modal.showModal();
-    fetch('{% url 'flows:prediction_compare_options' %}?exclude=' + runId, {
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-    })
-        .then(function (r) { return r.text(); })
-        .then(function (html) { target.innerHTML = html; })
-        .catch(function () {
-            target.innerHTML = '<p class="text-sm text-error">Failed to load options.</p>';
-        });
-}
-</script>

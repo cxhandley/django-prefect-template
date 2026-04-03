@@ -1,39 +1,42 @@
 {% if executions %}
-    <form id="compare-select-form"
-          onsubmit=" var sel = this.querySelector('[name=compare_id]:checked'); if (!sel) return false; window.location = '{% url 'flows:comparison' %}?ids={{ current_run_id }},' + sel.value; return false; ">
-        <div class="space-y-2 max-h-64 overflow-y-auto">
-            {% for ex in executions %}
-                <label class="flex items-center gap-3 p-3 rounded-lg border border-base-200 cursor-pointer hover:bg-base-200 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
-                    <input type="radio"
-                           name="compare_id"
-                           value="{{ ex.flow_run_id }}"
-                           class="radio radio-primary radio-sm"
-                           required />
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium">{{ ex.created_at|date:"M d, Y H:i" }}</p>
-                        <p class="text-xs text-base-content/60">
-                            {% with p=ex.parameters %}
-                                Income: ${{ p.income|default:"—" }} · Age: {{ p.age|default:"—" }} · FICO: {{ p.credit_score|default:"—" }}
-                                {% if p.classification %}
-                                    ·
-                                    {% if p.classification == "Approved" %}
-                                        <span class="text-success font-medium">{{ p.classification }}</span>
-                                    {% elif p.classification == "Review" %}
-                                        <span class="text-warning font-medium">{{ p.classification }}</span>
-                                    {% else %}
-                                        <span class="text-error font-medium">{{ p.classification }}</span>
-                                    {% endif %}
+    <div class="space-y-2 max-h-64 overflow-y-auto" id="compare-options-list">
+        {% for ex in executions %}
+            <label class="flex items-center gap-3 p-3 rounded-lg border border-base-200 cursor-pointer hover:bg-base-200 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+                <input type="radio"
+                       name="compare_id"
+                       value="{{ ex.flow_run_id }}"
+                       class="radio radio-primary radio-sm" />
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium">{{ ex.created_at|date:"M d, Y H:i" }}</p>
+                    <p class="text-xs text-base-content/60">
+                        {% with p=ex.parameters %}
+                            Income: ${{ p.income|default:"—" }} · Age: {{ p.age|default:"—" }} · FICO: {{ p.credit_score|default:"—" }}
+                            {% if p.classification %}
+                                ·
+                                {% if p.classification == "Approved" %}
+                                    <span class="text-success font-medium">{{ p.classification }}</span>
+                                {% elif p.classification == "Review" %}
+                                    <span class="text-warning font-medium">{{ p.classification }}</span>
+                                {% else %}
+                                    <span class="text-error font-medium">{{ p.classification }}</span>
                                 {% endif %}
-                            {% endwith %}
-                        </p>
-                    </div>
-                </label>
-            {% endfor %}
-        </div>
-        <div class="mt-4">
-            <button type="submit" class="btn btn-primary btn-sm w-full">Compare →</button>
-        </div>
-    </form>
+                            {% endif %}
+                        {% endwith %}
+                    </p>
+                </div>
+            </label>
+        {% endfor %}
+    </div>
+    <div class="mt-4">
+        <button type="button"
+                class="btn btn-primary btn-sm w-full"
+                data-compare-base-url="{% url 'flows:comparison' %}"
+                data-compare-current="{{ current_run_id }}"
+                data-compare-list="compare-options-list"
+                onclick="(function(btn){var list=document.getElementById(btn.dataset.compareList);var sel=list.querySelector('[name=compare_id]:checked');if(!sel){return;}window.location=btn.dataset.compareBaseUrl+'?ids='+btn.dataset.compareCurrent+','+sel.value;})(this)">
+            Compare →
+        </button>
+    </div>
 {% else %}
     <div class="text-center py-6 text-base-content/50">
         <p class="text-sm">No other completed predictions to compare with.</p>
