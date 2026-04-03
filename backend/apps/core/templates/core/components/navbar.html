@@ -40,16 +40,13 @@
         <!-- Navbar end: User menu & notifications -->
         <div class="navbar-end gap-2">
             <!-- Notifications dropdown -->
-            <div class="dropdown dropdown-end z-50"
-                 x-data="{ open: false }"
-                 @click.outside="open = false">
+            <div class="dropdown dropdown-end z-50">
                 <div tabindex="0"
                      role="button"
                      class="btn btn-ghost btn-circle indicator"
-                     @click="open = !open"
                      hx-get="{% url 'accounts:notifications_dropdown' %}"
                      hx-target="#notification-dropdown-items"
-                     hx-trigger="click once">
+                     hx-trigger="focus once">
                     <svg xmlns="http://www.w3.org/2000/svg"
                          class="h-5 w-5"
                          fill="none"
@@ -62,8 +59,7 @@
                     {% endif %}
                 </div>
                 <ul tabindex="0"
-                    class="dropdown-content menu bg-base-100 rounded-box z-50 w-72 p-2 shadow-lg border border-base-200"
-                    x-show="open">
+                    class="dropdown-content menu bg-base-100 rounded-box z-50 w-72 p-2 shadow-lg border border-base-200">
                     <div id="notification-dropdown-items">
                         <li class="menu-title">
                             <span>Notifications</span>
