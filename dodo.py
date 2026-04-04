@@ -16,12 +16,13 @@ PIPELINE_PARAMS environment variable (JSON):
         "run_id": "uuid-string",
         "input_s3_path": "s3://bucket/raw/uploads/...",
         "bucket": "django-prefect-datalake-dev",
-        "aws_access_key_id": "...",
-        "aws_secret_access_key": "...",
         "aws_s3_region": "us-east-1",
         "s3_endpoint": "localhost:9000",
         "notebook_output_dir": "data/notebook_outputs"
     }
+
+AWS credentials are read from AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment
+variables directly within each notebook, so they are never baked into output notebooks.
 """
 
 import json
