@@ -51,6 +51,32 @@ services:
     networks:
       - app-network
 
+  # ─── OpenTelemetry Collector ────────────────────────────────────────────────
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    container_name: django-otel-collector
+    command: ["--config=/etc/otelcol/config.yml"]
+    volumes:
+      - ./otel/collector-dev.yml:/etc/otelcol/config.yml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+    depends_on:
+      - jaeger
+    networks:
+      - app-network
+
+  # ─── Jaeger (trace UI — http://localhost:16686) ──────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: django-jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4318:4318"    # OTLP HTTP (internal)
+    networks:
+      - app-network
+
   # ─── Frontend asset build (one-shot: compiles Tailwind CSS + vendors HTMX) ──
   frontend-build:
     image: node:20-alpine
@@ -82,6 +108,11 @@ services:
       AWS_S3_ENDPOINT_URL: http://rustfs:9000
       EMAIL_HOST: mailhog
       EMAIL_PORT: "1025"
+      OTEL_SERVICE_NAME: app-dev
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_TRACES_SAMPLER: always_on
+      OTEL_SDK_DISABLED: "false"
+      DEBUG: "true"
     volumes:
       - ./backend:/app
     ports:
@@ -95,6 +126,8 @@ services:
         condition: service_healthy
       frontend-build:
         condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
     networks:
       - app-network
 
@@ -151,6 +184,11 @@ services:
       PROJECT_ROOT: /project
       NOTEBOOKS_DIR: /project/notebooks
       NOTEBOOK_OUTPUT_DIR: /project/data/notebook_outputs
+      OTEL_SERVICE_NAME: app-dev
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_TRACES_SAMPLER: always_on
+      OTEL_SDK_DISABLED: "false"
+      DEBUG: "true"
     depends_on:
       db:
         condition: service_healthy
@@ -158,6 +196,8 @@ services:
         condition: service_healthy
       rustfs:
         condition: service_healthy
+      otel-collector:
+        condition: service_started
     volumes:
       - ./backend:/app
       - .:/project

@@ -1,4 +1,10 @@
+import os
+
 from .base import *  # noqa: F401, F403
+
+# Disable OpenTelemetry in tests — avoids collector connection attempts and
+# keeps the test suite fast.
+os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 
 DEBUG = False
 

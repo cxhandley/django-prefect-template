@@ -380,6 +380,31 @@ Valuable but not blocking any core workflow.
 
 ---
 
+### BL-021 · OpenTelemetry — Distributed Tracing & Metrics `M` `[~]`
+
+**User story:** US-T8
+**Value:** With Celery tasks, S3 calls, DuckDB queries, and Django views all involved in a single pipeline run, there is currently no way to see where time is spent or which component caused a failure. OpenTelemetry adds end-to-end traces across all environments with no changes to business logic.
+
+**Scope:**
+- Add `opentelemetry-sdk`, `opentelemetry-instrumentation-django`, `opentelemetry-instrumentation-celery`, `opentelemetry-instrumentation-boto`, `opentelemetry-exporter-otlp-proto-grpc` to `backend/pyproject.toml`
+- `apps/core/apps.py` — initialise SDK in `AppConfig.ready()` using env vars (`OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_TRACES_SAMPLER`)
+- Propagate trace context from Django view into dispatched Celery tasks so traces span the full request lifecycle
+- `otel/collector-dev.yml` — OTLP receiver → debug exporter + Jaeger exporter (stdout + local UI)
+- `otel/collector-staging.yml` — OTLP receiver → stdout JSON exporter (CloudWatch-friendly)
+- `otel/collector-production.yml` — OTLP receiver → configurable backend exporter (Tempo / Honeycomb / X-Ray via env var)
+- `docker-compose.yml` — add `otel-collector` (dev) + `jaeger` (dev UI) services
+- `docker-stack.yml` — add `otel-collector` service with production collector config
+- `deploy/.env.tpl` — add `OTEL_*` variables sourced from 1Password
+- Per-environment Django settings: dev uses `SimpleSpanProcessor` (synchronous, good for debugging); staging/production use `BatchSpanProcessor` (async, low overhead)
+
+**Depends on:** BL-018 (production environment should be in place before wiring in the production backend)
+
+**Docs required before starting:**
+- Sequence diagram: `docs/sequences/otel_trace_lifecycle.mmd`
+- Design doc: `docs/observability/opentelemetry.md` ✓ (see below)
+
+---
+
 ## Backlog Summary
 
 | ID | Title | Tier | Effort | Depends on |
@@ -404,3 +429,4 @@ Valuable but not blocking any core workflow.
 | ~~BL-019~~ | ~~Notification management (in-app centre + preferences)~~ | 4 | M | BL-011 |
 | ~~BL-020~~ | ~~Feature flags (per-user & environment toggles)~~ | 5 | M | — |
 | BL-018 | Production environment (Swarm + PG backups) | 5 | XL | BL-017, BL-019, BL-020 |
+| BL-021 | OpenTelemetry — distributed tracing & metrics | 5 | M | BL-018 |
