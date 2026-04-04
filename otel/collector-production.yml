@@ -1,0 +1,47 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch: {}
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: production
+        action: insert
+
+exporters:
+  # ── Option A: Grafana Tempo (self-hosted or Grafana Cloud) ────────────────
+  # Set TEMPO_ENDPOINT and TEMPO_TOKEN in deploy/.env.tpl / 1Password.
+  otlp/tempo:
+    endpoint: ${env:TEMPO_ENDPOINT}
+    headers:
+      authorization: Bearer ${env:TEMPO_TOKEN}
+    tls:
+      insecure: false
+
+  # ── Option B: Honeycomb ───────────────────────────────────────────────────
+  # Set HONEYCOMB_API_KEY in deploy/.env.tpl / 1Password.
+  otlp/honeycomb:
+    endpoint: api.honeycomb.io:443
+    headers:
+      x-honeycomb-team: ${env:HONEYCOMB_API_KEY}
+    tls:
+      insecure: false
+
+  # ── Option C: AWS X-Ray ───────────────────────────────────────────────────
+  # Uses the EC2 instance IAM role — no credentials needed.
+  awsxray:
+    region: ap-southeast-2
+    no_verify_ssl: false
+    local_mode: false
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, resource]
+      # Swap the exporter here to switch backends — no code deploy needed.
+      exporters: [otlp/tempo]

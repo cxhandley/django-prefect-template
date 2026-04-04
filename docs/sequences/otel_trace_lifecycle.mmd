@@ -1,0 +1,42 @@
+sequenceDiagram
+    participant Browser
+    participant Django as Django (WSGI)
+    participant OTelSDK as OTel SDK
+    participant Celery as Celery Task
+    participant S3 as S3 / boto3
+    participant Collector as OTel Collector
+    participant Backend as Trace Backend<br/>(Jaeger / Tempo / Honeycomb)
+
+    Browser->>Django: POST /flows/run/
+    activate Django
+    OTelSDK->>OTelSDK: Start root span<br/>service=web, http.method=POST
+
+    Django->>Django: Validate form, create FlowExecution
+    OTelSDK->>OTelSDK: Child span: db.query INSERT
+
+    Django->>Celery: run_pipeline_task.delay(run_id)<br/>W3C traceparent header injected into task headers
+    deactivate Django
+
+    activate Celery
+    OTelSDK->>OTelSDK: Extract traceparent → continue root trace<br/>Start span: celery.task run_pipeline_task
+
+    Celery->>S3: boto3.put_object (upload input file)
+    OTelSDK->>OTelSDK: Child span: http.client PUT s3://...
+
+    Celery->>Celery: Run doit pipeline (subprocess)
+    OTelSDK->>OTelSDK: Child span: subprocess.run doit
+
+    Celery->>S3: boto3.get_object (read output)
+    OTelSDK->>OTelSDK: Child span: http.client GET s3://...
+
+    Celery->>Celery: Update FlowExecution status
+    OTelSDK->>OTelSDK: Child span: db.query UPDATE
+
+    OTelSDK->>OTelSDK: End celery task span
+    deactivate Celery
+
+    OTelSDK->>Collector: Export spans (OTLP/gRPC batch)
+    Collector->>Backend: Forward traces
+
+    note over OTelSDK,Collector: Dev: SimpleSpanProcessor (synchronous)<br/>Staging/Prod: BatchSpanProcessor (async, low overhead)
+    note over Collector,Backend: Dev: Jaeger (localhost:16686)<br/>Staging: stdout JSON<br/>Prod: Tempo / Honeycomb / X-Ray (env var)

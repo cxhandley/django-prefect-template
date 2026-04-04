@@ -11,8 +11,9 @@ RUN cd frontend && npm install
 COPY apps/ apps/
 COPY frontend/ frontend/
 
-# Outputs: /static/dist/main.css and /static/vendor/htmx.min.js
-RUN cd frontend && npm run build
+# Outputs: /build/static/dist/main.css and /build/static/vendor/htmx.min.js
+RUN mkdir -p /build/static/dist /build/static/vendor \
+    && cd frontend && npm run build
 
 # ── Stage 2: Django application ───────────────────────────────────────────────
 FROM python:3.13-slim

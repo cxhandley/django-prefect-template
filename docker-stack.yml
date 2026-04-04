@@ -37,6 +37,7 @@ services:
       - .env.production
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.production
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.web.rule=Host(`${PRODUCTION_HOST}`)"
@@ -79,6 +80,7 @@ services:
       - .env.production
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.production
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       PROJECT_ROOT: /project
       NOTEBOOKS_DIR: /project/notebooks
       NOTEBOOK_OUTPUT_DIR: /project/data/notebook_outputs
@@ -183,6 +185,23 @@ services:
       placement:
         constraints:
           - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  # ─── OpenTelemetry Collector ──────────────────────────────────────────────
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otelcol/config.yml"]
+    env_file:
+      - .env.production
+    volumes:
+      - ./otel/collector-production.yml:/etc/otelcol/config.yml:ro
+    networks:
+      - app-network
+    deploy:
+      replicas: 1
       restart_policy:
         condition: on-failure
         delay: 5s

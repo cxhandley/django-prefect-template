@@ -57,3 +57,16 @@ DEFAULT_FROM_EMAIL={{ op://Production/App/from_email }}
 
 # Docker image registry
 GHCR_REPO={{ op://Production/App/ghcr_repo }}
+
+# OpenTelemetry
+OTEL_SERVICE_NAME={{ op://Production/App/otel_service_name }}
+OTEL_EXPORTER_OTLP_ENDPOINT={{ op://Production/App/otel_endpoint }}
+OTEL_TRACES_SAMPLER=parentbased_traceidratio
+OTEL_TRACES_SAMPLER_ARG=0.1
+OTEL_SDK_DISABLED=false
+
+# Trace backend credentials (used by otel/collector-production.yml)
+# Set whichever backend you're using; leave others blank.
+TEMPO_ENDPOINT={{ op://Production/App/tempo_endpoint }}
+TEMPO_TOKEN={{ op://Production/App/tempo_token }}
+HONEYCOMB_API_KEY={{ op://Production/App/honeycomb_api_key }}

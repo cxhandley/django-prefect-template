@@ -369,6 +369,29 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
+## Epic 11: Observability — OpenTelemetry `[ ]`
+
+### US-T8: Distributed Tracing & Metrics with OpenTelemetry `[ ]`
+**As a** developer
+**I want** OpenTelemetry instrumentation across Django, Celery, and the OTLP pipeline
+**So that** I can trace requests end-to-end, identify slow operations, and diagnose failures in all environments without changing application code
+
+**Acceptance Criteria:**
+- [ ] `opentelemetry-sdk` and auto-instrumentation packages added to `backend/pyproject.toml`
+- [ ] Django requests automatically produce traces (HTTP method, URL, status code, DB query spans)
+- [ ] Celery tasks automatically produce traces (task name, queue, duration, exception details)
+- [ ] Outbound HTTP calls (boto3/S3, email) produce child spans
+- [ ] Trace context propagated from Django view → Celery task (distributed trace continuity)
+- [ ] **Dev:** OTLP exporter sends to a local `otel-collector` sidecar in `docker-compose.yml`; Jaeger UI available at `http://localhost:16686` for visual trace exploration
+- [ ] **Staging:** same collector pipeline; traces forwarded to stdout (JSON) for CloudWatch ingestion
+- [ ] **Production:** collector configured to export to a chosen backend (Grafana Tempo / Honeycomb / AWS X-Ray) via environment variable — backend is swappable without code changes
+- [ ] `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_TRACES_SAMPLER` controlled by environment variables; no hardcoded values in Django settings
+- [ ] Instrumentation initialised via a Django `AppConfig.ready()` hook — no manual calls in views or tasks
+- [ ] `otel-collector` service added to `docker-compose.yml` (dev) and `docker-stack.yml` (production)
+- [ ] Collector config (`otel-collector-config.yml`) defines per-environment pipelines in separate files
+
+---
+
 ## MVP Scope Summary
 
 | Area | Status |
