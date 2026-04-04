@@ -369,7 +369,30 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
-## Epic 11: Observability — OpenTelemetry `[ ]`
+## Epic 11: Security — Secrets Management `[ ]`
+
+### US-T9: Audit and Remediate Plaintext Secret Exposure `[ ]`
+**As a** developer
+**I want to** ensure no secrets are stored or transmitted in plaintext anywhere in the application
+**So that** credentials cannot be compromised via source code, logs, output files, or config leakage
+
+> **Reference:** OWASP ASVS v4.0 §2.10 (Service Authentication), §6.1–6.2 (Stored Cryptography);
+> OWASP Top 10:2021 A02 — Cryptographic Failures; OWASP Secrets Management Cheat Sheet.
+
+**Acceptance Criteria:**
+
+- [ ] **Source code** — no secrets (API keys, passwords, tokens, DSNs) hardcoded anywhere in the repo; confirmed by a `gitleaks` or `truffleHog` scan with zero high-severity findings (ASVS 2.10.4 / CWE-321)
+- [ ] **Settings** — all secrets read exclusively from environment variables or a secrets vault; `settings/base.py` has no literal credential values; `DEBUG=True` cannot reach production
+- [ ] **Notebook output** — papermill-executed notebooks write no credentials into injected-parameters cells; verified by inspecting a sample output `.ipynb` from S3 (CWE-312)
+- [ ] **Docker Compose / stack files** — no plaintext passwords in `docker-compose.yml`, `docker-compose.staging.yml`, or `docker-stack.yml`; any shown values are placeholders that are overridden at runtime via env files or Docker secrets
+- [ ] **CI/CD** — all secrets in GitHub Actions stored as repository secrets (not hardcoded in workflow YAML); secret values never echoed to logs
+- [ ] **Logs and telemetry** — Django log handlers, Celery task output, and OpenTelemetry spans scrubbed so `AWS_SECRET_ACCESS_KEY`, `DATABASE_URL`, `SECRET_KEY`, and similar values are never emitted (ASVS 8.3.4)
+- [ ] **Database fields** — confirm no sensitive user data (passwords, tokens) stored in plaintext model fields; Django auth uses PBKDF2/Argon2 (ASVS 2.10.3)
+- [ ] **Rotation readiness** — document which secrets exist, where they are used, and the rotation procedure for each; confirm app can recover from a secret rotation without downtime
+
+---
+
+## Epic 12: Observability — OpenTelemetry `[ ]`
 
 ### US-T8: Distributed Tracing & Metrics with OpenTelemetry `[ ]`
 **As a** developer
@@ -410,3 +433,4 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 | Superuser management | Complete |
 | In-app notification centre & preferences | Complete |
 | Feature flags (per-user & environment toggles) | Complete |
+| Secrets management audit | Not started |
