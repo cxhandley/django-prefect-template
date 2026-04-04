@@ -2,6 +2,41 @@
 
 Guidelines and conventions for this project.
 
+## Design Principles
+
+Two lenses to apply before designing any new feature. Full analysis in [`docs/design-review.md`](docs/design-review.md).
+
+### Rich Hickey — Don't complect
+Complecting means tangling together things that are inherently separate. Before adding to a model or function, ask: are these two different things at different points in time, or with different lifecycles? If yes, they belong in separate structures.
+
+Current complections to be aware of (tracked in BL-026–030):
+- `FlowExecution` serves two domain concepts — data pipelines and credit predictions — discriminated by a `flow_name` string. New features should not deepen this; they should work toward the split.
+- `FlowExecution.parameters` holds both prediction inputs (immutable at submission) and results (written on completion) in one schemaless blob. Do not add more keys to this field; work toward `PredictionResult` and `PredictionInput` as typed relations.
+- The scoring algorithm (weights/thresholds) is embedded in notebook code. Do not add more hardcoded values; work toward `ScoringModel`.
+
+### Linus Torvalds — Data structures first
+Get the data structures right and the code becomes obvious. Before writing any view or task logic, define the model fields. Ask: can this be queried with a standard ORM filter? If the answer requires `.parameters.get("key")`, the structure is wrong.
+
+When designing new models:
+- Prefer typed fields over JSONField blobs for anything that will be filtered, aggregated, or displayed
+- State machines belong in `TextChoices` with transition guards — not bare `CharField`
+- Every relation that will be queried should have a corresponding `Index`
+- A string discriminator (`flow_name = "pipeline"`) is a code smell for a missing model
+
+---
+
+## Reference Documents
+
+| Document | Purpose |
+|----------|---------|
+| [`docs/user-stories.md`](docs/user-stories.md) | All features as user stories with acceptance criteria and status |
+| [`docs/backlog.md`](docs/backlog.md) | Prioritised backlog with effort, dependencies, and scope |
+| [`docs/data-model.mmd`](docs/data-model.mmd) | Mermaid ER diagram — keep in sync with models |
+| [`docs/design-system.md`](docs/design-system.md) | Component library, colour tokens, spacing, HTMX conventions, Do/Don't |
+| [`docs/design-review.md`](docs/design-review.md) | Structural analysis — known complections and missing entities |
+
+---
+
 ## Development Workflow
 
 When implementing any new feature, follow this sequence in order. Each step produces an artifact in the `docs/` folder that informs the next.
@@ -123,15 +158,7 @@ Profile: `django`. Key rules to follow:
 
 ## HTMX
 
-The project uses **HTMX 1.9.10** (loaded from CDN in `core/base.html`).
-
-### Known bug — 1.9.10 polling with `outerHTML` swap
-
-HTMX 1.9.10 has a bug where polling via `hx-trigger="every Ns"` combined with `hx-swap="outerHTML"` crashes with:
-
-> `Cannot read properties of null (reading 'htmx-internal-data')`
-
-This happens because after the element is replaced, HTMX's settle phase tries to access the now-removed element. **Workaround**: replace HTMX polling with a plain `setInterval` + `fetch()` loop (see `prediction_running.html`).
+The project uses **HTMX 2.x** (vendored at `backend/static/vendor/htmx.min.js`).
 
 ### Scripts injected via `innerHTML` do not execute
 
@@ -141,22 +168,42 @@ When content is injected via plain JS `element.innerHTML = html`, any `<script>`
 
 **Workaround**: use delegated event listeners registered in `base.html` (which always runs), and communicate intent via `data-*` attributes on the injected elements. See the `[data-compare-modal]` click handler in `base.html` for an example.
 
-### Upgrading to HTMX 2.x
-
-HTMX 2.0 is the current stable release. The 1.9.10 polling bug is fixed in 2.x. Migration impact for this project is **low**:
-
-- `hx-get`, `hx-post`, `hx-target`, `hx-swap`, `hx-trigger`, `hx-boost`, `hx-push-url` — **no changes needed**
-- `htmx.config.selfRequestsOnly` now defaults to `true` — confirm all HTMX requests target the same origin (they do)
-- DELETE requests send params in the URL instead of the request body — check any `hx-delete` usage
-- `hx-on` attribute syntax changed (only if used)
-
-To upgrade, update the CDN script tag in `core/base.html` from `htmx.org@1.9.10` to `htmx.org@2.0.4` (or latest 2.x).
-
 ## Notebooks
 
 Notebooks in `notebooks/steps/` are executed by papermill via doit. They must have `kernelspec` and `language_info` in their metadata — papermill requires this to determine the kernel language. The `nbstripout` hook strips cell outputs but preserves this metadata.
 
 Do not add `--extra-keys metadata.kernelspec metadata.language_info` to the nbstripout hook args.
+
+## Secrets & Credentials
+
+**Never pass credentials as papermill parameters.** Parameters are injected into the output notebook as plaintext and stored in S3.
+
+- AWS credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) are read from the process environment by s3fs and polars automatically via the standard AWS credential chain — no explicit passing in notebooks required
+- All secrets are read from environment variables in `backend/config/settings/base.py` via `env()`
+- `PipelineRunner` passes non-secret parameters via `PIPELINE_PARAMS`; credentials flow through `**os.environ` automatically
+- DuckDB `CREATE SECRET` in `services/datalake.py` currently interpolates credentials via f-string — this is a known limitation, not a pattern to follow elsewhere (tracked in BL-022)
+
+---
+
+## Accessibility
+
+Target: **WCAG 2.1 Level AA** (tracked in BL-025, US-T10).
+
+Rules to apply when writing or modifying templates:
+
+- Use `<button>` for all interactive elements — never `<div role="button">`
+- All icon-only `<button>` elements must have `aria-label`
+- Decorative inline SVGs (alongside visible text) must have `aria-hidden="true"`
+- Containers that receive HTMX-injected content must have `aria-live="polite"`
+- All `<input>` elements must be associated with a `<label>` via `for`/`id`; JS-injected errors must use `aria-describedby`
+- All `<dialog>` modals must have `aria-labelledby` pointing at their title element
+- Table `<th>` elements must have `scope="col"` or `scope="row"`; empty action columns use `<th scope="col" class="sr-only">Actions</th>`
+- Active nav and pagination items must carry `aria-current="page"`
+- Never convey status or meaning by colour alone — always pair with text
+
+See [`docs/design-system.md`](docs/design-system.md) for the full Do/Don't reference.
+
+---
 
 ## Project structure
 
