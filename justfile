@@ -80,8 +80,10 @@ doit-list:
     doit -f dodo.py list
 
 # Manually trigger the full pipeline (pass run_id and input_s3_path)
+# AWS credentials are NOT passed in PIPELINE_PARAMS — notebooks read them from
+# the process environment via the standard AWS credential chain.
 run-pipeline run_id input_s3_path:
-    PIPELINE_PARAMS='{"run_id":"{{run_id}}","input_s3_path":"{{input_s3_path}}","bucket":"${DATA_LAKE_BUCKET}","aws_access_key_id":"${AWS_ACCESS_KEY_ID}","aws_secret_access_key":"${AWS_SECRET_ACCESS_KEY}","aws_s3_region":"${AWS_S3_REGION}","s3_endpoint":"${AWS_S3_ENDPOINT_URL}","notebook_output_dir":"data/notebook_outputs"}' \
+    PIPELINE_PARAMS='{"run_id":"{{run_id}}","input_s3_path":"{{input_s3_path}}","bucket":"${DATA_LAKE_BUCKET}","aws_s3_region":"${AWS_S3_REGION}","s3_endpoint":"${AWS_S3_ENDPOINT_URL}","notebook_output_dir":"data/notebook_outputs"}' \
     NOTEBOOKS_DIR=notebooks \
     NOTEBOOK_OUTPUT_DIR=data/notebook_outputs \
     doit -f dodo.py run pipeline

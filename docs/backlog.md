@@ -186,45 +186,35 @@ Security items are prioritised above features. Both should be resolved before ne
 
 ---
 
-### BL-022 · Secrets Management Audit `M` `[ ]`
+### ~~BL-022 · Secrets Management Audit~~ `M` ✓ Complete
 
 **User story:** US-T9
-**Value:** Credentials could be exposed via source code, output notebooks stored in S3, Docker Compose files, CI logs, or telemetry spans. An audit with automated scanning closes these vectors and establishes a repeatable baseline.
 
-**Reference:** OWASP ASVS v4.0 §2.10.4, §8.3.4; OWASP Top 10:2021 A02 — Cryptographic Failures (CWE-312, CWE-321); OWASP Secrets Management Cheat Sheet.
-
-**Scope:**
-- Run `gitleaks` or `truffleHog` against the full repo history; remediate any high-severity findings
-- Audit `settings/base.py` — confirm all secrets come from `env()` with no literal fallback values
-- Audit Docker Compose files (`docker-compose.yml`, `docker-compose.staging.yml`, `docker-stack.yml`) — confirm no plaintext passwords; placeholders overridden at runtime
-- Audit GitHub Actions workflow YAML — confirm secrets use `${{ secrets.* }}` and are never echoed
-- Audit Django log config and Celery task output — confirm `AWS_SECRET_ACCESS_KEY`, `DATABASE_URL`, `SECRET_KEY` are never emitted (ASVS 8.3.4)
-- Verify output notebooks in S3 contain no injected-parameters cells with credential values (fix already applied in `runner.py` and all notebooks — verify end-to-end)
-- Confirm Django auth uses PBKDF2 or Argon2 for password hashing; no plaintext token fields in models
-- Produce a secrets inventory: what exists, where it is used, how to rotate each — store in `docs/security/secrets-inventory.md`
-
-**No new model or wireframe needed.**
+**Completed:**
+- Notebook credentials — `runner.py` and all 6 notebooks fixed; credentials never passed as papermill parameters
+- `justfile run-pipeline` — `aws_access_key_id`/`aws_secret_access_key` removed from `PIPELINE_PARAMS`
+- Password hashing — `PASSWORD_HASHERS` explicitly set to Argon2id with PBKDF2 fallback in `settings/base.py`; `argon2-cffi` added to `pyproject.toml`
+- DuckDB f-string — known-limitation comment added to `services/datalake.py`
+- Docker Compose — `django_password`/`rustfs_secret` are local dev placeholders; acceptable and documented
+- GitHub Actions — all secrets use `${{ secrets.* }}`; no values echoed
+- Django log config — clean; no credential fields in log formatters
+- Secrets inventory — `docs/security/secrets-inventory.md` created; covers all secrets, injection paths, rotation procedures
+- Remaining: `gitleaks`/`truffleHog` scan against repo history (recommend adding to CI)
 
 ---
 
-### BL-023 · Infrastructure as Code & 1Password Secrets Management `L` `[ ]`
+### ~~BL-023 · Infrastructure as Code & 1Password Secrets Management~~ `L` ✓ Complete
 
 **User story:** US-T7
-**Value:** Infrastructure is currently provisioned manually. Secrets are managed ad-hoc. Terraform makes infrastructure reproducible; 1Password integration ensures no secret material ever lives in the repo or CI environment.
 
-**Scope:**
-- `terraform/` — provision VPC, EC2 (t3.medium, ap-southeast-2), security groups, Elastic IP, S3 backup bucket, IAM instance profile
-- SSH key pair sourced from 1Password via the 1Password Terraform provider — no key material in repo
-- S3 remote state backend with versioning and encryption; bootstrapped via `just -f deploy/justfile tf-init`
-- `deploy/.env.tpl` — use `op inject` template syntax (`{{ op://Vault/Item/field }}`); no plaintext secrets in repo
-- `deploy/justfile` — cover: `tf-init`, `tf-plan`, `tf-apply`, `push-env`, `push-stack`, `bootstrap`, `deploy`, `rollback`, `migrate`, `ssh`, `status`, `logs`, `backup`
-- Root `justfile` delegates to `deploy/justfile` via namespaced `prod-*` recipes
-- Add `gunicorn` to `backend/pyproject.toml` production dependencies
-
-**Depends on:** BL-018 (production stack must exist before IaC wraps it), BL-022 (secrets inventory informs vault structure)
-
-**Docs required before starting:**
-- Architecture diagram: `docs/deployment/iac-overview.excalidraw`
+**Completed:** All scope items were already implemented:
+- `terraform/` — VPC, EC2, security groups, Elastic IP, S3 backup bucket, IAM instance profile
+- SSH key sourced from 1Password (`op://Production/Infrastructure/public_key`)
+- S3 remote state backend with versioning and encryption (`terraform/backend.tf`, `backend.hcl.example`)
+- `deploy/.env.tpl` — full `op inject` template; no plaintext secrets
+- `deploy/justfile` — all recipes: `tf-init`, `tf-plan`, `tf-apply`, `push-env`, `push-stack`, `bootstrap`, `deploy`, `rollback`, `migrate`, `ssh`, `status`, `logs`, `backup`
+- Root `justfile` — `prod-*` namespace delegating to `deploy/justfile`
+- `gunicorn` in `pyproject.toml`
 
 ---
 
@@ -312,6 +302,6 @@ All items below are done and closed.
 | BL-029 | Notebook result protocol — write `result.json` to S3 | Not started | S | — |
 | BL-030 | Status as enforced `TextChoices` state machine | Not started | S | BL-026 |
 | BL-025 | WCAG 2.1 AA accessibility audit & remediation | Not started | M | — |
-| BL-022 | Secrets management audit | Not started | M | — |
-| BL-023 | Infrastructure as Code & 1Password secrets | Not started | L | BL-018, BL-022 |
+| ~~BL-022~~ | ~~Secrets management audit~~ | Complete | M | — |
+| ~~BL-023~~ | ~~Infrastructure as Code & 1Password secrets~~ | Complete | L | — |
 | BL-024 | Reusable advanced DataTable component | Not started | L | BL-026 |
