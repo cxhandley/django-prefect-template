@@ -1,0 +1,152 @@
+# deploy/justfile — Production operations
+#
+# Run from workspace root:
+#   just -f deploy/justfile <recipe>
+#
+# Prerequisites:
+#   - op CLI (1Password): https://developer.1password.com/docs/cli/get-started/
+#   - terraform >= 1.7
+#   - AWS CLI configured (aws configure or AWS_PROFILE env var)
+#   - SSH key added to ssh-agent: ssh-add ~/.ssh/id_ed25519
+
+set shell := ["bash", "-euo", "pipefail", "-c"]
+
+stack := "app"
+deploy_user := "ubuntu"
+
+# Resolve host IP from Terraform state (requires `tf-apply` to have run)
+host := `cd terraform && terraform output -raw host_ip 2>/dev/null || echo "NOT_CONFIGURED"`
+
+default:
+    @just -f deploy/justfile --list
+
+# ── Terraform ────────────────────────────────────────────────────────────────
+
+# Initialise Terraform remote state (run once — copy backend.hcl.example → backend.hcl first)
+tf-init:
+    cd terraform && terraform init -backend-config=backend.hcl
+
+# Preview infrastructure changes
+tf-plan:
+    op run --env-file=deploy/.env.tpl -- bash -c 'cd terraform && terraform plan -var-file=terraform.tfvars'
+
+# Apply infrastructure changes
+tf-apply:
+    op run --env-file=deploy/.env.tpl -- bash -c 'cd terraform && terraform apply -var-file=terraform.tfvars'
+
+# Show Terraform outputs (host IP, bucket name, etc.)
+tf-outputs:
+    @cd terraform && terraform output
+
+# Destroy all infrastructure — requires typing "yes"
+tf-destroy:
+    @echo "WARNING: this will destroy ALL production infrastructure."
+    @echo -n "Type 'yes' to confirm: " && read confirm && [ "$$confirm" = "yes" ] || exit 1
+    op run --env-file=deploy/.env.tpl -- bash -c 'cd terraform && terraform destroy -var-file=terraform.tfvars'
+
+# ── Secrets & Config ──────────────────────────────────────────────────────────
+
+# Inject 1Password secrets into .env.production on the host
+push-env:
+    @echo "Pushing secrets to {{ host }}..."
+    op inject -i deploy/.env.tpl | ssh {{ deploy_user }}@{{ host }} "sudo tee /opt/app/.env.production > /dev/null && sudo chmod 600 /opt/app/.env.production"
+    @echo "Done."
+
+# Copy docker-stack.yml to the host
+push-stack:
+    @echo "Pushing docker-stack.yml to {{ host }}..."
+    scp docker-stack.yml {{ deploy_user }}@{{ host }}:/opt/app/docker-stack.yml
+    @echo "Done."
+
+# ── Bootstrap (first deploy) ─────────────────────────────────────────────────
+
+# Full first-time setup: push config, init Swarm, log in to GHCR, deploy stack
+bootstrap:
+    @echo "Bootstrapping {{ host }}..."
+    just -f deploy/justfile push-stack
+    just -f deploy/justfile push-env
+    ssh {{ deploy_user }}@{{ host }} "docker swarm init --advertise-addr {{ host }} 2>/dev/null || echo 'Swarm already initialised'"
+    @GHCR_TOKEN=$$(op read "op://Production/GHCR/token") && \
+        ssh {{ deploy_user }}@{{ host }} "echo $$GHCR_TOKEN | docker login ghcr.io -u {{ deploy_user }} --password-stdin"
+    ssh {{ deploy_user }}@{{ host }} "cd /opt/app && IMAGE_TAG=latest docker stack deploy -c docker-stack.yml {{ stack }} --with-registry-auth"
+    @echo ""
+    @echo "Bootstrap complete. Run migrations next:"
+    @echo "  just -f deploy/justfile migrate latest"
+
+# ── Deploy ────────────────────────────────────────────────────────────────────
+
+# Deploy a specific image tag (e.g.: just -f deploy/justfile deploy abc1234)
+deploy tag:
+    @echo "Deploying {{ tag }} to {{ host }}..."
+    @REPO=$$(op read "op://Production/App/ghcr_repo") && \
+        ssh {{ deploy_user }}@{{ host }} " \
+            docker service update --image ghcr.io/$$REPO:{{ tag }} --with-registry-auth {{ stack }}_web && \
+            docker service update --image ghcr.io/$$REPO:{{ tag }} --with-registry-auth {{ stack }}_celery-worker && \
+            docker service update --image ghcr.io/$$REPO:{{ tag }} --with-registry-auth {{ stack }}_flower \
+        "
+    @echo "Deploy of {{ tag }} complete."
+
+# Roll back web and worker to their previous image
+rollback:
+    @echo "Rolling back {{ host }}..."
+    ssh {{ deploy_user }}@{{ host }} " \
+        docker service rollback {{ stack }}_web && \
+        docker service rollback {{ stack }}_celery-worker \
+    "
+    @echo "Rollback complete."
+
+# Run Django migrations (pass the image tag, default: latest)
+migrate tag="latest":
+    @echo "Running migrations with image tag {{ tag }}..."
+    @REPO=$$(op read "op://Production/App/ghcr_repo") && \
+        ssh {{ deploy_user }}@{{ host }} " \
+            docker run --rm \
+                --network app-network \
+                --env-file /opt/app/.env.production \
+                -e DJANGO_SETTINGS_MODULE=config.settings.production \
+                ghcr.io/$$REPO:{{ tag }} \
+                python manage.py migrate --noinput \
+        "
+
+# Run collectstatic inside a one-shot container
+collectstatic tag="latest":
+    @REPO=$$(op read "op://Production/App/ghcr_repo") && \
+        ssh {{ deploy_user }}@{{ host }} " \
+            docker run --rm \
+                --network app-network \
+                --env-file /opt/app/.env.production \
+                -e DJANGO_SETTINGS_MODULE=config.settings.production \
+                ghcr.io/$$REPO:{{ tag }} \
+                python manage.py collectstatic --noinput \
+        "
+
+# ── Operations ────────────────────────────────────────────────────────────────
+
+# Open an interactive SSH session on the production host
+ssh:
+    ssh {{ deploy_user }}@{{ host }}
+
+# Show Swarm service status
+status:
+    ssh {{ deploy_user }}@{{ host }} "docker stack services {{ stack }}"
+
+# Tail logs for a service (default: web). e.g.: just -f deploy/justfile logs celery-worker
+logs service="web":
+    ssh {{ deploy_user }}@{{ host }} "docker service logs --tail 100 -f {{ stack }}_{{ service }}"
+
+# Trigger a manual PostgreSQL backup immediately
+backup:
+    @echo "Triggering backup on {{ host }}..."
+    ssh {{ deploy_user }}@{{ host }} "docker service update --force {{ stack }}_pg-backup"
+
+# Open a Django shell inside a one-shot container
+django-shell tag="latest":
+    @REPO=$$(op read "op://Production/App/ghcr_repo") && \
+        ssh -t {{ deploy_user }}@{{ host }} " \
+            docker run --rm -it \
+                --network app-network \
+                --env-file /opt/app/.env.production \
+                -e DJANGO_SETTINGS_MODULE=config.settings.production \
+                ghcr.io/$$REPO:{{ tag }} \
+                python manage.py shell \
+        "

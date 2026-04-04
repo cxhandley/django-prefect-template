@@ -1,0 +1,34 @@
+sequenceDiagram
+    participant Dev as Developer
+    participant GH as GitHub
+    participant GHA as GitHub Actions
+    participant GHCR as GHCR (Container Registry)
+    participant Prod as Production Host (Swarm Manager)
+    participant LB as Traefik (Load Balancer)
+    participant Web as Django web replicas
+    participant Worker as Celery worker replicas
+
+    Dev->>GH: git push to main
+    GH->>GHA: Trigger deploy workflow
+
+    GHA->>GHA: Run tests (pytest)
+    alt Tests fail
+        GHA-->>Dev: Notify failure — deploy aborted
+    end
+
+    GHA->>GHA: docker build (multi-stage: frontend + Django)
+    GHA->>GHCR: docker push ghcr.io/org/app:<sha>
+
+    GHA->>Prod: SSH — docker service update app_web --image <sha>
+    Prod->>Web: Rolling update (one replica at a time)
+    Web->>LB: Health check GET /health/ (200 OK required before traffic)
+    LB-->>Web: Traffic restored once healthy
+
+    GHA->>Prod: SSH — docker service update app_celery-worker --image <sha>
+    Prod->>Worker: Rolling update
+
+    GHA-->>Dev: Notify deploy complete
+
+    note over Prod: Nightly PG backup (cron @ 02:00)
+    Prod->>Prod: docker service update --force app_pg-backup
+    Prod->>Prod: pg_dump | gzip | aws s3 cp → s3://backup-bucket/postgres/<timestamp>.sql.gz

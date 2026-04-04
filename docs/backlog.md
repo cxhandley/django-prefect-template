@@ -317,7 +317,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-019 · Notification Management — In-App Notification Centre & Preferences `M`
+### ~~BL-019 · Notification Management — In-App Notification Centre & Preferences~~ `M` ✓ Complete
 
 **User story:** US-7.2 (extends BL-011)
 **Value:** Email-only notifications (BL-011) miss users who don't monitor their inbox. An in-app notification centre surfaces run completions, failures, and system messages without requiring email, and a preferences page lets users control which channels they want.
@@ -339,7 +339,7 @@ Valuable but not blocking any core workflow.
 
 ---
 
-### BL-020 · Feature Flags — Per-User & Environment Toggle System `M`
+### ~~BL-020 · Feature Flags — Per-User & Environment Toggle System~~ `M` ✓ Complete
 
 **Value:** Before production, there is no mechanism to gradually roll out new features, run A/B tests, or disable functionality per environment without a code deploy. A lightweight feature-flag system removes this risk and enables confident incremental releases.
 
@@ -401,6 +401,6 @@ Valuable but not blocking any core workflow.
 | ~~BL-015~~ | ~~Prediction form UX — disable during run, fix cancel flicker~~ | 4 | S | — |
 | ~~BL-016~~ | ~~Frontend asset pipeline (Tailwind build + compressor)~~ | 5 | M | — |
 | ~~BL-017~~ | ~~Staging environment (EC2 + Traefik SSL)~~ | 5 | L | BL-016 |
-| BL-019 | Notification management (in-app centre + preferences) | 4 | M | BL-011 |
-| BL-020 | Feature flags (per-user & environment toggles) | 5 | M | — |
+| ~~BL-019~~ | ~~Notification management (in-app centre + preferences)~~ | 4 | M | BL-011 |
+| ~~BL-020~~ | ~~Feature flags (per-user & environment toggles)~~ | 5 | M | — |
 | BL-018 | Production environment (Swarm + PG backups) | 5 | XL | BL-017, BL-019, BL-020 |

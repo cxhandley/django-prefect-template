@@ -193,3 +193,56 @@ reset-db:
 
 tree:
     tree -I '__pycache__|*.pyc|staticfiles|__init__.py|.doit.db|.venv'
+
+
+# ============================================================================
+# Production  (delegates to deploy/justfile — requires op CLI, terraform, SSH)
+# ============================================================================
+
+# Initialise Terraform remote state (run once)
+prod-tf-init:
+    just -f deploy/justfile tf-init
+
+# Preview infrastructure changes
+prod-tf-plan:
+    just -f deploy/justfile tf-plan
+
+# Apply infrastructure changes
+prod-tf-apply:
+    just -f deploy/justfile tf-apply
+
+# Show Terraform outputs (host IP, bucket, etc.)
+prod-tf-outputs:
+    just -f deploy/justfile tf-outputs
+
+# First-time bootstrap: push config, init Swarm, deploy stack
+prod-bootstrap:
+    just -f deploy/justfile bootstrap
+
+# Deploy a specific image tag to production
+prod-deploy tag:
+    just -f deploy/justfile deploy {{tag}}
+
+# Roll back web + worker to previous image
+prod-rollback:
+    just -f deploy/justfile rollback
+
+# Run Django migrations
+prod-migrate tag="latest":
+    just -f deploy/justfile migrate {{tag}}
+
+# Open SSH session on production host
+prod-ssh:
+    just -f deploy/justfile ssh
+
+# Show Swarm service status
+prod-status:
+    just -f deploy/justfile status
+
+# Tail logs for a service (default: web)
+prod-logs service="web":
+    just -f deploy/justfile logs {{service}}
+
+# Trigger a manual PostgreSQL backup
+prod-backup:
+    just -f deploy/justfile backup

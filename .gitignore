@@ -95,3 +95,16 @@ dmypy.json
 .doit.db*
 
 data/notebook_outputs/
+
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+terraform/backend.hcl
+terraform/terraform.tfvars
+terraform/*.tfplan
+
+# Production env (resolved secrets — never commit)
+.env.production
+deploy/.env.production

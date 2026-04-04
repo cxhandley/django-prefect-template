@@ -1,191 +1,238 @@
 # Production Environment
 
-Production runs Docker Compose on a dedicated host by default, with an optional upgrade path to Docker Swarm for multi-node horizontal scaling. PostgreSQL backups are automated to S3.
+Production runs Docker Swarm on a single EC2 instance (upgradeable to multi-node). Infrastructure is provisioned with Terraform; secrets are managed by 1Password; deploys are triggered via `just`.
 
 ## Architecture
 
 ```
-Internet → Load Balancer / Traefik → Django web (1–N replicas)
-                                   → Celery worker (1–N replicas)
-                                   → Flower (internal / admin access only)
-           PostgreSQL (managed RDS or container with WAL-G backup)
-           Redis (managed ElastiCache or container)
-           S3 / RustFS (data lake storage)
+Internet → Traefik (80/443, Let's Encrypt) → Django web (2 replicas, gunicorn)
+                                           → Celery worker (2 replicas)
+                                           → Flower (SSH tunnel only)
+           PostgreSQL (container, nightly pg_dump → S3)
+           Redis (container)
+           S3 / RustFS (data lake) — or AWS S3 directly
 ```
 
-## Option A — Docker Compose (single host, simpler)
+All services run in a Docker Swarm overlay network on a single `t3.medium` EC2 instance in `ap-southeast-2` (Sydney). The Elastic IP is stable across instance restarts.
 
-Same structure as staging (see [staging.md](staging.md)) with production settings and a stronger instance (`t3.large` or `m6i.xlarge`). Scale by increasing replica counts:
+---
 
-```yaml
-services:
-  web:
-    deploy:
-      replicas: 2
-  celery-worker:
-    deploy:
-      replicas: 2
-```
+## Prerequisites
 
-> **Note:** `deploy.replicas` is ignored by plain `docker compose up`. Use `docker compose up --scale web=2` or migrate to Swarm.
+| Tool | Purpose | Install |
+|------|---------|---------|
+| `terraform >= 1.7` | Provision AWS infra | [terraform.io](https://developer.hashicorp.com/terraform/install) |
+| `op` CLI | 1Password secrets | [1password.com/downloads/command-line](https://developer.1password.com/docs/cli/get-started/) |
+| `aws` CLI | Authenticate to AWS | [aws.amazon.com/cli](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html) |
+| `just` | Task runner | `brew install just` |
+| SSH key | EC2 access | See [1Password SSH setup](#1password-ssh-key-setup) |
 
-## Option B — Docker Swarm (multi-node, optional)
+---
 
-Docker Swarm provides built-in service scheduling, rolling updates, and health-check restarts across multiple EC2 nodes without the complexity of Kubernetes.
+## 1Password Setup
 
-### Swarm initialisation
+### Service account (for Terraform)
+
+1. Go to **1Password.com → Developer Tools → Service Accounts**
+2. Create a service account with read access to the **Production** vault
+3. Store the token in 1Password: `op://Private/Terraform SA/token`
+4. Export before running Terraform commands:
+   ```bash
+   export OP_SERVICE_ACCOUNT_TOKEN=$(op read "op://Private/Terraform SA/token")
+   ```
+
+### SSH key setup
+
+1. Generate an ED25519 key pair:
+   ```bash
+   ssh-keygen -t ed25519 -C "production-deploy" -f ~/.ssh/id_ed25519_prod
+   ```
+2. In 1Password, create an item **Infrastructure** in the **Production** vault
+3. Add a field `public_key` with the contents of `~/.ssh/id_ed25519_prod.pub`
+4. Terraform reads this field to create the EC2 key pair — no key material in the repo
+
+### Production vault items
+
+Create these items in the **Production** 1Password vault before running `push-env`:
+
+**Item: App**
+| Field | Value |
+|-------|-------|
+| `django_secret_key` | 50-char random string |
+| `db_password` | strong random password |
+| `data_lake_bucket` | S3 bucket name for pipeline data |
+| `backup_bucket` | copy from `just prod-tf-outputs` after apply |
+| `production_host` | copy from `just prod-tf-outputs` after apply |
+| `ghcr_repo` | `my-org/my-repo` |
+| `email_host` | SMTP host (e.g. `email-smtp.ap-southeast-2.amazonaws.com`) |
+| `email_user` | SMTP username |
+| `email_password` | SMTP password |
+| `from_email` | `noreply@yourdomain.com` |
+
+**Item: AWS**
+| Field | Value |
+|-------|-------|
+| `access_key_id` | IAM access key for S3 data lake access |
+| `secret_access_key` | IAM secret key |
+
+**Item: GHCR**
+| Field | Value |
+|-------|-------|
+| `token` | GitHub personal access token with `read:packages` scope |
+
+---
+
+## First-time provisioning
+
+### 1. Bootstrap Terraform remote state
+
+Create the S3 bucket for Terraform state manually (chicken-and-egg: Terraform can't manage its own state bucket):
 
 ```bash
-# On the manager node
-docker swarm init --advertise-addr <manager-private-ip>
-
-# On each worker node (token shown by init command)
-docker swarm join --token <token> <manager-private-ip>:2377
+aws s3 mb s3://my-org-tfstate --region ap-southeast-2
+aws s3api put-bucket-versioning \
+    --bucket my-org-tfstate \
+    --versioning-configuration Status=Enabled
+aws s3api put-bucket-encryption \
+    --bucket my-org-tfstate \
+    --server-side-encryption-configuration \
+    '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
 ```
 
-### Stack deployment
-
-Convert `docker-compose.yml` to a Swarm stack file (`docker-stack.yml`) — the main difference is using `deploy:` keys and Swarm secrets instead of `env_file`:
+### 2. Configure Terraform
 
 ```bash
-docker stack deploy -c docker-stack.yml app
-docker stack services app        # view running services
-docker service scale app_web=3   # scale web tier
-docker stack rm app              # teardown
+cp terraform/backend.hcl.example terraform/backend.hcl    # fill in bucket name
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars  # fill in your IP
 ```
 
-### Secrets management (Swarm)
+Edit `terraform/terraform.tfvars`:
+```hcl
+ssh_allowed_cidr = "your.ip.address/32"   # find with: curl -s ifconfig.me
+```
+
+### 3. Initialise and apply
 
 ```bash
-echo "supersecretvalue" | docker secret create django_secret_key -
+export OP_SERVICE_ACCOUNT_TOKEN=$(op read "op://Private/Terraform SA/token")
+
+just prod-tf-init
+just prod-tf-plan    # review — no charges until apply
+just prod-tf-apply
 ```
 
-Reference in `docker-stack.yml`:
-```yaml
-secrets:
-  django_secret_key:
-    external: true
+This creates: VPC, public subnet, security groups, EC2 (Ubuntu 24.04, Docker pre-installed), Elastic IP, S3 backup bucket, IAM instance profile.
 
-services:
-  web:
-    secrets:
-      - django_secret_key
-    environment:
-      SECRET_KEY_FILE: /run/secrets/django_secret_key
-```
-
-## Django Settings — Production
-
-Create `backend/config/settings/production.py`:
-```python
-from .base import *
-
-DEBUG = False
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
-
-MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-# Security
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-SECURE_HSTS_SECONDS = 31536000
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
-# Logging — structured JSON to stdout for CloudWatch / Datadog
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {"json": {"()": "pythonjsonlogger.jsonlogger.JsonFormatter"}},
-    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
-    "root": {"handlers": ["console"], "level": "INFO"},
-}
-```
-
-## PostgreSQL Backups
-
-### Option 1 — Scheduled `pg_dump` to S3 (simple)
-
-Add a `pg-backup` service to the Compose/Swarm stack:
-
-```yaml
-services:
-  pg-backup:
-    image: postgres:16-alpine
-    environment:
-      PGPASSWORD: ${DB_PASSWORD}
-    entrypoint: >
-      sh -c "
-        pg_dump -h db -U app app | gzip |
-        aws s3 cp - s3://${BACKUP_BUCKET}/postgres/$(date +%Y-%m-%dT%H:%M:%S).sql.gz
-      "
-    deploy:
-      restart_policy:
-        condition: none
-      # Run via external scheduler (e.g. cron on the manager node, or AWS EventBridge)
-```
-
-Trigger daily via cron on the manager node:
-```cron
-0 2 * * * docker service update --force app_pg-backup
-```
-
-Retention: set an S3 lifecycle rule to expire backups older than 30 days.
-
-### Option 2 — WAL-G continuous archiving (robust)
-
-WAL-G streams WAL segments to S3 continuously, enabling point-in-time recovery (PITR). Recommended if data loss tolerance is < 1 hour.
+### 4. Update 1Password with Terraform outputs
 
 ```bash
-# Configure in postgresql.conf (via custom postgres image)
-archive_mode = on
-archive_command = 'wal-g wal-push %p'
-restore_command = 'wal-g wal-fetch %f %p'
+just prod-tf-outputs
+# Copy `host_ip` → op://Production/App/production_host
+# Copy `backup_bucket` → op://Production/App/backup_bucket
 ```
 
-See [WAL-G docs](https://github.com/wal-g/wal-g) for full setup.
-
-### Backup restore test
-
-Always test restores on staging before relying on production backups:
+### 5. Bootstrap the application
 
 ```bash
-# Restore latest pg_dump backup
-aws s3 cp s3://${BACKUP_BUCKET}/postgres/latest.sql.gz - | gunzip | psql -h localhost -U app app
+just prod-bootstrap
+# Pushes docker-stack.yml and .env.production (via op inject), initialises
+# Docker Swarm, logs in to GHCR, and deploys the stack.
+
+just prod-migrate latest   # run database migrations
 ```
 
-## CI/CD Pipeline (GitHub Actions sketch)
+---
 
-```yaml
-jobs:
-  deploy:
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build and push image
-        run: |
-          docker build -t ghcr.io/org/app:${{ github.sha }} .
-          docker push ghcr.io/org/app:${{ github.sha }}
-      - name: Deploy to production
-        run: |
-          ssh deploy@prod "docker service update --image ghcr.io/org/app:${{ github.sha }} app_web"
-          ssh deploy@prod "docker service update --image ghcr.io/org/app:${{ github.sha }} app_celery-worker"
+## Routine deploys
+
+After the GitHub Actions workflow pushes an image to GHCR:
+
+```bash
+just prod-deploy <sha>    # e.g. just prod-deploy abc1234
+just prod-migrate <sha>   # if migrations are included in this release
 ```
 
-## Health checks
+Or let GitHub Actions handle it automatically on push to `main` (see `.github/workflows/deploy.yml`).
 
-Add to `docker-compose.yml` / `docker-stack.yml`:
+---
 
-```yaml
-services:
-  web:
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+## Rollback
+
+```bash
+just prod-rollback         # reverts web + celery-worker to previous image
 ```
 
-Add a `GET /health/` view in `core/views.py` returning `{"status": "ok"}`.
+Docker Swarm retains the previous image on each node until a new deploy succeeds, so rollbacks are instant.
+
+---
+
+## Operations reference
+
+```bash
+just prod-status           # show all Swarm services and replica counts
+just prod-logs             # tail web logs (default)
+just prod-logs celery-worker
+just prod-ssh              # interactive SSH session
+just prod-backup           # trigger immediate PostgreSQL backup
+```
+
+---
+
+## PostgreSQL backups
+
+Backups run nightly at 02:00 AEST via cron on the manager node (configured in Terraform user_data):
+
+```
+0 2 * * * ubuntu docker service update --force app_pg-backup
+```
+
+The `pg-backup` service in `docker-stack.yml` runs `pg_dump | gzip | aws s3 cp` using the EC2 instance's IAM role — no AWS credentials needed in the environment.
+
+Backups are retained for 30 days (configurable via `backup_retention_days` Terraform variable). An S3 lifecycle rule expires objects automatically.
+
+### Restore procedure
+
+```bash
+# List available backups
+aws s3 ls s3://$(just prod-tf-outputs | grep backup_bucket | awk '{print $3}')/postgres/
+
+# Restore a specific backup (run on the production host or locally with VPN)
+just prod-ssh
+aws s3 cp s3://<backup-bucket>/postgres/<timestamp>.sql.gz - | \
+    gunzip | \
+    docker exec -i $(docker ps -qf name=app_db) \
+        psql -U app app
+```
+
+Always test restores on staging before relying on production backups.
+
+---
+
+## Scaling
+
+To scale services without migrating to multi-node Swarm:
+
+```bash
+just prod-ssh
+docker service scale app_web=3 app_celery-worker=3
+```
+
+For multi-node Swarm, run on the manager:
+```bash
+docker swarm join-token worker   # copy the join command
+# On each worker node:
+docker swarm join --token <token> <manager-ip>:2377
+```
+
+Then update `docker-stack.yml` placement constraints as needed.
+
+---
+
+## Secrets management summary
+
+| Where | How |
+|-------|-----|
+| Terraform runs | `OP_SERVICE_ACCOUNT_TOKEN` env var + 1Password provider reads SSH public key |
+| `.env.production` on host | `op inject -i deploy/.env.tpl` — resolved at push time, never stored in repo |
+| GitHub Actions | `secrets.GITHUB_TOKEN` (auto), `secrets.PROD_SSH_KEY`, `secrets.PROD_HOST`, `secrets.PROD_USER` |
+| EC2 → S3 backup | IAM instance profile — no credentials in environment |

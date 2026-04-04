@@ -287,51 +287,85 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
-## Epic 8: Notification Management (BL-019)
+## Epic 8: Notification Management (BL-019) `[x]`
 
-### US-8.1: In-App Notification Centre `[ ]`
+### US-8.1: In-App Notification Centre `[x]`
 **As a** user
 **I want to** see in-app notifications when my executions complete or fail
 **So that** I know the outcome without checking email or the history page
 
 **Acceptance Criteria:**
-- [ ] A bell icon in the navbar shows a badge with the count of unread notifications
-- [ ] Clicking the bell opens a dropdown showing up to 5 recent notifications
-- [ ] Each notification links to the related execution detail page
-- [ ] A "View all" link navigates to a full notification list page at `/accounts/notifications/`
-- [ ] The full list page shows all notifications, newest first, with a "Mark all as read" action
-- [ ] Individual notifications can be marked as read by clicking them
-- [ ] The unread badge disappears when all notifications are read
+- [x] A bell icon in the navbar shows a badge with the count of unread notifications
+- [x] Clicking the bell opens a dropdown showing up to 5 recent notifications
+- [x] Each notification links to the related execution detail page
+- [x] A "View all" link navigates to a full notification list page at `/accounts/notifications/`
+- [x] The full list page shows all notifications, newest first, with a "Mark all as read" action
+- [x] Individual notifications can be marked as read by clicking them
+- [x] The unread badge disappears when all notifications are read
 
-### US-8.2: Notification Preferences `[ ]`
+### US-8.2: Notification Preferences `[x]`
 **As a** user
 **I want to** control how I am notified about execution outcomes
 **So that** I only receive the notifications I care about through the channels I prefer
 
 **Acceptance Criteria:**
-- [ ] Settings page shows four toggles: "Notify on failure", "Notify on success", "In-app notifications", "Email notifications"
-- [ ] Each toggle persists independently; changes take effect on next execution
-- [ ] When "In-app notifications" is off, no Notification records are created
-- [ ] When "Email notifications" is off, no emails are sent
-- [ ] Notification on success is opt-in (default off); notification on failure is opt-in (default on)
+- [x] Settings page shows four toggles: "Notify on failure", "Notify on success", "In-app notifications", "Email notifications"
+- [x] Each toggle persists independently; changes take effect on next execution
+- [x] When "In-app notifications" is off, no Notification records are created
+- [x] When "Email notifications" is off, no emails are sent
+- [x] Notification on success is opt-in (default off); notification on failure is opt-in (default on)
 
 ---
 
-## Epic 9: Feature Flags (BL-020)
+## Epic 9: Feature Flags (BL-020) `[x]`
 
-### US-9.1: Feature Flag Administration `[ ]`
+### US-9.1: Feature Flag Administration `[x]`
 **As an** admin
 **I want to** toggle features on or off per user or by percentage rollout
 **So that** I can safely release new features incrementally without a code deploy
 
 **Acceptance Criteria:**
-- [ ] Flags are managed entirely through Django Admin (`/admin/`)
-- [ ] Each flag has: name (slug), description, global enabled toggle, rollout percentage (0–100), and an optional explicit user list
-- [ ] Flag resolution order: explicit user list → rollout percentage → global toggle
-- [ ] Rollout percentage uses deterministic hashing so a given user always gets the same result
-- [ ] A `{% flag "name" %}...{% endflag %}` template tag conditionally renders content
-- [ ] A `@require_flag("name")` view decorator returns 404 when the flag is off for that user
-- [ ] Flag lookups are cached (Redis, 5-minute TTL) with cache invalidation on admin save
+- [x] Flags are managed entirely through Django Admin (`/admin/`)
+- [x] Each flag has: name (slug), description, global enabled toggle, rollout percentage (0–100), and an optional explicit user list
+- [x] Flag resolution order: explicit user list → rollout percentage → global toggle
+- [x] Rollout percentage uses deterministic hashing so a given user always gets the same result
+- [x] A `{% flag "name" %}...{% endflag %}` template tag conditionally renders content
+- [x] A `@require_flag("name")` view decorator returns 404 when the flag is off for that user
+- [x] Flag lookups are cached (Redis, 5-minute TTL) with cache invalidation on admin save
+
+---
+
+---
+
+## Epic 10: Production Environment (BL-018) `[ ]`
+
+### US-T6: Production Deployment `[~]`
+**As a** developer
+**I want** a production-ready Docker Swarm deployment with automated database backups and a CI/CD pipeline
+**So that** the application can be safely deployed, scaled, and recovered from failure in production
+
+**Acceptance Criteria:**
+- [x] `backend/config/settings/production.py` has full security headers, WhiteNoise static serving, HSTS, and structured logging to stdout
+- [x] `docker-stack.yml` is Swarm-compatible with `deploy:` keys (replicas, restart policy, health checks) for web, celery-worker, and flower services
+- [x] A `pg-backup` service runs scheduled `pg_dump` exports to S3 (triggered via cron on the manager node)
+- [x] `GET /health/` endpoint in `core/views.py` returns `{"status": "ok"}` and is used by load balancer health checks
+- [x] GitHub Actions workflow builds the Docker image, pushes to GHCR, and rolls out to production via `docker service update`
+- [ ] Swarm init and node join procedure documented in `docs/deployment/production.md`
+- [ ] Backup restore procedure documented and tested against staging
+
+### US-T7: Infrastructure as Code & Secrets Management `[ ]`
+**As a** developer
+**I want** Terraform to provision production AWS infrastructure and 1Password to manage all secrets
+**So that** infrastructure is reproducible, secrets are never stored in files or CI, and deploys are CI-agnostic
+
+**Acceptance Criteria:**
+- [ ] `terraform/` provisions VPC, EC2 (t3.medium, ap-southeast-2), security groups, Elastic IP, S3 backup bucket, and IAM instance profile
+- [ ] SSH key pair sourced from 1Password via the 1Password Terraform provider — no key material in the repo
+- [ ] S3 remote state backend with versioning and encryption; bootstrapped via `just -f deploy/justfile tf-init`
+- [ ] `deploy/.env.tpl` uses `op inject` template syntax (`{{ op://Vault/Item/field }}`) — no plaintext secrets in the repo
+- [ ] `deploy/justfile` covers: `tf-init`, `tf-plan`, `tf-apply`, `push-env`, `push-stack`, `bootstrap`, `deploy`, `rollback`, `migrate`, `ssh`, `status`, `logs`, `backup`
+- [ ] Root `justfile` delegates to `deploy/justfile` via namespaced `prod-*` recipes
+- [ ] `gunicorn` added to `backend/pyproject.toml` production dependencies
 
 ---
 
@@ -351,3 +385,5 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 | Email notifications for failures | Complete |
 | Retry failed execution | Complete |
 | Superuser management | Complete |
+| In-app notification centre & preferences | Complete |
+| Feature flags (per-user & environment toggles) | Complete |

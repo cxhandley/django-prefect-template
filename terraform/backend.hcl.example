@@ -1,0 +1,17 @@
+# Copy this file to backend.hcl and fill in your values.
+# backend.hcl is gitignored — never commit it.
+#
+# Bootstrap (one-time):
+#   aws s3 mb s3://<your-tfstate-bucket> --region ap-southeast-2
+#   aws s3api put-bucket-versioning \
+#       --bucket <your-tfstate-bucket> \
+#       --versioning-configuration Status=Enabled
+#   aws s3api put-bucket-encryption \
+#       --bucket <your-tfstate-bucket> \
+#       --server-side-encryption-configuration \
+#       '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+
+bucket  = "my-org-tfstate"
+key     = "app/production/terraform.tfstate"
+region  = "ap-southeast-2"
+encrypt = true

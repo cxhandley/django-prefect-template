@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
@@ -20,6 +21,12 @@ def base_layout(request):
         "user": request.user,
     }
     return render(request, "core/base.html", context)
+
+
+@require_http_methods(["GET"])
+def health(request):
+    """Load balancer health check — no authentication required."""
+    return JsonResponse({"status": "ok"})
 
 
 @login_required

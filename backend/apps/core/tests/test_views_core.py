@@ -61,3 +61,15 @@ def test_base_layout_requires_auth(client):
 def test_navbar_requires_auth(client):
     response = client.get("/navbar/")
     assert response.status_code == 302
+
+
+def test_health_anonymous(client):
+    """Health endpoint must be publicly accessible (no auth, no DB)."""
+    response = client.get("/health/")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_health_post_not_allowed(client):
+    response = client.post("/health/")
+    assert response.status_code == 405
