@@ -16,7 +16,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -94,6 +94,81 @@ HISTORY_BULK_ACTIONS = [
     },
 ]
 
+# ── DataTable configuration for the admin executions view ────────────────────
+
+ADMIN_EXEC_COLUMNS = [
+    {
+        "key": "created_at",
+        "label": "Started",
+        "sortable": True,
+        "sort_field": "created_at",
+        "filterable": True,
+        "filter_type": "datetime",
+        "filter_choices": [],
+        "visible": True,
+        "hideable": False,
+    },
+    {
+        "key": "user",
+        "label": "User",
+        "sortable": True,
+        "sort_field": "triggered_by__email",
+        "filterable": True,
+        "filter_type": "text",
+        "filter_choices": [],
+        "visible": True,
+        "hideable": True,
+    },
+    {
+        "key": "flow_name",
+        "label": "Flow",
+        "sortable": True,
+        "sort_field": "flow_name",
+        "filterable": True,
+        "filter_type": "text",
+        "filter_choices": [],
+        "visible": True,
+        "hideable": True,
+    },
+    {
+        "key": "status",
+        "label": "Status",
+        "sortable": True,
+        "sort_field": "status",
+        "filterable": True,
+        "filter_type": "choice",
+        "filter_choices": ["COMPLETED", "RUNNING", "FAILED", "PENDING"],
+        "visible": True,
+        "hideable": True,
+    },
+    {
+        "key": "duration",
+        "label": "Duration",
+        "sortable": False,
+        "filterable": False,
+        "visible": True,
+        "hideable": True,
+    },
+    {
+        "key": "error_message",
+        "label": "Error",
+        "sortable": False,
+        "filterable": True,
+        "filter_type": "text",
+        "filter_choices": [],
+        "visible": True,
+        "hideable": True,
+    },
+]
+
+ADMIN_EXEC_FILTER_FIELDS = {
+    "created_at": {"type": "datetime", "orm_field": "created_at"},
+    "user": {"type": "text", "orm_field": "triggered_by__email"},
+    "flow_name": {"type": "text", "orm_field": "flow_name"},
+    "status": {"type": "choice", "orm_field": "status"},
+    "error_message": {"type": "text", "orm_field": "error_message"},
+}
+
 # ── Comparison constants ───────────────────────────────────────────────────────
 
 PREDICTION_INPUT_KEYS = ["income", "age", "credit_score", "employment_years"]
@@ -164,6 +239,12 @@ def history(request):
     paginator = Paginator(qs, 10)
     page_obj = paginator.get_page(request.GET.get("page", 1))
 
+    # Determine if any running/pending executions exist in the filtered set
+    # (not just on the current page) so the table poller registers correctly.
+    has_running_rows = qs.filter(
+        status__in=[ExecutionStatus.RUNNING, ExecutionStatus.PENDING]
+    ).exists()
+
     table_config = {
         "table_id": "history",
         "hx_url": reverse("flows:history"),
@@ -178,6 +259,7 @@ def history(request):
         "user": request.user,
         "active_page": "history",
         "page_obj": page_obj,
+        "has_running_rows": has_running_rows,
         "table_config": table_config,
         "table_config_json": build_table_config_json(table_config),
         "page_row_ids_json": json.dumps([str(ex.flow_run_id) for ex in page_obj]),
@@ -887,42 +969,38 @@ def delete_preset(request, preset_id):
 @staff_member_required(login_url="/accounts/login/")
 @require_http_methods(["GET"])
 def admin_executions(request):
-    """Staff-only execution log viewer with filters across all users."""
-    qs = FlowExecution.objects.select_related("triggered_by").order_by("-created_at")
+    """Staff-only execution log viewer with DataTable: filters across all users."""
+    qs = FlowExecution.objects.select_related("triggered_by")
+    qs, sort = get_filtered_queryset(
+        request, qs, ADMIN_EXEC_FILTER_FIELDS, ADMIN_EXEC_COLUMNS, default_sort="-created_at"
+    )
 
-    user_q = request.GET.get("user", "").strip()
-    status_q = request.GET.get("status", "").strip()
-    date_from = request.GET.get("date_from", "").strip()
-    date_to = request.GET.get("date_to", "").strip()
-
-    if user_q:
-        qs = qs.filter(
-            Q(triggered_by__email__icontains=user_q) | Q(triggered_by__username__icontains=user_q)
-        )
-    if status_q:
-        qs = qs.filter(status=status_q)
-    if date_from:
-        try:
-            qs = qs.filter(created_at__date__gte=datetime.date.fromisoformat(date_from))
-        except ValueError:
-            pass
-    if date_to:
-        try:
-            qs = qs.filter(created_at__date__lte=datetime.date.fromisoformat(date_to))
-        except ValueError:
-            pass
+    has_running_rows = qs.filter(
+        status__in=[ExecutionStatus.RUNNING, ExecutionStatus.PENDING]
+    ).exists()
 
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get("page", 1))
 
+    table_config = {
+        "table_id": "admin-exec",
+        "hx_url": reverse("flows:admin_executions"),
+        "hx_target": "#dt-admin-exec-body",
+        "columns": ADMIN_EXEC_COLUMNS,
+        "bulk_actions": [],
+        "active_filters": build_active_filters(request),
+        "sort_field": sort,
+    }
+
     context = {
         "active_page": "admin_dashboard",
         "page_obj": page_obj,
-        "user_q": user_q,
-        "status_q": status_q,
-        "date_from": date_from,
-        "date_to": date_to,
-        "status_choices": [s.value for s in ExecutionStatus],
+        "has_running_rows": has_running_rows,
+        "table_config": table_config,
+        "table_config_json": build_table_config_json(table_config),
+        "page_row_ids_json": json.dumps([str(ex.flow_run_id) for ex in page_obj]),
+        "filter_query_string": build_filter_query_string(request),
+        "table_body_template": "flows/partials/admin_executions_table_body.html",
         "breadcrumbs": [
             {"name": "Admin Dashboard", "url": "/flows/admin/dashboard/"},
             {"name": "Execution Logs"},
@@ -930,7 +1008,7 @@ def admin_executions(request):
     }
 
     if request.headers.get("HX-Request"):
-        return render(request, "flows/partials/admin_executions_table.html", context)
+        return render(request, "flows/partials/admin_executions_table_body.html", context)
     return render(request, "flows/admin_executions.html", context)
 
 

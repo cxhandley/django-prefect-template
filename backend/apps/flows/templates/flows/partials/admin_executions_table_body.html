@@ -1,19 +1,14 @@
 {% comment %}
-  HTMX partial: history table tbody + tfoot.
-  Swapped into #dt-history-body on filter / sort / page changes.
-  data-row-ids is read by Alpine's pageRowIds getter for select-all logic.
-
-  data-poller-register is present only when there are RUNNING/PENDING rows
-  in the filtered set — the global poller picks it up and triggers table
-  refreshes until all executions complete.
+  HTMX partial: admin executions table tbody + tfoot.
+  Swapped into #dt-admin-exec-body on filter / sort / page changes.
+  data-poller-register is present when any RUNNING/PENDING executions exist.
 {% endcomment %}
-<tbody id="dt-history-body"
+<tbody id="dt-admin-exec-body"
        data-row-ids="{{ page_row_ids_json|safe }}"
-       {% if has_running_rows %}data-poller-register data-poller-id="dt-history" data-poller-type="table_refresh" data-poller-target="#dt-history-body" data-poller-params='{"table_url": "{{ request.get_full_path|escapejs }}", "scope": "user"}'{% endif %}>
+       {% if has_running_rows %}data-poller-register data-poller-id="dt-admin-exec" data-poller-type="table_refresh" data-poller-target="#dt-admin-exec-body" data-poller-params='{"table_url": "{{ request.get_full_path|escapejs }}", "scope": "all"}'{% endif %}>
     {% for execution in page_obj %}
-        <tr class="hover"
-            :class="isSelected('{{ execution.flow_run_id }}') ? 'bg-primary/5' : ''">
-            <!-- Checkbox -->
+        <tr class="hover">
+            <!-- Checkbox (no bulk actions for admin exec; placeholder for consistency) -->
             <td class="w-10">
                 <input type="checkbox"
                        class="checkbox checkbox-sm"
@@ -22,47 +17,41 @@
                        @change="toggleRow('{{ execution.flow_run_id }}')"
                        aria-label="Select row" />
             </td>
-            <!-- Date / Time (not hideable) -->
-            <td class="text-sm whitespace-nowrap">{{ execution.created_at|date:"M d, Y H:i" }}</td>
-            <!-- Input Summary (hideable) -->
-            <td x-show="isVisible('input_summary')"
-                class="text-sm text-base-content/70">
-                {% if execution.flow_name == "credit-prediction" and execution.income %}
-                    Income: {{ execution.income|floatformat:0 }},
-                    Age: {{ execution.age|default:"-" }},
-                    Credit: {{ execution.credit_score|default:"-" }},
-                    Emp: {{ execution.employment_years|default:"-" }} yrs
-                {% else %}
-                    {{ execution.flow_name }}
-                {% endif %}
+            <!-- Started -->
+            <td class="text-sm whitespace-nowrap">{{ execution.created_at|date:"Y-m-d H:i" }}</td>
+            <!-- User (hideable) -->
+            <td x-show="isVisible('user')" class="text-sm">
+                <div class="font-medium">{{ execution.triggered_by.email }}</div>
+                <div class="text-xs text-base-content/50">{{ execution.triggered_by.username }}</div>
             </td>
-            <!-- Prediction / Classification (hideable) -->
-            <td x-show="isVisible('classification')" class="text-sm">
-                {% with cls=execution.prediction_result.classification %}
-                    {% if cls == "Approved" %}
-                        <span class="badge badge-success badge-sm">{{ cls }}</span>
-                    {% elif cls == "Review" %}
-                        <span class="badge badge-warning badge-sm">{{ cls }}</span>
-                    {% elif cls == "Declined" %}
-                        <span class="badge badge-error badge-sm">{{ cls }}</span>
-                    {% else %}
-                        <span class="text-base-content/30">—</span>
-                    {% endif %}
-                {% endwith %}
-            </td>
+            <!-- Flow (hideable) -->
+            <td x-show="isVisible('flow_name')" class="font-mono text-sm">{{ execution.flow_name }}</td>
             <!-- Status (hideable) -->
             <td x-show="isVisible('status')">
                 {% include "core/components/ui/badge.html" with status=execution.status size="badge-sm" %}
             </td>
+            <!-- Duration (hideable) -->
+            <td x-show="isVisible('duration')" class="text-sm text-base-content/70">
+                {% if execution.completed_at and execution.created_at %}
+                    {{ execution.completed_at|timeuntil:execution.created_at }}
+                {% else %}
+                    —
+                {% endif %}
+            </td>
+            <!-- Error (hideable) -->
+            <td x-show="isVisible('error_message')"
+                class="text-sm text-error max-w-xs truncate">
+                {{ execution.error_message|default:"—"|truncatechars:60 }}
+            </td>
             <!-- Actions -->
             <td class="w-16">
-                <a href="{% url 'flows:execution_detail' execution.flow_run_id %}"
+                <a href="{% url 'flows:admin_execution_detail' execution.flow_run_id %}"
                    class="btn btn-ghost btn-xs">View</a>
             </td>
         </tr>
     {% empty %}
         <tr>
-            <td colspan="6">
+            <td colspan="8">
                 {% include "core/components/ui/empty_state.html" with title="No executions found" message="Try adjusting your filters." %}
             </td>
         </tr>
@@ -70,7 +59,7 @@
 </tbody>
 <tfoot>
     <tr>
-        <td colspan="6">
+        <td colspan="7">
             {% if page_obj.has_other_pages %}
                 <div class="join flex justify-center py-3">
                     {% if page_obj.has_previous %}

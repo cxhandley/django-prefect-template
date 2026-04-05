@@ -9,4 +9,5 @@ urlpatterns = [
     path("health/", views.health, name="health"),
     path("base/", views.base_layout, name="base"),
     path("navbar/", views.navbar, name="navbar"),
+    path("poll/", views.poll, name="poll"),
 ]

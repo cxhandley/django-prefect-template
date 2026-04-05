@@ -15,6 +15,7 @@ urlpatterns = [
     path(
         "api/notifications/dropdown/", views.notifications_dropdown, name="notifications_dropdown"
     ),
+    path("api/notifications/badge/", views.notification_badge, name="notification_badge"),
     # Notifications
     path("notifications/", views.notifications, name="notifications"),
     path("notifications/<int:pk>/read/", views.notification_read, name="notification_read"),

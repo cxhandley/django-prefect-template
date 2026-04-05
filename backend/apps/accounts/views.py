@@ -308,3 +308,23 @@ def notifications_dropdown(request):
     return render(
         request, "accounts/partials/notification_dropdown.html", {"notifications": recent}
     )
+
+
+@login_required
+@require_http_methods(["GET"])
+def notification_badge(request):
+    """
+    Poller partial: returns the notification badge area inner HTML.
+
+    Fetched by the centralized poller when the unread count changes.
+    The response includes an updated data-poller-register marker so the
+    poller keeps running with the new known_count.
+    """
+    count = Notification.objects.filter(user=request.user, is_read=False).count()
+    # Refresh the cache so subsequent context-processor calls are consistent
+    cache.set(f"notification_count_{request.user.pk}", count, 60)
+    return render(
+        request,
+        "accounts/partials/notification_badge.html",
+        {"count": count},
+    )

@@ -7,7 +7,7 @@
 <thead>
     <tr>
         <!-- Select-all checkbox -->
-        <th class="w-10">
+        <th scope="col" class="w-10">
             <input type="checkbox"
                    class="checkbox checkbox-sm"
                    :checked="allPageSelected"
@@ -29,6 +29,6 @@
             </th>
         {% endfor %}
         <!-- Actions column -->
-        <th class="w-16"></th>
+        <th scope="col" class="w-16 sr-only">Actions</th>
     </tr>
 </thead>
