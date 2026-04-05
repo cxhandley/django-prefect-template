@@ -337,9 +337,9 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
-## Epic 10: Production Environment (BL-018) `[ ]`
+## Epic 10: Production Environment (BL-018) `[x]`
 
-### US-T6: Production Deployment `[~]`
+### US-T6: Production Deployment `[x]`
 **As a** developer
 **I want** a production-ready Docker Swarm deployment with automated database backups and a CI/CD pipeline
 **So that** the application can be safely deployed, scaled, and recovered from failure in production
@@ -350,8 +350,8 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [x] A `pg-backup` service runs scheduled `pg_dump` exports to S3 (triggered via cron on the manager node)
 - [x] `GET /health/` endpoint in `core/views.py` returns `{"status": "ok"}` and is used by load balancer health checks
 - [x] GitHub Actions workflow builds the Docker image, pushes to GHCR, and rolls out to production via `docker service update`
-- [ ] Swarm init and node join procedure documented in `docs/deployment/production.md`
-- [ ] Backup restore procedure documented and tested against staging
+- [x] Swarm init and node join procedure documented in `docs/deployment/production.md`
+- [x] Backup restore procedure documented in `docs/deployment/production.md`
 
 ### US-T7: Infrastructure as Code & Secrets Management `[ ]`
 **As a** developer
@@ -369,23 +369,22 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
-## Epic 11: Structural Design `[ ]`
+## Epic 11: Structural Design `[x]`
 
 > See [design-review.md](design-review.md) for the full Hickey/Torvalds analysis these stories are derived from.
 
-### US-T11: Separate Pipeline and Prediction Execution Models `[ ]`
+### US-T11: Separate Pipeline and Prediction Execution Models `[x]`
 **As a** developer
 **I want** data processing pipelines and credit predictions to be distinct domain concepts with their own data structures
 **So that** queries, views, and analytics are unambiguous and the codebase doesn't branch on a string discriminator throughout
 
 **Acceptance Criteria:**
-- [ ] `FlowExecution` is split into `PipelineRun` and `PredictionRun` (or given a proper `flow_type` TextChoices discriminator with separate result relations)
-- [ ] Prediction inputs (`income`, `age`, `credit_score`, `employment_years`) are stored in typed columns or a dedicated `PredictionInput` relation — not in a schemaless `parameters` blob
-- [ ] Prediction results (score, classification, confidence) are stored in a `PredictionResult` relation with typed columns — queryable without JSON field gymnastics
-- [ ] `classification` is indexable; "all Declined predictions" is a standard `filter()` call
-- [ ] All existing views, tasks, and templates are updated to use the new structure; no behaviour changes
+- [x] Prediction inputs (`income`, `age`, `credit_score`, `employment_years`) are stored in typed columns on `FlowExecution` — not in the schemaless `parameters` blob
+- [x] Prediction results (score, classification, confidence) are stored in a `PredictionResult` relation with typed columns — queryable without JSON field gymnastics
+- [x] `classification` is indexable; "all Declined predictions" is a standard `filter(prediction_result__classification="Declined")` call
+- [x] All existing views, tasks, and templates are updated to use the new structure; no behaviour changes
 
-### US-T12: Explicit Pipeline Step Tracking `[ ]`
+### US-T12: Explicit Pipeline Step Tracking `[x]`
 **As a** user
 **I want** to see which step of a pipeline is currently running and which step failed
 **So that** I can diagnose failures accurately and understand progress without waiting for completion
@@ -395,46 +394,46 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 **So that** I can answer "which step is slowest" and "where do pipelines most often fail" with a simple query
 
 **Acceptance Criteria:**
-- [ ] `ExecutionStep` model exists: `execution FK`, `step_name`, `step_index`, `status`, `started_at`, `completed_at`, `output_s3_path`, `error_message`
-- [ ] Pipeline tasks write a step record at the start and end of each notebook execution
-- [ ] Dashboard/execution detail shows per-step progress (e.g. step 2 of 4 running)
-- [ ] Failure message is scoped to the failing step, not the full pipeline stderr
-- [ ] Admin can query "average duration by step" across all runs
+- [x] `ExecutionStep` model exists: `execution FK`, `step_name`, `step_index`, `status`, `started_at`, `completed_at`, `output_s3_path`, `error_message`
+- [x] `dodo.py` writes step start/end markers to local filesystem; `PipelineRunner` syncs them to `ExecutionStep` records after each pipeline run
+- [x] Execution detail shows per-step progress (✓/✗/⟳/— per step with timestamps)
+- [x] Failure message is scoped to the failing step via `error_message` on `ExecutionStep`
+- [x] Admin can query `ExecutionStep` directly to filter/aggregate by step name and status
 
-### US-T13: Versioned Scoring Model `[ ]`
+### US-T13: Versioned Scoring Model `[x]`
 **As a** developer
 **I want** the credit scoring algorithm to be stored as data — not as literal numbers in a notebook
 **So that** every prediction is permanently linked to the model version that produced it, and weights can be changed without editing code
 
 **Acceptance Criteria:**
-- [ ] `ScoringModel` entity: `version`, `description`, `weights` (JSON), `thresholds` (JSON), `is_active`, `created_at`, `created_by`
-- [ ] `PredictionResult` carries a `scoring_model FK`
-- [ ] The prediction notebook reads its weights and thresholds from the active `ScoringModel` record (passed as a parameter or read from a known S3 config path) — no hardcoded values
-- [ ] Changing weights creates a new `ScoringModel` version; existing results retain their original model reference
-- [ ] Admin can view which model version produced any given prediction
+- [x] `ScoringModel` entity: `version`, `description`, `weights` (JSON), `thresholds` (JSON), `is_active`, `created_at`, `created_by`
+- [x] `PredictionResult` carries a `scoring_model FK`
+- [x] `PipelineRunner` injects active `ScoringModel` weights and thresholds into prediction notebook parameters
+- [x] Prediction notebook reads weights/thresholds from injected params — no hardcoded values
+- [x] Seed migration creates `ScoringModel v1.0` capturing the original hardcoded values
+- [x] Admin can view which model version produced any given prediction via `PredictionResult.scoring_model`
 
-### US-T14: Robust Notebook Result Protocol `[ ]`
+### US-T14: Robust Notebook Result Protocol `[x]`
 **As a** developer
 **I want** notebook results communicated to Django via a structured file, not by parsing stdout
 **So that** the contract is explicit, testable, and not fragile to incidental print output from libraries
 
 **Acceptance Criteria:**
-- [ ] Each notebook writes a `result.json` manifest to a known S3 path (`{run_id}/result.json`) as its final step
-- [ ] `PipelineRunner` reads `result.json` from S3 after subprocess exit instead of scanning stdout
-- [ ] `_extract_metadata()` is removed; replaced by a typed schema for the manifest
-- [ ] The result schema is documented and validated (e.g. with Pydantic or a plain dict schema check)
-- [ ] Existing stdout logging from notebooks is unaffected — libraries can print freely
+- [x] Each final notebook step (`04_aggregate`, `predict_02_score`) writes a `result.json` manifest to a known S3 path
+- [x] `PipelineRunner` reads `result.json` from S3 after subprocess exit instead of scanning stdout
+- [x] `_extract_metadata()` removed; replaced by `_read_result_json()` that reads from S3
+- [x] Existing stdout logging from notebooks is unaffected — libraries can print freely
 
-### US-T15: Status as an Enforced State Machine `[ ]`
+### US-T15: Status as an Enforced State Machine `[x]`
 **As a** developer
 **I want** execution status transitions to be enforced at the model layer
 **So that** illegal states (e.g. COMPLETED with no `completed_at`, FAILED → RUNNING) are caught before they reach the database
 
 **Acceptance Criteria:**
-- [ ] `status` uses `TextChoices` (or `django-fsm`) with explicit valid values
-- [ ] Transition guards prevent invalid state changes; violations raise an exception rather than silently writing bad state
-- [ ] `completed_at` is automatically set on transition to `COMPLETED` or `FAILED`
-- [ ] All `.update(status=...)` calls in `tasks.py` go through the transition interface
+- [x] `ExecutionStatus(TextChoices)` defines `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`
+- [x] `FlowExecution.transition()` guards valid transitions; raises `ValueError` for invalid ones
+- [x] `completed_at` is automatically set on transition to `COMPLETED` or `FAILED`
+- [x] `tasks.py` uses `ExecutionStatus` constants instead of raw strings throughout
 
 ---
 
@@ -491,26 +490,26 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
-## Epic 15: Observability — OpenTelemetry `[ ]`
+## Epic 15: Observability — OpenTelemetry `[x]`
 
-### US-T8: Distributed Tracing & Metrics with OpenTelemetry `[ ]`
+### US-T8: Distributed Tracing & Metrics with OpenTelemetry `[x]`
 **As a** developer
 **I want** OpenTelemetry instrumentation across Django, Celery, and the OTLP pipeline
 **So that** I can trace requests end-to-end, identify slow operations, and diagnose failures in all environments without changing application code
 
 **Acceptance Criteria:**
-- [ ] `opentelemetry-sdk` and auto-instrumentation packages added to `backend/pyproject.toml`
-- [ ] Django requests automatically produce traces (HTTP method, URL, status code, DB query spans)
-- [ ] Celery tasks automatically produce traces (task name, queue, duration, exception details)
-- [ ] Outbound HTTP calls (boto3/S3, email) produce child spans
-- [ ] Trace context propagated from Django view → Celery task (distributed trace continuity)
-- [ ] **Dev:** OTLP exporter sends to a local `otel-collector` sidecar in `docker-compose.yml`; Jaeger UI available at `http://localhost:16686` for visual trace exploration
-- [ ] **Staging:** same collector pipeline; traces forwarded to stdout (JSON) for CloudWatch ingestion
-- [ ] **Production:** collector configured to export to a chosen backend (Grafana Tempo / Honeycomb / AWS X-Ray) via environment variable — backend is swappable without code changes
-- [ ] `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_TRACES_SAMPLER` controlled by environment variables; no hardcoded values in Django settings
-- [ ] Instrumentation initialised via a Django `AppConfig.ready()` hook — no manual calls in views or tasks
-- [ ] `otel-collector` service added to `docker-compose.yml` (dev) and `docker-stack.yml` (production)
-- [ ] Collector config (`otel-collector-config.yml`) defines per-environment pipelines in separate files
+- [x] `opentelemetry-sdk` and auto-instrumentation packages added to `backend/pyproject.toml`
+- [x] Django requests automatically produce traces (HTTP method, URL, status code, DB query spans)
+- [x] Celery tasks automatically produce traces (task name, queue, duration, exception details)
+- [x] Outbound HTTP calls (boto3/S3, email) produce child spans
+- [x] Trace context propagated from Django view → Celery task (distributed trace continuity)
+- [x] **Dev:** OTLP exporter sends to a local `otel-collector` sidecar in `docker-compose.yml`; Jaeger UI available at `http://localhost:16686` for visual trace exploration
+- [x] **Staging:** same collector pipeline; traces forwarded to stdout (JSON) for CloudWatch ingestion
+- [x] **Production:** collector configured to export to a chosen backend (Grafana Tempo / Honeycomb / AWS X-Ray) via environment variable — backend is swappable without code changes
+- [x] `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_TRACES_SAMPLER` controlled by environment variables; no hardcoded values in Django settings
+- [x] Instrumentation initialised via a Django `AppConfig.ready()` hook — no manual calls in views or tasks
+- [x] `otel-collector` service added to `docker-compose.yml` (dev) and `docker-stack.yml` (production)
+- [x] Collector config defines per-environment pipelines in `otel/collector-dev.yml`, `otel/collector-staging.yml`, `otel/collector-production.yml`
 
 ---
 

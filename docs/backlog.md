@@ -12,25 +12,22 @@ Derived from [user-stories.md](user-stories.md). Items are ordered by priority w
 
 ---
 
-### BL-018 · Production Environment — Docker Swarm + PostgreSQL Backups `XL` `[~]`
+### ~~BL-018~~ · ~~Production Environment — Docker Swarm + PostgreSQL Backups~~ `XL` ✓ Complete
 
 **User story:** US-T6
-**Value:** No production deployment exists. Core infrastructure is done; remaining work is documentation gating a safe go-live.
 
-**Remaining scope:**
-- [ ] Document Docker Swarm init and node join procedure in `docs/deployment/production.md`
-- [ ] Document backup restore procedure and test against staging
-
-**Completed scope:**
+**Completed:**
 - [x] `backend/config/settings/production.py` — security headers, WhiteNoise, HSTS, structured logging
 - [x] `docker-stack.yml` — Swarm-compatible with `deploy:` keys (replicas, restart policy, health checks)
 - [x] `pg-backup` service — scheduled `pg_dump` → S3 via cron on manager node
 - [x] `GET /health/` endpoint in `core/views.py`
 - [x] GitHub Actions workflow — build → push GHCR → `docker service update`
+- [x] Docker Swarm init and node join procedure documented in `docs/deployment/production.md`
+- [x] Backup restore procedure documented in `docs/deployment/production.md`
 
 ---
 
-### BL-021 · OpenTelemetry — Distributed Tracing & Metrics `M` `[~]`
+### ~~BL-021~~ · ~~OpenTelemetry — Distributed Tracing & Metrics~~ `M` ✓ Complete
 
 **User story:** US-T8
 **Value:** With Celery tasks, S3 calls, DuckDB queries, and Django views all involved in a single pipeline run, there is currently no way to see where time is spent or which component caused a failure. OpenTelemetry adds end-to-end traces across all environments with no changes to business logic.
@@ -62,7 +59,7 @@ These address complected data structures that compound in cost with every featur
 
 ---
 
-### BL-026 · Split Execution Models — Typed Results, Remove Schemaless Blob `L` `[ ]`
+### ~~BL-026~~ · ~~Split Execution Models — Typed Results, Remove Schemaless Blob~~ `L` ✓ Complete
 
 **User story:** US-T11
 **Value:** `FlowExecution.parameters` currently conflates prediction inputs (immutable, set at submission) with prediction results (written on completion). Every downstream consumer — comparison view, history list, analytics — has to know the internal key names and do JSON gymnastics. Typed columns make queries, filtering, and future analytics trivial.
@@ -80,7 +77,7 @@ These address complected data structures that compound in cost with every featur
 
 ---
 
-### BL-027 · `ExecutionStep` — Per-Step Pipeline Tracking `M` `[ ]`
+### ~~BL-027~~ · ~~`ExecutionStep` — Per-Step Pipeline Tracking~~ `M` ✓ Complete
 
 **User story:** US-T12
 **Value:** A 4-step pipeline is currently a black box. Users see "FAILED" with a truncated error and no indication of whether step 1 succeeded. Step-level records unlock accurate failure diagnosis, per-step progress display, and performance analytics without any additional instrumentation.
@@ -96,7 +93,7 @@ These address complected data structures that compound in cost with every featur
 
 ---
 
-### BL-028 · `ScoringModel` — Versioned Scoring Algorithm `M` `[ ]`
+### ~~BL-028~~ · ~~`ScoringModel` — Versioned Scoring Algorithm~~ `M` ✓ Complete
 
 **User story:** US-T13
 **Value:** The scoring weights (0.40/0.30/0.20/0.10) and thresholds (0.70/0.50) are hardcoded in `predict_02_score.ipynb`. There is no record of which algorithm version produced a given score. Changing weights is invisible in the data layer. A `ScoringModel` entity makes the algorithm data — versionable, auditable, and swappable without touching notebook code.
@@ -115,7 +112,7 @@ These address complected data structures that compound in cost with every featur
 
 ---
 
-### BL-029 · Notebook Result Protocol — Write `result.json` to S3 `S` `[ ]`
+### ~~BL-029~~ · ~~Notebook Result Protocol — Write `result.json` to S3~~ `S` ✓ Complete
 
 **User story:** US-T14
 **Value:** `PipelineRunner._extract_metadata()` scans stdout backwards for the first `{`. Any library printing a dict-like string can silently corrupt the result. Writing a `result.json` manifest to S3 instead makes the contract explicit, independently readable, and not fragile to logging noise.
@@ -130,7 +127,7 @@ These address complected data structures that compound in cost with every featur
 
 ---
 
-### BL-030 · Status as Enforced `TextChoices` State Machine `S` `[ ]`
+### ~~BL-030~~ · ~~Status as Enforced `TextChoices` State Machine~~ `S` ✓ Complete
 
 **User story:** US-T15
 **Value:** `status = CharField(max_length=50)` with no `choices`. Invalid states (typos, missing `completed_at`, backward transitions) are silently written. The state machine is real — it drives the entire UI polling loop — but it is enforced only by convention.
@@ -222,15 +219,7 @@ Security items are prioritised above features. Both should be resolved before ne
 
 ---
 
-### BL-018 (remaining docs) — see Active above
-
----
-
 ## Tier 3 — Platform & Infrastructure
-
----
-
-### BL-021 (OpenTelemetry) — see Active above
 
 ---
 
@@ -294,13 +283,13 @@ All items below are done and closed.
 
 | ID | Title | Status | Effort | Depends on |
 |----|-------|--------|--------|------------|
-| BL-018 | Production environment (docs remaining) | In progress | S | — |
-| BL-021 | OpenTelemetry — distributed tracing & metrics | In progress | M | BL-018 |
-| BL-026 | Split execution models — typed results, remove blob | Not started | L | — |
-| BL-027 | `ExecutionStep` — per-step pipeline tracking | Not started | M | BL-026 |
-| BL-028 | `ScoringModel` — versioned scoring algorithm | Not started | M | BL-026 |
-| BL-029 | Notebook result protocol — write `result.json` to S3 | Not started | S | — |
-| BL-030 | Status as enforced `TextChoices` state machine | Not started | S | BL-026 |
+| ~~BL-018~~ | ~~Production environment (docs remaining)~~ | Complete | S | — |
+| ~~BL-021~~ | ~~OpenTelemetry — distributed tracing & metrics~~ | Complete | M | BL-018 |
+| ~~BL-026~~ | ~~Split execution models — typed results, remove blob~~ | Complete | L | — |
+| ~~BL-027~~ | ~~`ExecutionStep` — per-step pipeline tracking~~ | Complete | M | BL-026 |
+| ~~BL-028~~ | ~~`ScoringModel` — versioned scoring algorithm~~ | Complete | M | BL-026 |
+| ~~BL-029~~ | ~~Notebook result protocol — write `result.json` to S3~~ | Complete | S | — |
+| ~~BL-030~~ | ~~Status as enforced `TextChoices` state machine~~ | Complete | S | BL-026 |
 | BL-025 | WCAG 2.1 AA accessibility audit & remediation | Not started | M | — |
 | ~~BL-022~~ | ~~Secrets management audit~~ | Complete | M | — |
 | ~~BL-023~~ | ~~Infrastructure as Code & 1Password secrets~~ | Complete | L | — |

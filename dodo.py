@@ -25,6 +25,7 @@ AWS credentials are read from AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY enviro
 variables directly within each notebook, so they are never baked into output notebooks.
 """
 
+import datetime
 import json
 import os
 import sys
@@ -45,20 +46,66 @@ def _get_params() -> dict:
     return json.loads(os.environ.get("PIPELINE_PARAMS", "{}"))
 
 
-def _run_notebook(step_name: str, params: dict, run_id: str) -> None:
-    """Execute a single notebook step via papermill."""
+def _step_marker_dir(run_id: str) -> Path:
+    """Return the directory for step status marker files."""
+    return OUTPUT_DIR / run_id / "steps"
+
+
+def _write_step_started(run_id: str, step_index: int, step_name: str) -> None:
+    marker_dir = _step_marker_dir(run_id)
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    marker = marker_dir / f"{step_index:02d}_{step_name}_started.json"
+    with open(marker, "w") as f:
+        json.dump({"started_at": datetime.datetime.utcnow().isoformat()}, f)
+
+
+def _write_step_completed(run_id: str, step_index: int, step_name: str) -> None:
+    marker_dir = _step_marker_dir(run_id)
+    marker = marker_dir / f"{step_index:02d}_{step_name}_completed.json"
+    with open(marker, "w") as f:
+        json.dump(
+            {
+                "completed_at": datetime.datetime.utcnow().isoformat(),
+                "status": "COMPLETED",
+            },
+            f,
+        )
+
+
+def _write_step_failed(run_id: str, step_index: int, step_name: str, error: str) -> None:
+    marker_dir = _step_marker_dir(run_id)
+    marker = marker_dir / f"{step_index:02d}_{step_name}_failed.json"
+    with open(marker, "w") as f:
+        json.dump(
+            {
+                "completed_at": datetime.datetime.utcnow().isoformat(),
+                "status": "FAILED",
+                "error": error[:2000],
+            },
+            f,
+        )
+
+
+def _run_notebook(step_name: str, params: dict, run_id: str, step_index: int = 0) -> None:
+    """Execute a single notebook step via papermill, writing step markers."""
     input_nb = NOTEBOOKS_DIR / "steps" / f"{step_name}.ipynb"
     output_nb = OUTPUT_DIR / f"{run_id}_{step_name}.ipynb"
     output_nb.parent.mkdir(parents=True, exist_ok=True)
 
-    pm.execute_notebook(
-        str(input_nb),
-        str(output_nb),
-        parameters=params,
-        kernel_name="python3",
-        progress_bar=False,
-        stdout_file=sys.stdout,
-    )
+    _write_step_started(run_id, step_index, step_name)
+    try:
+        pm.execute_notebook(
+            str(input_nb),
+            str(output_nb),
+            parameters=params,
+            kernel_name="python3",
+            progress_bar=False,
+            stdout_file=sys.stdout,
+        )
+        _write_step_completed(run_id, step_index, step_name)
+    except Exception as exc:
+        _write_step_failed(run_id, step_index, step_name, str(exc))
+        raise
 
 
 # ============================================================================
@@ -72,7 +119,7 @@ def task_ingest():
     run_id = params.get("run_id", "dev")
 
     return {
-        "actions": [lambda: _run_notebook("01_ingest", params, run_id)],
+        "actions": [lambda: _run_notebook("01_ingest", params, run_id, step_index=0)],
         "targets": [str(OUTPUT_DIR / f"{run_id}_01_ingest.ipynb")],
         "uptodate": [False],
         "verbosity": 2,
@@ -85,7 +132,7 @@ def task_validate():
     run_id = params.get("run_id", "dev")
 
     return {
-        "actions": [lambda: _run_notebook("02_validate", params, run_id)],
+        "actions": [lambda: _run_notebook("02_validate", params, run_id, step_index=1)],
         "task_dep": ["ingest"],
         "targets": [str(OUTPUT_DIR / f"{run_id}_02_validate.ipynb")],
         "uptodate": [False],
@@ -99,7 +146,7 @@ def task_transform():
     run_id = params.get("run_id", "dev")
 
     return {
-        "actions": [lambda: _run_notebook("03_transform", params, run_id)],
+        "actions": [lambda: _run_notebook("03_transform", params, run_id, step_index=2)],
         "task_dep": ["validate"],
         "targets": [str(OUTPUT_DIR / f"{run_id}_03_transform.ipynb")],
         "uptodate": [False],
@@ -113,7 +160,7 @@ def task_aggregate():
     run_id = params.get("run_id", "dev")
 
     return {
-        "actions": [lambda: _run_notebook("04_aggregate", params, run_id)],
+        "actions": [lambda: _run_notebook("04_aggregate", params, run_id, step_index=3)],
         "task_dep": ["transform"],
         "targets": [str(OUTPUT_DIR / f"{run_id}_04_aggregate.ipynb")],
         "uptodate": [False],
@@ -136,7 +183,7 @@ def task_predict_ingest():
     run_id = params.get("run_id", "dev")
 
     return {
-        "actions": [lambda: _run_notebook("predict_01_ingest", params, run_id)],
+        "actions": [lambda: _run_notebook("predict_01_ingest", params, run_id, step_index=0)],
         "targets": [str(OUTPUT_DIR / f"{run_id}_predict_01_ingest.ipynb")],
         "uptodate": [False],
         "verbosity": 2,
@@ -149,7 +196,7 @@ def task_predict_score():
     run_id = params.get("run_id", "dev")
 
     return {
-        "actions": [lambda: _run_notebook("predict_02_score", params, run_id)],
+        "actions": [lambda: _run_notebook("predict_02_score", params, run_id, step_index=1)],
         "task_dep": ["predict_ingest"],
         "targets": [str(OUTPUT_DIR / f"{run_id}_predict_02_score.ipynb")],
         "uptodate": [False],

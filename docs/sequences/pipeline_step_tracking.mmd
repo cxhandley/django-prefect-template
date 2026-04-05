@@ -1,0 +1,29 @@
+sequenceDiagram
+    participant Celery as Celery Worker
+    participant Runner as PipelineRunner
+    participant doit as doit subprocess
+    participant Notebook as papermill notebook
+    participant DB as PostgreSQL
+    participant S3
+
+    Celery->>DB: Create FlowExecution(status=RUNNING)
+    Celery->>Runner: run_pipeline(run_id, input_s3_path)
+    Runner->>DB: Create ExecutionStep rows (PENDING) for each step
+    Runner->>doit: subprocess: doit run pipeline
+
+    loop For each step (ingest → validate → transform → aggregate)
+        doit->>Runner: step_start_callback(step_name)
+        Runner->>DB: ExecutionStep.update(status=RUNNING, started_at=now)
+        doit->>Notebook: papermill.execute_notebook(params)
+        Notebook->>S3: Read input parquet
+        Notebook->>S3: Write output parquet
+        Notebook->>S3: Write result.json (final step only)
+        doit->>Runner: step_end_callback(step_name, success=True)
+        Runner->>DB: ExecutionStep.update(status=COMPLETED, completed_at=now)
+    end
+
+    Runner->>S3: Read result.json
+    Runner-->>Celery: metadata dict
+    Celery->>DB: FlowExecution.update(status=COMPLETED, row_count, s3_output_path)
+
+    Note over doit,Notebook: On failure, step_end_callback(success=False)<br/>sets step status=FAILED with error_message

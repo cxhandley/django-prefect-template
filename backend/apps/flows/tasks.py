@@ -12,6 +12,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
+from .models import ExecutionStatus
 from .runner import PipelineRunner
 
 
@@ -141,7 +142,7 @@ def run_pipeline_task(
         row_count = metadata.get("row_count")
 
         FlowExecution.objects.filter(flow_run_id=run_id).update(
-            status="COMPLETED",
+            status=ExecutionStatus.COMPLETED,
             s3_output_path=s3_output_path,
             row_count=row_count,
             completed_at=timezone.now(),
@@ -151,8 +152,9 @@ def run_pipeline_task(
     except Exception as exc:
         error_str = str(exc)[:2000]
         FlowExecution.objects.filter(flow_run_id=run_id).update(
-            status="FAILED",
+            status=ExecutionStatus.FAILED,
             error_message=error_str,
+            completed_at=timezone.now(),
         )
         if self.request.retries >= self.max_retries:
             _send_failure_notification(run_id, user_id, "pipeline", error_str)
@@ -181,7 +183,7 @@ def run_prediction_task(
     Returns:
         Metadata dict from the pipeline including score, classification, confidence.
     """
-    from apps.flows.models import FlowExecution
+    from apps.flows.models import FlowExecution, PredictionResult, ScoringModel
 
     run_id = uuid.UUID(flow_run_id)
 
@@ -193,29 +195,39 @@ def run_prediction_task(
             doit_task="predict_pipeline",
         )
 
-        # Merge prediction results into existing parameters
-        execution = FlowExecution.objects.get(flow_run_id=run_id)
-        updated_params = {
-            **execution.parameters,
-            "score": metadata.get("score"),
-            "classification": metadata.get("classification"),
-            "confidence": metadata.get("confidence"),
-        }
+        score = metadata.get("score")
+        classification = metadata.get("classification")
+        confidence = metadata.get("confidence")
+        s3_output_path = metadata.get("s3_output_path", "")
+        row_count = metadata.get("row_count")
 
         FlowExecution.objects.filter(flow_run_id=run_id).update(
-            status="COMPLETED",
-            s3_output_path=metadata.get("s3_output_path", ""),
-            row_count=metadata.get("row_count"),
+            status=ExecutionStatus.COMPLETED,
+            s3_output_path=s3_output_path,
+            row_count=row_count,
             completed_at=timezone.now(),
             error_message="",
-            parameters=updated_params,
+        )
+
+        # Write typed PredictionResult (replaces parameters blob for result fields)
+        execution = FlowExecution.objects.get(flow_run_id=run_id)
+        active_model = ScoringModel.get_active()
+        PredictionResult.objects.update_or_create(
+            execution=execution,
+            defaults={
+                "score": score,
+                "classification": classification,
+                "confidence": confidence,
+                "scoring_model": active_model,
+            },
         )
 
     except Exception as exc:
         error_str = str(exc)[:2000]
         FlowExecution.objects.filter(flow_run_id=run_id).update(
-            status="FAILED",
+            status=ExecutionStatus.FAILED,
             error_message=error_str,
+            completed_at=timezone.now(),
         )
         if self.request.retries >= self.max_retries:
             _send_failure_notification(run_id, user_id, "predict_pipeline", error_str)

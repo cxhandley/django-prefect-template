@@ -208,6 +208,51 @@ Always test restores on staging before relying on production backups.
 
 ---
 
+## Docker Swarm management
+
+### Init (first-time, handled by `just prod-bootstrap`)
+
+`just prod-bootstrap` runs `docker swarm init` automatically. To verify or re-initialise manually:
+
+```bash
+just prod-ssh
+
+# Check if Swarm is already active
+docker info --format '{{.Swarm.LocalNodeState}}'
+# → "active" means Swarm is running; "inactive" means it needs initialising
+
+# Initialise Swarm (only if inactive)
+docker swarm init --advertise-addr <manager-ip>
+
+# Verify manager status
+docker node ls
+```
+
+### Add a worker node
+
+On the manager node, get the join token:
+```bash
+docker swarm join-token worker
+```
+
+This prints a `docker swarm join` command. Run it on each new worker:
+```bash
+# On the worker node:
+docker swarm join --token SWMTKN-<token> <manager-ip>:2377
+```
+
+Verify the worker appears:
+```bash
+docker node ls   # run on manager
+```
+
+After adding workers, update `docker-stack.yml` placement constraints as needed (e.g. remove `node.role == manager` constraints from stateless services) and redeploy:
+```bash
+just prod-deploy <current-sha>
+```
+
+---
+
 ## Scaling
 
 To scale services without migrating to multi-node Swarm:
@@ -216,15 +261,6 @@ To scale services without migrating to multi-node Swarm:
 just prod-ssh
 docker service scale app_web=3 app_celery-worker=3
 ```
-
-For multi-node Swarm, run on the manager:
-```bash
-docker swarm join-token worker   # copy the join command
-# On each worker node:
-docker swarm join --token <token> <manager-ip>:2377
-```
-
-Then update `docker-stack.yml` placement constraints as needed.
 
 ---
 

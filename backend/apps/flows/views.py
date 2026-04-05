@@ -24,7 +24,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 
-from .models import FlowExecution, InputPreset
+from .models import ExecutionStatus, FlowExecution, InputPreset
 from .services.datalake import DataLakeAnalytics
 from .tasks import run_pipeline_task, run_prediction_task
 
@@ -75,7 +75,7 @@ HISTORY_COLUMNS = [
 
 HISTORY_FILTER_FIELDS = {
     "created_at": {"type": "datetime", "orm_field": "created_at"},
-    "classification": {"type": "choice", "orm_field": "parameters__classification"},
+    "classification": {"type": "choice", "orm_field": "prediction_result__classification"},
     "status": {"type": "choice", "orm_field": "status"},
 }
 
@@ -110,7 +110,7 @@ def index(request):
         "user": request.user,
         "executions": executions,
         "flows_count": qs.count(),
-        "recent_runs": qs.filter(status="COMPLETED").count(),
+        "recent_runs": qs.filter(status=ExecutionStatus.COMPLETED).count(),
     }
     return render(request, "flows/index.html", context)
 
@@ -121,7 +121,7 @@ def dashboard(request):
     executions = FlowExecution.objects.filter(triggered_by=request.user).order_by("-created_at")
 
     total = executions.count()
-    completed = executions.filter(status="COMPLETED")
+    completed = executions.filter(status=ExecutionStatus.COMPLETED)
     success_rate = round((completed.count() / total * 100), 1) if total > 0 else 0
 
     # Calculate average duration for completed executions
@@ -136,7 +136,7 @@ def dashboard(request):
             avg_duration = round(sum(durations) / len(durations), 1)
 
     # Get the most recent running execution as active prediction
-    active_prediction = executions.filter(status="RUNNING").first()
+    active_prediction = executions.filter(status=ExecutionStatus.RUNNING).first()
 
     presets = InputPreset.objects.filter(user=request.user)
 
@@ -231,20 +231,26 @@ def execution_detail(request, run_id):
     if execution.completed_at and execution.created_at:
         duration = round((execution.completed_at - execution.created_at).total_seconds(), 2)
 
-    # Mock prediction result data for the UI
-    prediction_result = {
-        "value": "0.82",
-        "classification": "Approved",
-        "confidence": 82,
-    }
+    prediction_result = None
+    input_values = None
+    if execution.flow_name == "credit-prediction":
+        try:
+            pr = execution.prediction_result
+            prediction_result = {
+                "score": pr.score,
+                "classification": pr.classification,
+                "confidence": pr.confidence,
+            }
+        except execution.__class__.prediction_result.RelatedObjectDoesNotExist:
+            pass
+        input_values = {
+            "income": execution.income,
+            "age": execution.age,
+            "credit_score": execution.credit_score,
+            "employment_years": execution.employment_years,
+        }
 
-    # Mock input values
-    input_values = execution.parameters or {
-        "income": "$75,000",
-        "age": "35",
-        "credit_score": "720",
-        "employment_years": "8",
-    }
+    steps = list(execution.steps.all())
 
     context = {
         "user": request.user,
@@ -253,6 +259,7 @@ def execution_detail(request, run_id):
         "duration": duration,
         "prediction_result": prediction_result,
         "input_values": input_values,
+        "steps": steps,
         "breadcrumbs": [
             {"name": "Dashboard", "url": "/flows/dashboard/"},
             {"name": "History", "url": "/flows/history/"},
@@ -296,16 +303,34 @@ def comparison(request):
             },
         )
 
+    def _get_inputs(ex):
+        return {
+            "income": ex.income,
+            "age": ex.age,
+            "credit_score": ex.credit_score,
+            "employment_years": ex.employment_years,
+        }
+
+    def _get_result(ex):
+        try:
+            pr = ex.prediction_result
+            return {
+                "score": pr.score,
+                "classification": pr.classification,
+                "confidence": pr.confidence,
+            }
+        except ex.__class__.prediction_result.RelatedObjectDoesNotExist:
+            return {"score": None, "classification": None, "confidence": None}
+
     # Determine which input fields differ across all selected executions
     differing_fields = set()
     for key in PREDICTION_INPUT_KEYS:
-        values = {str(ex.parameters.get(key)) for ex in executions if ex.parameters}
+        values = {str(getattr(ex, key)) for ex in executions}
         if len(values) > 1:
             differing_fields.add(key)
 
     comparison_data = []
     for ex in executions:
-        params = ex.parameters or {}
         duration = None
         if ex.completed_at and ex.created_at:
             duration = round((ex.completed_at - ex.created_at).total_seconds(), 2)
@@ -313,12 +338,8 @@ def comparison(request):
             {
                 "execution": ex,
                 "duration": duration,
-                "inputs": {k: params.get(k) for k in PREDICTION_INPUT_KEYS},
-                "result": {
-                    "score": params.get("score"),
-                    "classification": params.get("classification"),
-                    "confidence": params.get("confidence"),
-                },
+                "inputs": _get_inputs(ex),
+                "result": _get_result(ex),
             }
         )
 
@@ -353,12 +374,23 @@ def comparison_export(request):
 
     short_ids = [str(ex.flow_run_id)[:8] for ex in executions]
 
+    def _get_field_value(ex, field):
+        # Input fields are typed columns on FlowExecution
+        if field in PREDICTION_INPUT_KEYS:
+            return getattr(ex, field, "") or ""
+        # Result fields come from PredictionResult
+        try:
+            pr = ex.prediction_result
+            return getattr(pr, field, "") or ""
+        except ex.__class__.prediction_result.RelatedObjectDoesNotExist:
+            return ""
+
     def _rows():
         yield ["field"] + short_ids
         for field in COMPARISON_CSV_FIELDS:
             row = [field]
             for ex in executions:
-                row.append(ex.parameters.get(field, "") if ex.parameters else "")
+                row.append(_get_field_value(ex, field))
             yield row
 
     def _stream():
@@ -414,12 +446,7 @@ def upload_and_process(request):
         triggered_by=request.user,
         s3_input_path=file_path,
         s3_output_path=f"processed/flows/data-processing/{run_id}/output.parquet",
-        status="RUNNING",
-        parameters={
-            "input_s3_path": input_s3_path,
-            "run_id": str(run_id),
-            "user_id": request.user.id,
-        },
+        status=ExecutionStatus.RUNNING,
     )
 
     # Enqueue Celery task — returns immediately
@@ -434,7 +461,7 @@ def upload_and_process(request):
     return JsonResponse(
         {
             "run_id": str(run_id),
-            "status": "RUNNING",
+            "status": ExecutionStatus.RUNNING,
             "message": "Pipeline started",
         }
     )
@@ -577,23 +604,18 @@ def run_prediction(request):
     file_path = default_storage.save(s3_key, ContentFile(csv_buffer.getvalue().encode("utf-8")))
     input_s3_path = f"s3://{settings.DATA_LAKE_BUCKET}/{file_path}"
 
-    # Create execution record
+    # Create execution record — typed input fields populated directly
     execution = FlowExecution.objects.create(
         flow_run_id=run_id,
         flow_name="credit-prediction",
         triggered_by=request.user,
         s3_input_path=file_path,
         s3_output_path=f"processed/flows/credit-prediction/{run_id}/output.parquet",
-        status="RUNNING",
-        parameters={
-            "income": income,
-            "age": age,
-            "credit_score": credit_score,
-            "employment_years": employment_years,
-            "input_s3_path": input_s3_path,
-            "run_id": str(run_id),
-            "user_id": request.user.id,
-        },
+        status=ExecutionStatus.RUNNING,
+        income=income,
+        age=age,
+        credit_score=credit_score,
+        employment_years=employment_years,
     )
 
     # Enqueue Celery task
@@ -625,20 +647,26 @@ def prediction_status(request, run_id):
         flow_name="credit-prediction",
     )
 
-    if execution.status == "COMPLETED":
-        params = execution.parameters
+    if execution.status == ExecutionStatus.COMPLETED:
+        try:
+            pr = execution.prediction_result
+            score = pr.score
+            classification = pr.classification
+            confidence = pr.confidence
+        except execution.__class__.prediction_result.RelatedObjectDoesNotExist:
+            score = classification = confidence = None
         return render(
             request,
             "flows/partials/prediction_result.html",
             {
                 "run_id": str(run_id),
-                "score": params.get("score"),
-                "classification": params.get("classification"),
-                "confidence": params.get("confidence"),
+                "score": score,
+                "classification": classification,
+                "confidence": confidence,
             },
         )
 
-    if execution.status == "FAILED":
+    if execution.status == ExecutionStatus.FAILED:
         return render(
             request,
             "flows/partials/prediction_error.html",
@@ -670,7 +698,7 @@ def stop_execution(request, run_id):
         celery_app.control.revoke(execution.celery_task_id, terminate=True, signal="SIGTERM")
 
     FlowExecution.objects.filter(flow_run_id=run_id).update(
-        status="FAILED",
+        status=ExecutionStatus.FAILED,
         error_message="Stopped by user.",
         completed_at=timezone.now(),
     )
@@ -710,7 +738,7 @@ def admin_dashboard(request):
     total = all_executions.count()
     total_recent = recent.count()
 
-    completed = all_executions.filter(status="COMPLETED")
+    completed = all_executions.filter(status=ExecutionStatus.COMPLETED)
     success_rate = round(completed.count() / total * 100, 1) if total else 0
 
     # Average runtime for completed executions that have both timestamps
@@ -734,7 +762,9 @@ def admin_dashboard(request):
     by_flow = []
     for row in recent.values("flow_name").annotate(count=Count("id")).order_by("-count"):
         flow_name = row["flow_name"]
-        flow_completed = recent.filter(flow_name=flow_name, status="COMPLETED").count()
+        flow_completed = recent.filter(
+            flow_name=flow_name, status=ExecutionStatus.COMPLETED
+        ).count()
         flow_rate = round(flow_completed / row["count"] * 100) if row["count"] else 0
         by_flow.append({"flow_name": flow_name, "count": row["count"], "success_rate": flow_rate})
 
@@ -781,7 +811,7 @@ def prediction_compare_options(request):
         FlowExecution.objects.filter(
             triggered_by=request.user,
             flow_name="credit-prediction",
-            status="COMPLETED",
+            status=ExecutionStatus.COMPLETED,
         )
         .exclude(flow_run_id=exclude_id)
         .order_by("-created_at")[:20]
@@ -892,7 +922,7 @@ def admin_executions(request):
         "status_q": status_q,
         "date_from": date_from,
         "date_to": date_to,
-        "status_choices": ["COMPLETED", "FAILED", "RUNNING", "PENDING"],
+        "status_choices": [s.value for s in ExecutionStatus],
         "breadcrumbs": [
             {"name": "Admin Dashboard", "url": "/flows/admin/dashboard/"},
             {"name": "Execution Logs"},
@@ -910,15 +940,8 @@ def retry_execution(request, run_id):
     """Clone a FAILED execution and dispatch the same task with original parameters."""
     original = get_object_or_404(FlowExecution, flow_run_id=run_id, triggered_by=request.user)
 
-    if original.status != "FAILED":
+    if original.status != ExecutionStatus.FAILED:
         return redirect("flows:execution_detail", run_id=run_id)
-
-    # Strip result fields — only carry forward input parameters
-    input_params = {
-        k: v
-        for k, v in original.parameters.items()
-        if k not in ("score", "classification", "confidence")
-    }
 
     new_run_id = uuid.uuid4()
     new_execution = FlowExecution.objects.create(
@@ -926,8 +949,12 @@ def retry_execution(request, run_id):
         flow_name=original.flow_name,
         triggered_by=request.user,
         s3_input_path=original.s3_input_path,
-        parameters=input_params,
-        status="PENDING",
+        status=ExecutionStatus.PENDING,
+        # Copy typed prediction inputs (null for non-prediction flows)
+        income=original.income,
+        age=original.age,
+        credit_score=original.credit_score,
+        employment_years=original.employment_years,
     )
 
     if original.flow_name == "predict_pipeline":

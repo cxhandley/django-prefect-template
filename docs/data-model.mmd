@@ -19,18 +19,55 @@ erDiagram
     FLOW_EXECUTION {
         int id PK
         uuid flow_run_id UK "unique execution identifier"
-        string flow_name "e.g. pipeline | predict_pipeline"
+        string flow_name "e.g. data-processing | credit-prediction"
         int triggered_by_id FK "references USER"
         string s3_input_path "S3 key for uploaded file"
         string s3_output_path "S3 key for output parquet"
         bigint row_count "populated after completion"
         decimal file_size_mb
-        string status "PENDING|RUNNING|COMPLETED|FAILED"
-        json parameters "execution params + prediction results"
+        string status "PENDING|RUNNING|COMPLETED|FAILED (TextChoices)"
+        float income "credit-prediction input — null for pipeline flows"
+        int age "credit-prediction input — null for pipeline flows"
+        int credit_score "credit-prediction input — null for pipeline flows"
+        float employment_years "credit-prediction input — null for pipeline flows"
+        json parameters "legacy blob — do not add new keys"
         string celery_task_id "for task revocation"
         text error_message
         datetime created_at
         datetime completed_at
+    }
+
+    PREDICTION_RESULT {
+        int id PK
+        int execution_id FK "OneToOne → FLOW_EXECUTION"
+        int scoring_model_id FK "nullable → SCORING_MODEL"
+        float score "weighted composite score 0–1"
+        string classification "Approved|Review|Declined"
+        float confidence "score * 100"
+        datetime scored_at
+    }
+
+    SCORING_MODEL {
+        int id PK
+        string version UK "e.g. 1.0"
+        text description
+        json weights "factor weights e.g. {credit_score: 0.40, income: 0.30, ...}"
+        json thresholds "classification thresholds e.g. {approved: 0.70, review: 0.50}"
+        boolean is_active "only one active model at a time"
+        datetime created_at
+        int created_by_id FK "nullable → USER"
+    }
+
+    EXECUTION_STEP {
+        int id PK
+        int execution_id FK "references FLOW_EXECUTION"
+        string step_name "e.g. ingest | validate | transform | aggregate"
+        smallint step_index "0-based step order"
+        string status "PENDING|RUNNING|COMPLETED|FAILED"
+        datetime started_at
+        datetime completed_at
+        string output_s3_path
+        text error_message
     }
 
     USER_PROFILE {
@@ -77,7 +114,11 @@ erDiagram
     USER ||--|| USER_PROFILE : "has"
     USER ||--o{ INPUT_PRESET : "owns"
     USER ||--o{ NOTIFICATION : "receives"
+    USER ||--o{ SCORING_MODEL : "creates"
+    FLOW_EXECUTION ||--o| PREDICTION_RESULT : "has result"
+    FLOW_EXECUTION ||--o{ EXECUTION_STEP : "has steps"
     FLOW_EXECUTION |o--o{ NOTIFICATION : "referenced by"
+    PREDICTION_RESULT }o--o| SCORING_MODEL : "scored by"
     FEATURE_FLAG ||--o{ FEATURE_FLAG_USERS : "enabled for"
     USER ||--o{ FEATURE_FLAG_USERS : "included in"
 
