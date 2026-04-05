@@ -28,10 +28,13 @@ urlpatterns = [
 ]
 
 if settings.DEBUG:
-    import debug_toolbar
+    try:
+        import debug_toolbar
 
-    urlpatterns += [
-        path("__debug__/", include(debug_toolbar.urls)),
-    ]
+        urlpatterns += [
+            path("__debug__/", include(debug_toolbar.urls)),
+        ]
+    except ImportError:
+        pass
     # Also ensure static files are served correctly in development if needed
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
