@@ -1,44 +1,15 @@
 """
-Tests for PipelineRunner: subprocess invocation and metadata extraction.
+Tests for PipelineRunner: subprocess invocation and result reading.
+
+Note: _extract_metadata was removed in BL-029.  Pipelines now write a
+result.json manifest to S3; PipelineRunner._read_result_json reads it.
 """
 
 import json
+import uuid
 
 import pytest
 from apps.flows.runner import PipelineRunner
-
-# ============================================================================
-# _extract_metadata
-# ============================================================================
-
-
-def test_extract_metadata_valid():
-    stdout = 'some log line\n{"row_count": 100, "s3_output_path": "processed/out.parquet"}\n'
-    result = PipelineRunner._extract_metadata(stdout)
-    assert result["row_count"] == 100
-    assert result["s3_output_path"] == "processed/out.parquet"
-
-
-def test_extract_metadata_last_json_wins():
-    """When multiple JSON lines exist, the last one is returned."""
-    stdout = '{"first": true}\nsome text\n{"second": true}\n'
-    result = PipelineRunner._extract_metadata(stdout)
-    assert result == {"second": True}
-
-
-def test_extract_metadata_empty_stdout():
-    assert PipelineRunner._extract_metadata("") == {}
-
-
-def test_extract_metadata_no_json():
-    assert PipelineRunner._extract_metadata("just plain log output\n") == {}
-
-
-def test_extract_metadata_invalid_json_skipped():
-    stdout = "{not valid json}\n{}\n"
-    result = PipelineRunner._extract_metadata(stdout)
-    assert result == {}
-
 
 # ============================================================================
 # run_pipeline
@@ -56,13 +27,16 @@ def test_run_pipeline_success(mocker, settings, tmp_path):
     settings.NOTEBOOKS_DIR = str(tmp_path / "notebooks")
 
     expected_metadata = {"row_count": 42, "s3_output_path": "processed/out.parquet"}
+
     mock_result = mocker.MagicMock()
     mock_result.returncode = 0
-    mock_result.stdout = json.dumps(expected_metadata) + "\n"
+    mock_result.stdout = ""
     mock_result.stderr = ""
     mocker.patch("apps.flows.runner.subprocess.run", return_value=mock_result)
-
-    import uuid
+    # BL-029: runner reads result.json from S3 instead of parsing stdout
+    mocker.patch.object(PipelineRunner, "_read_result_json", return_value=expected_metadata)
+    mocker.patch.object(PipelineRunner, "_sync_step_records")
+    mocker.patch.object(PipelineRunner, "_create_pending_steps")
 
     runner = PipelineRunner()
     metadata = runner.run_pipeline(
