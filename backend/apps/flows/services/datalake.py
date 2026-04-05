@@ -19,6 +19,12 @@ class DataLakeAnalytics:
         elif endpoint.startswith("https://"):
             endpoint = endpoint[len("https://") :]
 
+        # Known limitation: DuckDB's CREATE SECRET does not support parameterised
+        # queries, so credentials are interpolated via f-string. The values come
+        # from Django settings (sourced from environment variables — never from
+        # user input), so there is no injection risk here. Do not use this pattern
+        # for any value that originates outside the trusted settings layer.
+        # Tracked in BL-022 (secrets audit).
         self.conn.execute(f"""
             CREATE SECRET datalake_s3 (
                 TYPE S3,

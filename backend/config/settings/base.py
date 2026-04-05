@@ -93,6 +93,15 @@ WSGI_APPLICATION = "config.wsgi.application"
 DATABASES = {"default": env.db("DATABASE_URL")}
 
 
+# Password hashing — Argon2id is the OWASP-recommended algorithm (ASVS 2.10.3).
+# Fallback to PBKDF2 allows existing PBKDF2 hashes to verify; they are
+# transparently re-hashed to Argon2id on next login.
+# Requires: argon2-cffi (in pyproject.toml dependencies)
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+]
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 

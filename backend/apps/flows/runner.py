@@ -49,8 +49,6 @@ class PipelineRunner:
             "run_id": str(run_id),
             "input_s3_path": input_s3_path,
             "bucket": settings.DATA_LAKE_BUCKET,
-            "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
-            "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
             "aws_s3_region": settings.AWS_S3_REGION_NAME,
             "s3_endpoint": settings.AWS_S3_ENDPOINT_URL or "",
             "notebook_output_dir": str(output_dir),

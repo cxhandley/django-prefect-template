@@ -4,379 +4,29 @@ Derived from [user-stories.md](user-stories.md). Items are ordered by priority w
 
 **Effort sizing:** S = ~half day · M = 1–2 days · L = 3–5 days · XL = 1–2 weeks
 
----
-
-## Tier 1 — Complete the MVP (immediate)
-
-These close gaps in already-delivered epics. Low risk, small scope.
+> **Note:** US-7.1, US-7.2, and US-7.3 in user-stories.md are marked `[ ]` but their corresponding backlog items (BL-010, BL-011, BL-012) are complete. Those user story statuses need updating to `[x]`.
 
 ---
 
-### ~~BL-001 · Password Reset Flow~~ `M` ✓ Complete
-
-
-**User story:** US-1.1
-**Value:** Users who forget their password currently have no self-service path — an admin must intervene.
-
-**Scope:**
-- Add Django's built-in password reset URLs (`django.contrib.auth.urls`) to `config/urls.py`
-- Wire up email backend (SMTP or console for dev)
-- Template: `accounts/password_reset.html`, `accounts/password_reset_done.html`, `accounts/password_reset_confirm.html`, `accounts/password_reset_complete.html` — all extending `core/base_public.html`
-- Link "Forgot password?" on the login page
-
-**Docs required before starting:**
-- Wireframe: `password_reset_page.excalidraw`
+## Active — In Progress
 
 ---
 
-### ~~BL-002 · S3 Cleanup on Execution Delete~~ `S` ✓ Complete
-**User story:** US-2.4
-**Value:** Deleting an execution currently orphans its S3 files; storage grows unbounded.
-
-**Scope:**
-- Override `FlowExecution.delete()` (or use a `post_delete` signal) to remove `s3_input_path` and `s3_output_path` objects from S3
-- Handle the case where S3 objects are already absent (idempotent)
-- Add test coverage in `test_models.py`
-- Use daisy_ui modals for confirmation of delete.
-
-**No new wireframe or diagram needed.**
-
----
-
-### ~~BL-003 · Presigned S3 Download URLs~~ `S` ✓ Complete
-**User story:** US-2.3
-**Value:** Download links currently expose internal S3 paths directly; presigned URLs scope access and set an expiry.
-
-**Scope:**
-- `FlowExecution.generate_download_url()` is already implemented — wire it into the download view (`download_results`) instead of streaming via Django
-- Support CSV, Parquet, and JSON with appropriate `Content-Disposition` headers
-- URL expiry: 1 hour (configurable via settings)
-
-**No new wireframe or diagram needed.**
-
----
-
-### ~~BL-004 · Export Execution History as CSV~~ `S` ✓ Complete
-**User story:** US-4.1
-**Value:** Users frequently want to take their history into a spreadsheet.
-
-**Scope:**
-- Add `GET /flows/history/export/` endpoint
-- Query `FlowExecution` for the authenticated user, serialise to CSV (Python `csv` module)
-- Return as `Content-Disposition: attachment; filename=history.csv`
-- Add "Export CSV" button to `history.html`
-
-**No new wireframe needed — add button to existing history wireframe.**
-
----
-
-### ~~BL-005 · Prediction Comparison — Input & Score Detail~~ `M` ✓ Complete
-**User story:** US-4.2
-**Value:** The comparison page exists but only shows metadata; the key value is seeing how different inputs produced different scores.
-
-**Scope:**
-- For prediction executions, extract input values and score from `FlowExecution.parameters` and display them side-by-side in `comparison.html`
-- Highlight differing input values visually (e.g. badge colour)
-- Add "Export comparison as CSV" button (single endpoint, generates 2–3 column CSV)
-
-**Update wireframe:** `comparison_page_user.excalidraw` — sketch the input/score rows.
-
----
-
-## Tier 2 — Auth & Access Control
-
-Prerequisite for any multi-user or admin work.
-
----
-
-### ~~BL-006 · Superuser User Management UI~~ `L` ✓ Complete
-**User story:** US-1.2
-**Value:** Currently superusers must use Django Admin (`/admin/`) to manage users — there is no first-class UI.
-
-**Scope:**
-- New app page: `accounts/user_list.html` (superuser only, `@user_passes_test`)
-- List all users: email, date joined, active status, last login
-- Actions per user: activate / deactivate, reset password (trigger password-reset email)
-- Filter by active/inactive
-- No new model needed — uses Django's built-in `User`
-
-**Docs required before starting:**
-- Wireframe: `superuser_user_management.excalidraw`
-- Sequence diagram: `docs/sequences/superuser_user_management.mmd`
-
----
-
-### ~~BL-007 · Registration Email Confirmation~~ `M` ✓ Complete
-**User story:** US-1.1
-**Value:** Prevents fake accounts; confirms email ownership before granting access.
-
-**Scope:**
-- On signup, set `user.is_active = False` and send a confirmation email with a signed token (`django.core.signing`)
-- Add confirmation view: `GET /accounts/confirm-email/<token>/` — activates the account
-- Template: `accounts/confirm_email.html`, `accounts/email_confirmation_sent.html`
-- Consider: what happens if user tries to log in before confirming?
-
-**Depends on:** BL-001 (email backend must be configured)
-
-**Docs required before starting:**
-- Wireframe: `email_confirmation_page.excalidraw`
-- Sequence diagram: `docs/sequences/registration_email_confirmation.mmd`
-
----
-
-## Tier 3 — Admin Monitoring
-
-Requires Tier 2 access control to be meaningful in a multi-user environment.
-
----
-
-### ~~BL-008 · Admin Monitoring Dashboard~~ `L` ✓ Complete
-**User story:** US-5.1
-**Value:** Admins have no visibility into system health or usage trends without querying the database directly.
-
-**Scope:**
-- New page: `flows/admin_dashboard.html` (staff-only, `@staff_member_required`)
-- Stats cards: total executions, success rate, average run time (query `FlowExecution`)
-- Breakdown table: executions by user (last 30 days)
-- Breakdown table: executions by flow type (pipeline vs predict_pipeline)
-- Time-series chart: daily execution count for last 30 days (use Chart.js or a simple HTML table — no new JS dependency needed)
-- No new model needed — all data available in `FlowExecution`
-
-**Docs required before starting:**
-- Wireframe: `admin_dashboard.excalidraw`
-- Update `docs/data-model.mmd` if any new fields are added
-
----
-
-### ~~BL-009 · Admin Execution Log Viewer~~ `M` ✓ Complete
-**User story:** US-5.2
-**Value:** When a user reports a failed execution, admins currently have no UI to inspect it — they must check Celery/Flower or the database.
-
-**Scope:**
-- Extend the admin dashboard (BL-008) or add a dedicated `flows/admin_executions.html` page
-- List all executions across all users with filters: user, date range, status
-- Execution detail shows: user, inputs (`parameters`), error message, celery task ID, timestamps
-- Link through to Flower (`/flower/`) for Celery-level detail
-
-**Depends on:** BL-008
-
-**No new model needed.** Update admin dashboard wireframe to include this view.
-
----
-
-## Tier 4 — User Experience Enhancements
-
-Valuable but not blocking any core workflow.
-
----
-
-### ~~BL-010 · Input Presets (Save & Reuse Prediction Inputs)~~ `L` ✓ Complete
-**User story:** US-5.2 (original backlog)
-**Value:** Power users who run many predictions with similar inputs must re-enter values each time.
-
-**Scope:**
-- New model: `InputPreset` (user FK, name, `input_values` JSONField, created_at)
-- Migration required
-- Dashboard form: "Save as preset" button → modal with preset name input
-- Dashboard form: "Load preset" dropdown → populates form fields via HTMX
-- Manage presets: list, rename, delete (settings page or dedicated partial)
-
-**Docs required before starting:**
-- Update `docs/data-model.mmd` to add `InputPreset`
-- Wireframe: update `dashboard_user_loggedin.excalidraw` to show preset controls
-- Sequence diagram: `docs/sequences/input_presets.mmd`
-
----
-
-### ~~BL-011 · Email Notifications for Failed Executions~~ `M` ✓ Complete
-**User story:** US-7.2 (original backlog)
-**Value:** Users don't know a long-running pipeline has failed unless they check the history page.
-
-**Scope:**
-- In `run_pipeline_task` and `run_prediction_task`, send an email on terminal `FAILED` status
-- Use Django's `send_mail` with a simple text template
-- Email includes: flow name, run ID, error message, link to execution detail page
-- Configurable opt-out: add `notify_on_failure` boolean to `accounts/settings.html`
-
-**Depends on:** BL-001 (email backend)
-
-**Docs required before starting:**
-- Sequence diagram: update `docs/sequences/pipeline_execution.mmd` to show notification branch
-
----
-
-### ~~BL-012 · Retry Failed Execution~~ `S` ✓ Complete
-**User story:** US-4.3 (original backlog)
-**Value:** Users must re-enter all inputs to re-run a failed prediction; retrying with the same parameters requires a button, not a form.
-
-**Scope:**
-- Add `POST /flows/execution/<uuid>/retry/` endpoint
-- Clone the `FlowExecution` record (new UUID, same `parameters` and `flow_name`), dispatch the appropriate Celery task
-- "Retry" button on `execution_detail.html` (only visible when `status=FAILED`)
-
-**No new model or wireframe needed.** Update `execution_detail_page_user.excalidraw` to show the retry button.
-
----
-
----
-
-## Tier 4 (continued) — User Experience Enhancements
-
----
-
-### ~~BL-014 · UI Polish — Button Padding, Spacing & Visual Consistency~~ `S` ✓ Complete
-
-**Value:** Several UI elements have inconsistent padding and margins, making the interface feel unfinished. Fixing these increases perceived quality without touching any backend logic.
-
-**Known issues to address:**
-- Prediction form action buttons (`Run Prediction`, `Save as Preset`) have inconsistent padding vs adjacent controls
-- Spacing between form field labels and inputs varies across pages
-- Badge and tag sizing is inconsistent in history and comparison tables
-- Mobile viewport: sidebar collapse leaves content partially obscured on small screens
-
-**Scope:**
-- Audit all pages with browser DevTools at 1280px and 375px (mobile)
-- Apply consistent DaisyUI spacing utilities (`gap-*`, `p-*`, `space-y-*`)
-- No new components — fix existing templates only
-- No backend changes
-
-**No new wireframe needed** — reference existing DaisyUI spacing guidelines.
-
----
-
-### ~~BL-015 · Prediction Form UX — Disable During Run & Fix Cancel Behaviour~~ `S` ✓ Complete
-
-**Value:** The prediction form stays active while a prediction is running, allowing duplicate submissions. Closing the "Compare with Another" modal also gives the visual impression the prediction is restarting.
-
-**Known issues:**
-1. **Form stays active during run** — After clicking "Run Prediction", the form inputs and button remain enabled. The user can click again and trigger a second parallel prediction. The form should be visually disabled (greyed out, button shows spinner) until a result or error is shown.
-2. **Compare modal cancel flicker** — Closing the Compare Predictions modal briefly makes the result area appear to reset or re-render. Investigate whether the `<dialog>` close event is bubbling to anything that triggers a re-fetch or DOM update.
-
-**Scope:**
-- On form submit, disable all inputs and replace button text with a spinner via JS (no HTMX)
-- Re-enable the form if an error is returned
-- Debug the cancel-flicker: check for event listeners on the dialog `close` event or the `#prediction-result` container that trigger unintended re-renders
-
-**No new model or diagram needed.**
-
----
-
-## Tier 5 — Technical Debt & Infrastructure
-
----
-
-### ~~BL-013 · Migrate HTMX from 1.9.10 to 2.x~~ `S` ✓ Complete
-
-**Value:** HTMX 1.9.10 has a known bug with `outerHTML` polling (crashes with `Cannot read properties of null (reading 'htmx-internal-data')`). Version 2.x fixes this. The upgrade is low-effort for this project.
-
-**Scope:**
-- Update the CDN script tag in `core/base.html` from `htmx.org@1.9.10` to `htmx.org@2.0.4` (or latest 2.x)
-- Verify `hx-delete` usage — in 2.x, DELETE requests send params in the URL instead of the request body
-- Confirm no `hx-on` attribute syntax is in use (syntax changed in 2.x)
-- Smoke-test all HTMX interactions: history filters/pagination, upload flow, preset load/delete, admin execution list
-- `htmx.config.selfRequestsOnly` now defaults to `true` — all requests are same-origin so no change needed
-
-**No new model, wireframe, or diagram needed.** See `CLAUDE.md` for full migration notes.
-
----
-
-### ~~BL-016 · Frontend Asset Pipeline — Tailwind Build + django-compressor~~ `M` ✓ Complete
-
-**Value:** CSS and JS are currently loaded from CDN at runtime. A local build step removes CDN dependencies, enables tree-shaking (smaller Tailwind output), and adds cache-busting via django-compressor.
-
-**Scope:**
-- Add `package.json` with Tailwind CSS CLI build script (`npm run build` / `npm run watch`)
-- Replace CDN `<link>` for Tailwind/DaisyUI with compiled `static/dist/main.css`
-- Vendor HTMX (download `htmx.min.js` to `static/vendor/`), reference via `{% static %}`
-- Install and configure `django-compressor` (`COMPRESS_OFFLINE=True` for staging/prod)
-- Add a `frontend-build` Docker service (Node image) that runs before `collectstatic`
-- Update `Dockerfile` and CI to run `npm ci && npm run build` before `python manage.py collectstatic`
-
-**Docs:** See `docs/deployment/frontend-pipeline.md` for full approach and config snippets.
-
-**Depends on:** Nothing, but should be done before BL-017/BL-018 (staging/prod) so static files are handled correctly at deploy time.
-
----
-
-### ~~BL-017 · Staging Environment — Docker on EC2 with Traefik SSL~~ `L` ✓ Complete
-
-**Value:** There is currently no shared staging environment. Developers test against localhost only. A staging environment enables pre-production testing, stakeholder demos, and smoke-testing deployments before production.
-
-**Scope:**
-- Create `docker-compose.staging.yml` (Traefik service + label overrides for Django/Flower)
-- Create `backend/config/settings/staging.py` (DEBUG=False, WhiteNoise, HSTS)
-- Create `traefik/traefik.yml` (Let's Encrypt ACME via HTTP challenge)
-- Document EC2 provisioning steps and initial deploy procedure
-- Add `DJANGO_SETTINGS_MODULE=config.settings.staging` to staging env
-- Verify all services (web, celery-worker, Redis, PostgreSQL, RustFS) start correctly
-- Verify SSL certificate issuance and HTTPS redirect
-
-**Docs:** See `docs/deployment/staging.md` for full architecture and config.
-
-**Depends on:** BL-016 (frontend pipeline should be in place so `collectstatic` works correctly).
-
----
-
-### ~~BL-019 · Notification Management — In-App Notification Centre & Preferences~~ `M` ✓ Complete
-
-**User story:** US-7.2 (extends BL-011)
-**Value:** Email-only notifications (BL-011) miss users who don't monitor their inbox. An in-app notification centre surfaces run completions, failures, and system messages without requiring email, and a preferences page lets users control which channels they want.
-
-**Scope:**
-- New model: `Notification` (user FK, `notification_type` choices, `message`, `related_execution` FK nullable, `is_read` bool, `created_at`)
-- Migration required
-- In-app notification bell icon in `core/base.html` navbar — badge shows unread count (HTMX polling or SSE)
-- Notification list page: `accounts/notifications.html` — mark individual or all as read
-- Notification preferences page (extend `accounts/settings.html`): per-channel toggles (`notify_on_failure`, `notify_on_success`, `notify_in_app`, `notify_via_email`)
-- Celery tasks that currently send email (BL-011) also create a `Notification` record when `notify_in_app` is enabled
-
-**Depends on:** BL-011
-
-**Docs required before starting:**
-- Update `docs/data-model.mmd` to add `Notification` and update `UserProfile`
-- Wireframe: `notification_centre.excalidraw`
-- Sequence diagram: `docs/sequences/notifications.mmd`
-
----
-
-### ~~BL-020 · Feature Flags — Per-User & Environment Toggle System~~ `M` ✓ Complete
-
-**Value:** Before production, there is no mechanism to gradually roll out new features, run A/B tests, or disable functionality per environment without a code deploy. A lightweight feature-flag system removes this risk and enables confident incremental releases.
-
-**Scope:**
-- New model: `FeatureFlag` (name slug, description, `is_enabled` bool, `rollout_percentage` 0–100 integer, `enabled_for_users` M2M nullable)
-- Flag resolution order (first match wins):
-  1. `enabled_for_users` — if user is explicitly listed, flag is on regardless of other settings
-  2. `rollout_percentage` — if > 0, deterministically hash `user.id + flag.name` to decide inclusion (stable per-user, no random drift on re-check)
-  3. `is_enabled` — global on/off fallback
-- Migration required
-- Register model in Django Admin — managed entirely via `/admin/`; no custom UI needed
-- Template tag `{% flag "flag-name" %}...{% endflag %}` for conditional rendering in templates
-- View decorator `@require_flag("flag-name")` returning 404 when flag is off
-- Seed migration with a small set of initial flags (e.g. `notifications`, `input-presets`) so existing features can be wrapped without breaking them
-- No third-party dependency — implement with the new model and a simple cache layer (`django.core.cache`)
-
-**Docs required before starting:**
-- Update `docs/data-model.mmd` to add `FeatureFlag`
-
----
-
-### BL-018 · Production Environment — Docker Compose/Swarm + PostgreSQL Backups `XL`
-
-**Value:** No production deployment exists. This item covers the full production infrastructure: multi-replica web/worker services, automated PostgreSQL backups to S3, health checks, and a CI/CD deploy pipeline.
-
-**Scope:**
-- Create `backend/config/settings/production.py` (full security headers, structured JSON logging)
-- Create `docker-stack.yml` (Swarm-compatible, with `deploy:` keys for replicas and restart policy)
-- Add `pg-backup` service (scheduled `pg_dump` → S3 via cron on manager node)
-- Add `GET /health/` endpoint in `core/views.py` (used by load balancer health checks)
-- Document Docker Swarm init and node join procedure
-- Set up GitHub Actions deploy workflow (build image → push to GHCR → `docker service update`)
-- Test backup restore on staging before go-live
-
-**Docs:** See `docs/deployment/production.md` for full architecture, Swarm config, backup options, and CI/CD sketch.
-
-**Depends on:** BL-017 (staging must be proven stable first), BL-019 (notification system should be in place before prod traffic), BL-020 (feature flags needed to gate rollout).
+### BL-018 · Production Environment — Docker Swarm + PostgreSQL Backups `XL` `[~]`
+
+**User story:** US-T6
+**Value:** No production deployment exists. Core infrastructure is done; remaining work is documentation gating a safe go-live.
+
+**Remaining scope:**
+- [ ] Document Docker Swarm init and node join procedure in `docs/deployment/production.md`
+- [ ] Document backup restore procedure and test against staging
+
+**Completed scope:**
+- [x] `backend/config/settings/production.py` — security headers, WhiteNoise, HSTS, structured logging
+- [x] `docker-stack.yml` — Swarm-compatible with `deploy:` keys (replicas, restart policy, health checks)
+- [x] `pg-backup` service — scheduled `pg_dump` → S3 via cron on manager node
+- [x] `GET /health/` endpoint in `core/views.py`
+- [x] GitHub Actions workflow — build → push GHCR → `docker service update`
 
 ---
 
@@ -395,38 +45,263 @@ Valuable but not blocking any core workflow.
 - `docker-compose.yml` — add `otel-collector` (dev) + `jaeger` (dev UI) services
 - `docker-stack.yml` — add `otel-collector` service with production collector config
 - `deploy/.env.tpl` — add `OTEL_*` variables sourced from 1Password
-- Per-environment Django settings: dev uses `SimpleSpanProcessor` (synchronous, good for debugging); staging/production use `BatchSpanProcessor` (async, low overhead)
+- Per-environment Django settings: dev uses `SimpleSpanProcessor`; staging/production use `BatchSpanProcessor`
 
-**Depends on:** BL-018 (production environment should be in place before wiring in the production backend)
+**Depends on:** BL-018
 
 **Docs required before starting:**
 - Sequence diagram: `docs/sequences/otel_trace_lifecycle.mmd`
-- Design doc: `docs/observability/opentelemetry.md` ✓ (see below)
+
+---
+
+## Tier 1 — Structural Design (foundational)
+
+These address complected data structures that compound in cost with every feature added on top. They are not urgent rewrites, but they gate a whole class of future capability (per-step progress, model versioning, analytics). They should be sequenced before the DataTable component (BL-024) since that component will query the new structures.
+
+> See [design-review.md](design-review.md) for the full analysis.
+
+---
+
+### BL-026 · Split Execution Models — Typed Results, Remove Schemaless Blob `L` `[ ]`
+
+**User story:** US-T11
+**Value:** `FlowExecution.parameters` currently conflates prediction inputs (immutable, set at submission) with prediction results (written on completion). Every downstream consumer — comparison view, history list, analytics — has to know the internal key names and do JSON gymnastics. Typed columns make queries, filtering, and future analytics trivial.
+
+**Scope:**
+- Introduce `PredictionResult` model: `execution` (OneToOne FK), `scoring_model` (FK, nullable initially), `score` (FloatField), `classification` (TextChoices: Approved/Review/Declined), `confidence` (FloatField), `scored_at` (DateTimeField)
+- Introduce `PredictionInput` model (or add typed columns to `FlowExecution`): `income`, `age`, `credit_score`, `employment_years` as proper fields
+- Migration: backfill from existing `parameters` JSON for all `predict_pipeline` executions
+- Update `run_prediction_task` to write a `PredictionResult` row instead of merging into `parameters`
+- Update comparison view, history view, and execution detail to read from typed fields — remove all `.parameters.get("score")` calls
+- Update `data-model.mmd`
+
+**Depends on:** nothing — this is foundational
+**Docs required:** Update `docs/data-model.mmd`
+
+---
+
+### BL-027 · `ExecutionStep` — Per-Step Pipeline Tracking `M` `[ ]`
+
+**User story:** US-T12
+**Value:** A 4-step pipeline is currently a black box. Users see "FAILED" with a truncated error and no indication of whether step 1 succeeded. Step-level records unlock accurate failure diagnosis, per-step progress display, and performance analytics without any additional instrumentation.
+
+**Scope:**
+- New model: `ExecutionStep` (`execution FK`, `step_name VARCHAR`, `step_index SMALLINT`, `status TextChoices`, `started_at`, `completed_at`, `output_s3_path`, `error_message`)
+- Update `dodo.py` / `PipelineRunner` to create/update step records as each notebook starts and finishes (via a lightweight callback or by having each notebook write a step-start/step-end marker to a known S3 path)
+- Update execution detail UI to show step-level progress: e.g. `✓ Ingest · ✓ Validate · ⟳ Transform · — Aggregate`
+- Update `data-model.mmd`
+
+**Depends on:** BL-026 (clean execution model first)
+**Docs required:** Update `docs/data-model.mmd`; sequence diagram `docs/sequences/pipeline_step_tracking.mmd`
+
+---
+
+### BL-028 · `ScoringModel` — Versioned Scoring Algorithm `M` `[ ]`
+
+**User story:** US-T13
+**Value:** The scoring weights (0.40/0.30/0.20/0.10) and thresholds (0.70/0.50) are hardcoded in `predict_02_score.ipynb`. There is no record of which algorithm version produced a given score. Changing weights is invisible in the data layer. A `ScoringModel` entity makes the algorithm data — versionable, auditable, and swappable without touching notebook code.
+
+**Scope:**
+- New model: `ScoringModel` (`version VARCHAR`, `description TEXT`, `weights JSON`, `thresholds JSON`, `is_active BOOLEAN`, `created_at`, `created_by FK`)
+- Seed migration with `v1.0` capturing the current hardcoded values
+- Update `PipelineRunner` to pass the active `ScoringModel`'s weights and thresholds as notebook parameters (or write them to a known S3 config path that the notebook reads)
+- Remove hardcoded numbers from `predict_02_score.ipynb`; read from parameters
+- Link `PredictionResult.scoring_model FK → ScoringModel`
+- Admin registration so scoring models can be managed via `/admin/`
+- Update `data-model.mmd`
+
+**Depends on:** BL-026 (`PredictionResult` must exist first)
+**Docs required:** Update `docs/data-model.mmd`
+
+---
+
+### BL-029 · Notebook Result Protocol — Write `result.json` to S3 `S` `[ ]`
+
+**User story:** US-T14
+**Value:** `PipelineRunner._extract_metadata()` scans stdout backwards for the first `{`. Any library printing a dict-like string can silently corrupt the result. Writing a `result.json` manifest to S3 instead makes the contract explicit, independently readable, and not fragile to logging noise.
+
+**Scope:**
+- Each notebook's final cell writes `result.json` to `s3://{bucket}/processed/flows/{flow_type}/{run_id}/result.json` in addition to (or instead of) the stdout print
+- `PipelineRunner` reads `result.json` from S3 after subprocess exit; `_extract_metadata()` is removed
+- The manifest schema is a documented dict (or Pydantic model): `{step, row_count, s3_output_path, ...}` for pipeline; `{score, classification, confidence, ...}` for prediction
+- Existing stdout logging is unchanged — notebooks can print freely
+
+**Depends on:** nothing (independent improvement, but easier to do alongside BL-026/028)
+
+---
+
+### BL-030 · Status as Enforced `TextChoices` State Machine `S` `[ ]`
+
+**User story:** US-T15
+**Value:** `status = CharField(max_length=50)` with no `choices`. Invalid states (typos, missing `completed_at`, backward transitions) are silently written. The state machine is real — it drives the entire UI polling loop — but it is enforced only by convention.
+
+**Scope:**
+- Add `ExecutionStatus(models.TextChoices)`: `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`
+- Apply to `FlowExecution.status` and `ExecutionStep.status`
+- Add a `transition()` method (or use `django-fsm`) that guards valid transitions and auto-sets `completed_at`
+- Replace all raw `.update(status="COMPLETED")` calls in `tasks.py` with the transition interface
+- Migration: `RunPython` to normalise any existing rows with non-standard status strings
+
+**Depends on:** BL-026 (clean model first)
+
+---
+
+## Tier 1 — Accessibility & Security (immediate)
+
+Both are cross-cutting concerns that affect every page. Accessibility is included here because it has legal and ethical weight equivalent to security; neither should be deferred behind feature work.
+
+---
+
+### BL-025 · WCAG 2.1 AA Accessibility Audit & Remediation `M` `[ ]`
+
+**User story:** US-T10
+**Value:** The application is not currently navigable by keyboard-only users or screen reader users. Several specific gaps are known from reading the templates. This item audits and remediates all WCAG 2.1 AA failures.
+
+**Reference:** WCAG 2.1 Level AA; EN 301 549 v3.2.1; Section 508.
+
+**Scope — known gaps to fix:**
+
+1. **Skip link** — add `<a href="#main-content" class="sr-only focus:not-sr-only …">Skip to main content</a>` as first child of `<body>` in `base.html`; add `id="main-content"` to `<main>` (WCAG 2.4.1)
+2. **Navbar interactive elements** — replace `<div role="button">` notification bell and user avatar with `<button>` elements; add `aria-label="Open notifications"` and `aria-label="Open user menu"` respectively (`navbar.html`) (WCAG 4.1.2)
+3. **Decorative SVGs** — add `aria-hidden="true"` to all inline SVG icons used alongside visible text labels across all templates (`navbar.html`, `sidebar.html`, `dashboard.html`, `empty_state.html`, `badge.html`) (WCAG 1.1.1)
+4. **Async live regions** — add `aria-live="polite" aria-atomic="true"` to `#prediction-result` in `dashboard.html` and `#notification-dropdown-items` in `navbar.html` (WCAG 4.1.3)
+5. **Form error `aria-describedby`** — in `dashboard.html`'s JS `setFieldError`, set `aria-describedby` on the input pointing at the error element's ID; mirror the pattern from `form_input.html` (WCAG 3.3.1)
+6. **Modal `aria-labelledby`** — add `aria-labelledby="<id>"` to every `<dialog>` element and a matching `id` on the `<h3>` title; update `modal.html` component and all inline modals in `dashboard.html`, `base.html` (WCAG 4.1.2)
+7. **Table headers** — add `scope="col"` to all `<th>` elements; replace empty `<th></th>` action columns with `<th scope="col" class="sr-only">Actions</th>` in `dashboard.html`, `history.html`, `user_list.html`, `admin_executions.html` (WCAG 1.3.1)
+8. **Pagination** — add `aria-current="page"` to active page button; wrap pagination `div` in `<nav aria-label="Pagination">` in `pagination.html` (WCAG 2.4.3)
+9. **Active nav** — add `aria-current="page"` to active sidebar and navbar links in `sidebar.html` and `navbar.html` (WCAG 2.4.3)
+10. **Landmark regions** — wrap navbar content in `<nav aria-label="Main navigation">`; wrap sidebar `<ul>` in `<nav aria-label="Dashboard navigation">` (WCAG 1.3.1)
+11. **Contrast audit** — run Axe / Lighthouse on all page types; resolve any AA failures (WCAG 1.4.3)
+12. **Keyboard smoke test** — manually verify login, run prediction, view history, open/close modal, and mark notification as read are all completable by keyboard alone (WCAG 2.1.1)
+
+**No new model or wireframe needed.** Reference [design-system.md](design-system.md) Do/Don't section.
+
+**Definition of done:** Axe CLI or browser extension reports zero critical/serious violations on dashboard, history, and login pages.
+
+---
+
+## Tier 1 — Security (immediate)
+
+Security items are prioritised above features. Both should be resolved before new feature work.
+
+---
+
+### ~~BL-022 · Secrets Management Audit~~ `M` ✓ Complete
+
+**User story:** US-T9
+
+**Completed:**
+- Notebook credentials — `runner.py` and all 6 notebooks fixed; credentials never passed as papermill parameters
+- `justfile run-pipeline` — `aws_access_key_id`/`aws_secret_access_key` removed from `PIPELINE_PARAMS`
+- Password hashing — `PASSWORD_HASHERS` explicitly set to Argon2id with PBKDF2 fallback in `settings/base.py`; `argon2-cffi` added to `pyproject.toml`
+- DuckDB f-string — known-limitation comment added to `services/datalake.py`
+- Docker Compose — `django_password`/`rustfs_secret` are local dev placeholders; acceptable and documented
+- GitHub Actions — all secrets use `${{ secrets.* }}`; no values echoed
+- Django log config — clean; no credential fields in log formatters
+- Secrets inventory — `docs/security/secrets-inventory.md` created; covers all secrets, injection paths, rotation procedures
+- Remaining: `gitleaks`/`truffleHog` scan against repo history (recommend adding to CI)
+
+---
+
+### ~~BL-023 · Infrastructure as Code & 1Password Secrets Management~~ `L` ✓ Complete
+
+**User story:** US-T7
+
+**Completed:** All scope items were already implemented:
+- `terraform/` — VPC, EC2, security groups, Elastic IP, S3 backup bucket, IAM instance profile
+- SSH key sourced from 1Password (`op://Production/Infrastructure/public_key`)
+- S3 remote state backend with versioning and encryption (`terraform/backend.tf`, `backend.hcl.example`)
+- `deploy/.env.tpl` — full `op inject` template; no plaintext secrets
+- `deploy/justfile` — all recipes: `tf-init`, `tf-plan`, `tf-apply`, `push-env`, `push-stack`, `bootstrap`, `deploy`, `rollback`, `migrate`, `ssh`, `status`, `logs`, `backup`
+- Root `justfile` — `prod-*` namespace delegating to `deploy/justfile`
+- `gunicorn` in `pyproject.toml`
+
+---
+
+## Tier 2 — Production Readiness
+
+---
+
+### BL-018 (remaining docs) — see Active above
+
+---
+
+## Tier 3 — Platform & Infrastructure
+
+---
+
+### BL-021 (OpenTelemetry) — see Active above
+
+---
+
+## Tier 4 — Developer Experience
+
+---
+
+### BL-024 · Reusable Advanced DataTable Component `L` `[ ]`
+
+**User story:** US-6.1
+**Value:** Every list view (execution history, admin dashboard, notification list, user management) duplicates filter, sort, and pagination logic. A single reusable DataTable component eliminates that duplication and delivers consistent UX across all tables.
+
+**Scope:**
+- Reusable Django template partial: `core/templates/core/components/datatable.html`
+- Column definitions passed via `table_config` context dict — fields, labels, sortable/filterable/hideable flags
+- Column visibility toggled per-user via `localStorage` (keyed by `table_id`; no model change required)
+- Filter builder supports: contains, not contains, equals, not equals, starts/ends with, is empty/not empty (text); eq/neq/gt/gte/lt/lte (number); before/after/eq (datetime); eq/neq (choice)
+- Multiple filters combinable (AND); each shown as a dismissable chip in an active-filters bar
+- Filter and sort state encoded in URL query params (shareable, browser back/forward compatible)
+- Bulk action bar appears when ≥ 1 row checked; actions configured per table with `min_select`/`max_select`
+- HTMX fetches filtered/sorted/paginated results without full page reload
+- Alpine.js manages client-side state (filter builder rows, column toggles, selected IDs)
+- No changes to base templates — added via `{% include %}` only
+- Migrate history, admin execution list, notification list, and user management list to use the component
+
+**Docs required before starting:**
+- Wireframe: `docs/wireframes/datatable_component.excalidraw`
+- Sequence diagram: `docs/sequences/datatable_filtering.mmd`
+
+---
+
+## Completed
+
+All items below are done and closed.
+
+| ID | Title | Tier | Effort |
+|----|-------|------|--------|
+| ~~BL-001~~ | ~~Password reset flow~~ | 1 | M |
+| ~~BL-002~~ | ~~S3 cleanup on execution delete~~ | 1 | S |
+| ~~BL-003~~ | ~~Presigned S3 download URLs~~ | 1 | S |
+| ~~BL-004~~ | ~~Export execution history as CSV~~ | 1 | S |
+| ~~BL-005~~ | ~~Prediction comparison — input & score detail~~ | 1 | M |
+| ~~BL-006~~ | ~~Superuser user management UI~~ | 2 | L |
+| ~~BL-007~~ | ~~Registration email confirmation~~ | 2 | M |
+| ~~BL-008~~ | ~~Admin monitoring dashboard~~ | 3 | L |
+| ~~BL-009~~ | ~~Admin execution log viewer~~ | 3 | M |
+| ~~BL-010~~ | ~~Input presets (save & reuse prediction inputs)~~ | 4 | L |
+| ~~BL-011~~ | ~~Email notifications for failed executions~~ | 4 | M |
+| ~~BL-012~~ | ~~Retry failed execution~~ | 4 | S |
+| ~~BL-013~~ | ~~Migrate HTMX 1.9.10 → 2.x~~ | 5 | S |
+| ~~BL-014~~ | ~~UI polish — buttons, spacing, visual consistency~~ | 4 | S |
+| ~~BL-015~~ | ~~Prediction form UX — disable during run & fix cancel flicker~~ | 4 | S |
+| ~~BL-016~~ | ~~Frontend asset pipeline (Tailwind build + django-compressor)~~ | 5 | M |
+| ~~BL-017~~ | ~~Staging environment (EC2 + Traefik SSL)~~ | 5 | L |
+| ~~BL-019~~ | ~~Notification management (in-app centre + preferences)~~ | 4 | M |
+| ~~BL-020~~ | ~~Feature flags (per-user & environment toggles)~~ | 5 | M |
 
 ---
 
 ## Backlog Summary
 
-| ID | Title | Tier | Effort | Depends on |
-|----|-------|------|--------|------------|
-| ~~BL-001~~ | ~~Password reset flow~~ | 1 | M | — |
-| ~~BL-002~~ | ~~S3 cleanup on delete~~ | 1 | S | — |
-| ~~BL-003~~ | ~~Presigned download URLs~~ | 1 | S | — |
-| ~~BL-004~~ | ~~Export history as CSV~~ | 1 | S | — |
-| ~~BL-005~~ | ~~Prediction comparison detail~~ | 1 | M | — |
-| ~~BL-006~~ | ~~Superuser user management UI~~ | 2 | L | — |
-| ~~BL-007~~ | ~~Registration email confirmation~~ | 2 | M | BL-001 |
-| ~~BL-008~~ | ~~Admin monitoring dashboard~~ | 3 | L | BL-006 |
-| ~~BL-009~~ | ~~Admin execution log viewer~~ | 3 | M | BL-008 |
-| ~~BL-010~~ | ~~Input presets~~ | 4 | L | — |
-| ~~BL-011~~ | ~~Email notifications for failures~~ | 4 | M | BL-001 |
-| ~~BL-012~~ | ~~Retry failed execution~~ | 4 | S | — |
-| ~~BL-013~~ | ~~Migrate HTMX 1.9.10 → 2.x~~ | 5 | S | — |
-| ~~BL-014~~ | ~~UI polish — buttons, spacing, consistency~~ | 4 | S | — |
-| ~~BL-015~~ | ~~Prediction form UX — disable during run, fix cancel flicker~~ | 4 | S | — |
-| ~~BL-016~~ | ~~Frontend asset pipeline (Tailwind build + compressor)~~ | 5 | M | — |
-| ~~BL-017~~ | ~~Staging environment (EC2 + Traefik SSL)~~ | 5 | L | BL-016 |
-| ~~BL-019~~ | ~~Notification management (in-app centre + preferences)~~ | 4 | M | BL-011 |
-| ~~BL-020~~ | ~~Feature flags (per-user & environment toggles)~~ | 5 | M | — |
-| BL-018 | Production environment (Swarm + PG backups) | 5 | XL | BL-017, BL-019, BL-020 |
-| BL-021 | OpenTelemetry — distributed tracing & metrics | 5 | M | BL-018 |
+| ID | Title | Status | Effort | Depends on |
+|----|-------|--------|--------|------------|
+| BL-018 | Production environment (docs remaining) | In progress | S | — |
+| BL-021 | OpenTelemetry — distributed tracing & metrics | In progress | M | BL-018 |
+| BL-026 | Split execution models — typed results, remove blob | Not started | L | — |
+| BL-027 | `ExecutionStep` — per-step pipeline tracking | Not started | M | BL-026 |
+| BL-028 | `ScoringModel` — versioned scoring algorithm | Not started | M | BL-026 |
+| BL-029 | Notebook result protocol — write `result.json` to S3 | Not started | S | — |
+| BL-030 | Status as enforced `TextChoices` state machine | Not started | S | BL-026 |
+| BL-025 | WCAG 2.1 AA accessibility audit & remediation | Not started | M | — |
+| ~~BL-022~~ | ~~Secrets management audit~~ | Complete | M | — |
+| ~~BL-023~~ | ~~Infrastructure as Code & 1Password secrets~~ | Complete | L | — |
+| BL-024 | Reusable advanced DataTable component | Not started | L | BL-026 |

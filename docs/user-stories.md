@@ -369,7 +369,129 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
-## Epic 11: Observability — OpenTelemetry `[ ]`
+## Epic 11: Structural Design `[ ]`
+
+> See [design-review.md](design-review.md) for the full Hickey/Torvalds analysis these stories are derived from.
+
+### US-T11: Separate Pipeline and Prediction Execution Models `[ ]`
+**As a** developer
+**I want** data processing pipelines and credit predictions to be distinct domain concepts with their own data structures
+**So that** queries, views, and analytics are unambiguous and the codebase doesn't branch on a string discriminator throughout
+
+**Acceptance Criteria:**
+- [ ] `FlowExecution` is split into `PipelineRun` and `PredictionRun` (or given a proper `flow_type` TextChoices discriminator with separate result relations)
+- [ ] Prediction inputs (`income`, `age`, `credit_score`, `employment_years`) are stored in typed columns or a dedicated `PredictionInput` relation — not in a schemaless `parameters` blob
+- [ ] Prediction results (score, classification, confidence) are stored in a `PredictionResult` relation with typed columns — queryable without JSON field gymnastics
+- [ ] `classification` is indexable; "all Declined predictions" is a standard `filter()` call
+- [ ] All existing views, tasks, and templates are updated to use the new structure; no behaviour changes
+
+### US-T12: Explicit Pipeline Step Tracking `[ ]`
+**As a** user
+**I want** to see which step of a pipeline is currently running and which step failed
+**So that** I can diagnose failures accurately and understand progress without waiting for completion
+
+**As a** developer
+**I want** per-step timing and status persisted in the database
+**So that** I can answer "which step is slowest" and "where do pipelines most often fail" with a simple query
+
+**Acceptance Criteria:**
+- [ ] `ExecutionStep` model exists: `execution FK`, `step_name`, `step_index`, `status`, `started_at`, `completed_at`, `output_s3_path`, `error_message`
+- [ ] Pipeline tasks write a step record at the start and end of each notebook execution
+- [ ] Dashboard/execution detail shows per-step progress (e.g. step 2 of 4 running)
+- [ ] Failure message is scoped to the failing step, not the full pipeline stderr
+- [ ] Admin can query "average duration by step" across all runs
+
+### US-T13: Versioned Scoring Model `[ ]`
+**As a** developer
+**I want** the credit scoring algorithm to be stored as data — not as literal numbers in a notebook
+**So that** every prediction is permanently linked to the model version that produced it, and weights can be changed without editing code
+
+**Acceptance Criteria:**
+- [ ] `ScoringModel` entity: `version`, `description`, `weights` (JSON), `thresholds` (JSON), `is_active`, `created_at`, `created_by`
+- [ ] `PredictionResult` carries a `scoring_model FK`
+- [ ] The prediction notebook reads its weights and thresholds from the active `ScoringModel` record (passed as a parameter or read from a known S3 config path) — no hardcoded values
+- [ ] Changing weights creates a new `ScoringModel` version; existing results retain their original model reference
+- [ ] Admin can view which model version produced any given prediction
+
+### US-T14: Robust Notebook Result Protocol `[ ]`
+**As a** developer
+**I want** notebook results communicated to Django via a structured file, not by parsing stdout
+**So that** the contract is explicit, testable, and not fragile to incidental print output from libraries
+
+**Acceptance Criteria:**
+- [ ] Each notebook writes a `result.json` manifest to a known S3 path (`{run_id}/result.json`) as its final step
+- [ ] `PipelineRunner` reads `result.json` from S3 after subprocess exit instead of scanning stdout
+- [ ] `_extract_metadata()` is removed; replaced by a typed schema for the manifest
+- [ ] The result schema is documented and validated (e.g. with Pydantic or a plain dict schema check)
+- [ ] Existing stdout logging from notebooks is unaffected — libraries can print freely
+
+### US-T15: Status as an Enforced State Machine `[ ]`
+**As a** developer
+**I want** execution status transitions to be enforced at the model layer
+**So that** illegal states (e.g. COMPLETED with no `completed_at`, FAILED → RUNNING) are caught before they reach the database
+
+**Acceptance Criteria:**
+- [ ] `status` uses `TextChoices` (or `django-fsm`) with explicit valid values
+- [ ] Transition guards prevent invalid state changes; violations raise an exception rather than silently writing bad state
+- [ ] `completed_at` is automatically set on transition to `COMPLETED` or `FAILED`
+- [ ] All `.update(status=...)` calls in `tasks.py` go through the transition interface
+
+---
+
+## Epic 12: Accessibility (A11y) `[ ]`
+
+
+### US-T10: WCAG 2.1 AA Compliance `[ ]`
+**As a** user with a disability
+**I want** the application to be fully navigable and understandable using assistive technology
+**So that** I can run predictions, manage executions, and use all features without relying on a mouse or colour perception
+
+> **Reference:** WCAG 2.1 Level AA (W3C Recommendation); EN 301 549 v3.2.1 (EU accessibility standard); Section 508 (US). The following criteria are directly applicable: 1.1.1, 1.3.1, 1.3.3, 1.4.1, 1.4.3, 2.1.1, 2.4.1, 2.4.3, 2.4.7, 3.3.1, 3.3.2, 4.1.2, 4.1.3.
+
+**Acceptance Criteria:**
+
+- [ ] **Skip navigation** — a "Skip to main content" link is the first focusable element on every page; visible on focus (WCAG 2.4.1)
+- [ ] **Icon-only buttons** — all icon-only interactive elements (`<button>`) carry an `aria-label`; `<div role="button">` usages in the navbar (notification bell, user avatar) are replaced with `<button>` elements (WCAG 4.1.2)
+- [ ] **Decorative SVGs** — all inline SVG icons used alongside text labels carry `aria-hidden="true"` so screen readers skip them (WCAG 1.1.1)
+- [ ] **Async regions** — `#prediction-result`, `#notification-dropdown-items`, and any other container that receives HTMX-injected content carry `aria-live="polite"` so screen readers announce updates (WCAG 4.1.3)
+- [ ] **Form error association** — JS-injected validation errors (in `dashboard.html`) use `aria-describedby` to link each input to its error message, matching the pattern already used in `form_input.html` (WCAG 3.3.1)
+- [ ] **Modal labelling** — all `<dialog>` modals carry `aria-labelledby` pointing at their `<h3>` title element (WCAG 4.1.2)
+- [ ] **Table headers** — empty action-column `<th>` elements carry `scope="col"` and a visually-hidden label (e.g. "Actions"); all `<th>` elements carry `scope` (WCAG 1.3.1)
+- [ ] **Pagination** — the active page button carries `aria-current="page"`; the pagination wrapper carries `aria-label="Pagination"` (WCAG 2.4.3)
+- [ ] **Active nav items** — sidebar and navbar active links carry `aria-current="page"` (WCAG 2.4.3)
+- [ ] **Colour and status** — confirmed by audit that no status or meaning is conveyed by colour alone; all status badges include a text label (already the case — verify and document) (WCAG 1.4.1)
+- [ ] **Colour contrast** — automated scan (Axe or Lighthouse) reports zero contrast failures at WCAG AA thresholds (4.5:1 normal text, 3:1 large text) (WCAG 1.4.3)
+- [ ] **Keyboard navigation** — full end-to-end task flows (login, run prediction, view history, manage notifications) are completable using keyboard only; no focus traps outside modals (WCAG 2.1.1)
+- [ ] **Focus visibility** — all interactive elements have a visible focus ring in all states; no `outline: none` without a replacement (WCAG 2.4.7)
+- [ ] **Document landmark** — navbar is wrapped in `<nav aria-label="Main navigation">`; the sidebar is wrapped in `<nav aria-label="Dashboard navigation">` (WCAG 1.3.1)
+- [ ] **Automated baseline** — Axe (or equivalent) integrated into CI or run manually; zero critical/serious violations reported before the story is closed
+
+---
+
+## Epic 14: Security — Secrets Management `[ ]`
+
+### US-T9: Audit and Remediate Plaintext Secret Exposure `[ ]`
+**As a** developer
+**I want to** ensure no secrets are stored or transmitted in plaintext anywhere in the application
+**So that** credentials cannot be compromised via source code, logs, output files, or config leakage
+
+> **Reference:** OWASP ASVS v4.0 §2.10 (Service Authentication), §6.1–6.2 (Stored Cryptography);
+> OWASP Top 10:2021 A02 — Cryptographic Failures; OWASP Secrets Management Cheat Sheet.
+
+**Acceptance Criteria:**
+
+- [ ] **Source code** — no secrets (API keys, passwords, tokens, DSNs) hardcoded anywhere in the repo; confirmed by a `gitleaks` or `truffleHog` scan with zero high-severity findings (ASVS 2.10.4 / CWE-321)
+- [ ] **Settings** — all secrets read exclusively from environment variables or a secrets vault; `settings/base.py` has no literal credential values; `DEBUG=True` cannot reach production
+- [ ] **Notebook output** — papermill-executed notebooks write no credentials into injected-parameters cells; verified by inspecting a sample output `.ipynb` from S3 (CWE-312)
+- [ ] **Docker Compose / stack files** — no plaintext passwords in `docker-compose.yml`, `docker-compose.staging.yml`, or `docker-stack.yml`; any shown values are placeholders that are overridden at runtime via env files or Docker secrets
+- [ ] **CI/CD** — all secrets in GitHub Actions stored as repository secrets (not hardcoded in workflow YAML); secret values never echoed to logs
+- [ ] **Logs and telemetry** — Django log handlers, Celery task output, and OpenTelemetry spans scrubbed so `AWS_SECRET_ACCESS_KEY`, `DATABASE_URL`, `SECRET_KEY`, and similar values are never emitted (ASVS 8.3.4)
+- [ ] **Database fields** — confirm no sensitive user data (passwords, tokens) stored in plaintext model fields; Django auth uses PBKDF2/Argon2 (ASVS 2.10.3)
+- [ ] **Rotation readiness** — document which secrets exist, where they are used, and the rotation procedure for each; confirm app can recover from a secret rotation without downtime
+
+---
+
+## Epic 15: Observability — OpenTelemetry `[ ]`
 
 ### US-T8: Distributed Tracing & Metrics with OpenTelemetry `[ ]`
 **As a** developer
@@ -410,3 +532,6 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 | Superuser management | Complete |
 | In-app notification centre & preferences | Complete |
 | Feature flags (per-user & environment toggles) | Complete |
+| Structural design — model split, step tracking, scoring model | Not started |
+| Accessibility (WCAG 2.1 AA) | Not started |
+| Secrets management audit | Not started |
