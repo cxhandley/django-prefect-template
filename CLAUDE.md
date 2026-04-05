@@ -91,6 +91,28 @@ Add tests before marking the user story complete:
 - `test_services.py` — service layer unit tests
 - Target ≥ 90% coverage on new code
 
+## Container restarts
+
+The `web` and `celery-worker` containers mount the workspace via a volume, so Python file edits are reflected immediately via Django's auto-reloader. However, some changes require an explicit restart because the auto-reloader does not catch them or stale bytecode (`__pycache__`) can mask the new code:
+
+**Restart `web` and `celery-worker` after:**
+- Changes to `models.py` (new fields, new models, `TextChoices` additions)
+- Changes to `apps.py` (AppConfig, OTel init)
+- Changes to `settings/*.py`
+- Adding or removing entries in `INSTALLED_APPS`
+- Any change that causes `TypeError` or `ImportError` on startup (stale `.pyc` is often the cause)
+
+```bash
+docker compose restart web celery-worker
+```
+
+If restarting does not resolve a stale-bytecode error, clear the cache first:
+
+```bash
+find /workspace/backend -name "*.pyc" -delete && find /workspace/backend -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null; echo "Cleared"
+docker compose restart web celery-worker
+```
+
 ## Python dependencies
 
 Python packages are managed with `uv`. After pulling changes that add or update entries in
