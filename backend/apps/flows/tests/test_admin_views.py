@@ -161,7 +161,7 @@ def test_admin_executions_filter_by_status(staff_user, completed_execution, fail
     """Filtering by FAILED shows the failed execution's error and hides the completed one."""
     client = Client()
     client.force_login(staff_user)
-    response = client.get("/flows/admin/executions/?status=FAILED")
+    response = client.get("/flows/admin/executions/?f_field[]=status&f_op[]=eq&f_val[]=FAILED")
     assert response.status_code == 200
     # The failed execution has an error message; completed has none
     assert b"Timeout after 60s" in response.content
@@ -179,7 +179,9 @@ def test_admin_executions_filter_by_user(staff_user, completed_execution, db):
     )
     client = Client()
     client.force_login(staff_user)
-    response = client.get("/flows/admin/executions/?user=other%40example.com")
+    response = client.get(
+        "/flows/admin/executions/?f_field[]=user&f_op[]=contains&f_val[]=other%40example.com"
+    )
     assert response.status_code == 200
     assert b"other@example.com" in response.content
     assert b"regular@example.com" not in response.content
