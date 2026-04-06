@@ -219,6 +219,40 @@ Security items are prioritised above features. Both should be resolved before ne
 
 ---
 
+### ~~BL-031~~ · ~~Live Execution Detail Auto-Refresh & Prediction Step Progress~~ `M` ✓ Complete
+
+**User story:** US-2.5
+**Value:** The execution detail page currently renders a static snapshot; users watching a long-running pipeline must refresh manually to see step progress or know when it finishes. The prediction "running" panel shows only a generic spinner with no step visibility. Both surfaces already have the `ExecutionStep` model and the `prediction_status` polling pattern available — this item wires them together with HTMX to give users live feedback without any page reload.
+
+**Scope:**
+
+1. **New partial endpoint** — `GET /flows/executions/<id>/live-status/`
+   - Requires login; scoped to `triggered_by=request.user` (staff endpoint mirrors with any-user access)
+   - Returns an HTML partial (`flows/partials/execution_live_status.html`) containing:
+     - Status badge (re-rendered from current `execution.status`)
+     - Duration (computed from `created_at` → now or `completed_at`)
+     - `ExecutionStep` timeline: step name, status icon, `started_at`, `completed_at`, `error_message`
+     - Structured log lines built from `ExecutionStep` records (one log line per step event)
+   - When status is terminal (COMPLETED or FAILED): omit `hx-trigger` from the returned partial so the poll loop terminates naturally
+   - When status is PENDING or RUNNING: include `hx-trigger="every 3s"` and `hx-swap="outerHTML"` so HTMX re-polls
+
+2. **Update `execution_detail.html`** — wrap the status badge, duration stat, pipeline steps section, and execution logs section in a single `<div>` that carries the initial `hx-get`, `hx-trigger`, and `hx-swap` attributes; these are already omitted by the partial when the execution is terminal on first load (no unnecessary polls for completed executions)
+
+3. **Update `prediction_running.html`** — replace the static spinner with a call to the same `live-status` partial; show per-step progress (step name + status icon for each `ExecutionStep`) alongside the spinner so the user can see which notebook step is executing; retain the "View execution details →" link
+
+4. **Route** — add `path("executions/<uuid:run_id>/live-status/", views.execution_live_status, name="execution_live_status")` to `flows/urls.py`
+
+5. **No model changes required** — `ExecutionStep` already carries all needed fields (`step_name`, `step_index`, `status`, `started_at`, `completed_at`, `error_message`)
+
+**Out of scope:** raw notebook stdout streaming (not stored), WebSocket/SSE (HTMX polling is sufficient given 3-step pipelines complete in ~30 s)
+
+**Depends on:** BL-027 (`ExecutionStep` model must exist — already complete)
+
+**Docs required before starting:**
+- Sequence diagram: `docs/sequences/execution_live_status.mmd` — shows HTMX poll loop, Django view, DB query, and terminal-state poll removal
+
+---
+
 ## Tier 3 — Platform & Infrastructure
 
 ---

@@ -352,6 +352,58 @@ def execution_detail(request, run_id):
 
 
 @login_required
+@require_http_methods(["GET"])
+def execution_live_status(request, run_id):
+    """
+    HTMX partial endpoint: returns live status, step timeline, and log lines
+    for the execution detail page. Includes hx-trigger while PENDING/RUNNING so
+    HTMX keeps polling; omits it once a terminal status is reached so the loop ends.
+    """
+    execution = get_object_or_404(FlowExecution, flow_run_id=run_id, triggered_by=request.user)
+    steps = list(execution.steps.all())
+
+    duration = None
+    if execution.created_at:
+        end = execution.completed_at or timezone.now()
+        duration = round((end - execution.created_at).total_seconds(), 2)
+
+    is_terminal = execution.status in (ExecutionStatus.COMPLETED, ExecutionStatus.FAILED)
+
+    prediction_result = None
+    input_values = None
+    if execution.flow_name == "credit-prediction":
+        if execution.status == ExecutionStatus.COMPLETED:
+            try:
+                pr = execution.prediction_result
+                prediction_result = {
+                    "score": pr.score,
+                    "classification": pr.classification,
+                    "confidence": pr.confidence,
+                }
+            except execution.__class__.prediction_result.RelatedObjectDoesNotExist:
+                pass
+        input_values = {
+            "income": execution.income,
+            "age": execution.age,
+            "credit_score": execution.credit_score,
+            "employment_years": execution.employment_years,
+        }
+
+    return render(
+        request,
+        "flows/partials/execution_live_status.html",
+        {
+            "execution": execution,
+            "steps": steps,
+            "duration": duration,
+            "is_terminal": is_terminal,
+            "prediction_result": prediction_result,
+            "input_values": input_values,
+        },
+    )
+
+
+@login_required
 def comparison(request):
     """Compare multiple prediction executions side-by-side using real parameters."""
     ids_param = request.GET.get("ids", "")
@@ -758,12 +810,14 @@ def prediction_status(request, run_id):
             },
         )
 
-    # Still RUNNING or PENDING — return spinner (HTMX will keep polling)
+    # Still RUNNING or PENDING — return spinner with step progress (HTMX will keep polling)
+    steps = list(execution.steps.all())
     return render(
         request,
         "flows/partials/prediction_running.html",
         {
             "run_id": str(run_id),
+            "steps": steps,
         },
     )
 

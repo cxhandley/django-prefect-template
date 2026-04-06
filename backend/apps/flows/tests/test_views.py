@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
-from apps.flows.models import FlowExecution
+from apps.flows.models import ExecutionStep, FlowExecution
 from django.utils import timezone
 
 # ============================================================================
@@ -724,3 +724,131 @@ def test_delete_execution_with_task(authenticated_client, user, flow_execution_f
     response = authenticated_client.post(f"/flows/execution/{run_id}/delete/")
     assert response.status_code == 302
     assert not FlowExecution.objects.filter(flow_run_id=run_id).exists()
+
+
+# ============================================================================
+# execution_live_status
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_execution_live_status_pending(authenticated_client, user, flow_execution_factory):
+    """PENDING execution: returns 200 with hx-trigger to keep polling."""
+    execution = flow_execution_factory(triggered_by=user, status="PENDING")
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"every 3s" in response.content
+    assert b"live-status" in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_running(authenticated_client, user, flow_execution_factory):
+    """RUNNING execution: returns 200 with hx-trigger to keep polling."""
+    execution = flow_execution_factory(triggered_by=user, status="RUNNING")
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"every 3s" in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_completed_no_poll(
+    authenticated_client, user, flow_execution_factory
+):
+    """COMPLETED execution: hx-trigger is absent so the poll loop terminates."""
+    execution = make_completed(flow_execution_factory, user)
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"every 3s" not in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_failed_no_poll(authenticated_client, user, flow_execution_factory):
+    """FAILED execution: hx-trigger is absent so the poll loop terminates."""
+    execution = flow_execution_factory(
+        triggered_by=user, status="FAILED", error_message="Something broke"
+    )
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"every 3s" not in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_with_steps(authenticated_client, user, flow_execution_factory):
+    """Steps attached to the execution are rendered in the response."""
+    execution = flow_execution_factory(triggered_by=user, status="RUNNING")
+    ExecutionStep.objects.create(
+        execution=execution,
+        step_name="ingest",
+        step_index=0,
+        status="COMPLETED",
+        started_at=timezone.now(),
+        completed_at=timezone.now(),
+    )
+    ExecutionStep.objects.create(
+        execution=execution,
+        step_name="validate",
+        step_index=1,
+        status="RUNNING",
+        started_at=timezone.now(),
+    )
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"ingest" in response.content
+    assert b"validate" in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_requires_login(client, user, flow_execution_factory):
+    """Unauthenticated requests are redirected to login."""
+    execution = flow_execution_factory(triggered_by=user)
+    response = client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_execution_live_status_not_found(authenticated_client):
+    """Unknown run_id returns 404."""
+    response = authenticated_client.get(f"/flows/execution/{uuid.uuid4()}/live-status/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_execution_live_status_other_user_forbidden(
+    authenticated_client, user_factory, flow_execution_factory
+):
+    """Another user's execution is not accessible (404, not 403)."""
+    other = user_factory()
+    execution = flow_execution_factory(triggered_by=other, status="RUNNING")
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_prediction_status_running_includes_steps(
+    authenticated_client, user, flow_execution_factory
+):
+    """prediction_status returns step data in the running partial when steps exist."""
+    execution = flow_execution_factory(
+        triggered_by=user,
+        flow_name="credit-prediction",
+        status="RUNNING",
+    )
+    ExecutionStep.objects.create(
+        execution=execution,
+        step_name="predict_01_prepare",
+        step_index=0,
+        status="COMPLETED",
+        started_at=timezone.now(),
+        completed_at=timezone.now(),
+    )
+    ExecutionStep.objects.create(
+        execution=execution,
+        step_name="predict_02_score",
+        step_index=1,
+        status="RUNNING",
+        started_at=timezone.now(),
+    )
+    response = authenticated_client.get(f"/flows/prediction-status/{execution.flow_run_id}/")
+    assert response.status_code == 200
+    assert b"predict_01_prepare" in response.content
+    assert b"predict_02_score" in response.content
