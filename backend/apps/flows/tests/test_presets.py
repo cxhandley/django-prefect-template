@@ -170,7 +170,7 @@ def test_retry_creates_new_execution(authenticated_client, user, flow_execution_
         flow_name="predict_pipeline",
         status="FAILED",
         s3_input_path="raw/flows/abc/input.csv",
-        parameters={"income": "70000", "score": 0.4, "classification": "Declined"},
+        income=70000,
         error_message="Pipeline error",
     )
     mock_task = mocker.patch("apps.flows.views.run_prediction_task")
@@ -186,10 +186,8 @@ def test_retry_creates_new_execution(authenticated_client, user, flow_execution_
     assert new_exec.status == "PENDING"
     assert new_exec.flow_name == "predict_pipeline"
     assert new_exec.s3_input_path == original.s3_input_path
-    # Result keys stripped, input keys preserved
-    assert "income" in new_exec.parameters
-    assert "score" not in new_exec.parameters
-    assert "classification" not in new_exec.parameters
+    # BL-026: inputs are typed fields on FlowExecution, not parameters blob
+    assert new_exec.income == original.income
 
 
 @pytest.mark.django_db

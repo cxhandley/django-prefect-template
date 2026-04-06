@@ -209,12 +209,26 @@ function dataTable(config) {
                         if (newTbody.dataset.rowIds) {
                             tbody.dataset.rowIds = newTbody.dataset.rowIds;
                         }
+                        // Sync poller registration attrs from the refreshed tbody
+                        if (newTbody.hasAttribute('data-poller-register')) {
+                            tbody.setAttribute('data-poller-register', '');
+                            ['pollerId','pollerType','pollerTarget','pollerParams'].forEach(function(k) {
+                                if (newTbody.dataset[k]) { tbody.dataset[k] = newTbody.dataset[k]; }
+                            });
+                        } else {
+                            tbody.removeAttribute('data-poller-register');
+                        }
                         htmx.process(tbody);
                     }
                     var oldTfoot = tbody.nextElementSibling;
                     if (newTfoot && oldTfoot && oldTfoot.tagName === 'TFOOT') {
                         oldTfoot.innerHTML = newTfoot.innerHTML;
                         htmx.process(oldTfoot);
+                    }
+                    // Notify the poller that the table URL has changed
+                    if (window.__poller) {
+                        window.__poller.checkElement(tbody);
+                        window.__poller.update(self.tableId, { tableUrl: url });
                     }
                 });
             history.pushState({}, '', url);

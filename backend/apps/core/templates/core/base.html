@@ -58,7 +58,187 @@
             }
         }, true);
 
-        // Delegated handler for compare-prediction modal buttons.
+        // ── Centralized poller ──────────────────────────────────────────────
+        // One setInterval for the whole page.  Components register watchers
+        // via data-poller-* attributes; the backend decides what to refresh.
+        //
+        // Watcher lifecycle:
+        //   1. A partial with data-poller-register is swapped in (HTMX or SSR).
+        //   2. The poller auto-detects it and registers the watcher.
+        //   3. Every INTERVAL_MS the poller POSTs all watchers to /core/poll/.
+        //   4. The backend returns directives: {watcher_id, url, target, done}.
+        //   5. For each directive with a url: the poller fetches it and swaps.
+        //      - Regular elements: el.innerHTML = html.
+        //      - <tbody> elements: table-context parse to avoid invalid nesting.
+        //   6. When done is true (or new content lacks data-poller-register):
+        //      the watcher is removed and a 'poller:done' event is dispatched.
+        window.__poller = (function () {
+            var watchers  = {};   // id → {type, target, params}
+            var intervalId = null;
+            var INTERVAL_MS = 2000;
+
+            // ── helpers ──────────────────────────────────────────────────────
+            function _getCsrf() {
+                var pair = document.cookie.split('; ')
+                    .find(function(r) { return r.startsWith('csrftoken='); });
+                return pair ? pair.split('=')[1] : '';
+            }
+
+            function _fire(el, name) {
+                el.dispatchEvent(new CustomEvent(name, { bubbles: true }));
+            }
+
+            // ── public API ───────────────────────────────────────────────────
+            function register(id, type, target, params) {
+                watchers[id] = { type: type, target: target, params: params || {} };
+                _start();
+            }
+
+            function update(id, params) {
+                if (watchers[id]) { Object.assign(watchers[id].params, params); }
+            }
+
+            function unregister(id) {
+                delete watchers[id];
+                if (!Object.keys(watchers).length) { _stop(); }
+            }
+
+            function checkElement(el) {
+                // Scan el itself then its descendants for a poller marker.
+                var marker = (el && el.hasAttribute && el.hasAttribute('data-poller-register'))
+                    ? el
+                    : (el && el.querySelector ? el.querySelector('[data-poller-register]') : null);
+                if (marker) { _registerFromMarker(marker); }
+            }
+
+            // ── private ──────────────────────────────────────────────────────
+            function _registerFromMarker(marker) {
+                var id     = marker.dataset.pollerId;
+                var type   = marker.dataset.pollerType;
+                var target = marker.dataset.pollerTarget;
+                var params = {};
+                try { params = JSON.parse(marker.dataset.pollerParams || '{}'); } catch (e) {}
+                if (id && type && target) { register(id, type, target, params); }
+            }
+
+            function _start() {
+                if (!intervalId) { intervalId = setInterval(_tick, INTERVAL_MS); }
+            }
+
+            function _stop() {
+                if (intervalId) { clearInterval(intervalId); intervalId = null; }
+            }
+
+            function _tick() {
+                var ids = Object.keys(watchers);
+                if (!ids.length) { _stop(); return; }
+
+                fetch('{% url "core:poll" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _getCsrf() },
+                    body: JSON.stringify({
+                        page_path: window.location.pathname,
+                        watchers: ids.map(function(id) {
+                            return Object.assign({ id: id }, watchers[id]);
+                        }),
+                    }),
+                })
+                .then(function(r) { return r.ok ? r.json() : null; })
+                .then(function(data) {
+                    if (!data) { return; }
+                    (data.directives || []).forEach(_applyDirective);
+                })
+                .catch(function(err) { console.warn('[poller] tick error:', err); });
+            }
+
+            function _applyDirective(d) {
+                var el       = document.querySelector(d.target);
+                var fetchUrl = d.url;
+                var done     = d.done;
+                var watchId  = d.watcher_id;
+
+                if (!el) { if (done) { unregister(watchId); } return; }
+
+                if (!fetchUrl) {
+                    if (done) { unregister(watchId); _fire(el, 'poller:done'); }
+                    return;
+                }
+
+                fetch(fetchUrl, { headers: { 'HX-Request': 'true' } })
+                    .then(function(r) { return r.text(); })
+                    .then(function(html) {
+                        if (el.tagName === 'TBODY') {
+                            _swapTbody(el, html, watchId, done);
+                        } else {
+                            el.innerHTML = html;
+                            htmx.process(el);
+                            _fire(el, 'poller:update');
+                            var marker = el.querySelector('[data-poller-register]');
+                            if (marker) {
+                                // Refresh watcher params from the updated marker
+                                // (e.g. known_count advances after a badge refresh)
+                                try { update(watchId, JSON.parse(marker.dataset.pollerParams || '{}')); } catch (e) {}
+                            }
+                            if (done || !marker) {
+                                unregister(watchId);
+                                _fire(el, 'poller:done');
+                            }
+                        }
+                    })
+                    .catch(function() { if (done) { unregister(watchId); } });
+            }
+
+            // Swap <tbody> content using a temporary table so the browser
+            // parses <tbody>/<tfoot> in the correct table context.
+            function _swapTbody(tbody, html, watchId, done) {
+                var tmp = document.createElement('table');
+                tmp.innerHTML = html;
+                var newTbody = tmp.querySelector('tbody');
+                var newTfoot = tmp.querySelector('tfoot');
+
+                if (newTbody) {
+                    tbody.innerHTML = newTbody.innerHTML;
+                    // Sync data-row-ids for Alpine select-all
+                    if (newTbody.dataset.rowIds) { tbody.dataset.rowIds = newTbody.dataset.rowIds; }
+                    // Sync poller registration attrs from the new tbody
+                    if (newTbody.hasAttribute('data-poller-register')) {
+                        tbody.setAttribute('data-poller-register', '');
+                        ['pollerId','pollerType','pollerTarget','pollerParams'].forEach(function(k) {
+                            if (newTbody.dataset[k]) { tbody.dataset[k] = newTbody.dataset[k]; }
+                        });
+                        // Update watcher params (table_url may have changed)
+                        try { update(watchId, JSON.parse(newTbody.dataset.pollerParams || '{}')); } catch (e) {}
+                    } else {
+                        tbody.removeAttribute('data-poller-register');
+                    }
+                    htmx.process(tbody);
+                    _fire(tbody, 'poller:update');
+                }
+
+                if (newTfoot) {
+                    var oldTfoot = tbody.nextElementSibling;
+                    if (oldTfoot && oldTfoot.tagName === 'TFOOT') {
+                        oldTfoot.innerHTML = newTfoot.innerHTML;
+                        htmx.process(oldTfoot);
+                    }
+                }
+
+                if (done || !tbody.hasAttribute('data-poller-register')) {
+                    unregister(watchId);
+                    _fire(tbody, 'poller:done');
+                }
+            }
+
+            // ── auto-registration ────────────────────────────────────────────
+            document.addEventListener('htmx:afterSwap', function(e) { checkElement(e.detail.target); });
+            document.addEventListener('DOMContentLoaded', function() {
+                document.querySelectorAll('[data-poller-register]').forEach(_registerFromMarker);
+            });
+
+            return { register: register, update: update, unregister: unregister, checkElement: checkElement };
+        }());
+
+        // ── Compare-prediction modal (delegated) ─────────────────────────────
         // Uses a delegated listener here because the button is injected via
         // innerHTML (plain fetch), so inline <script> tags in that partial
         // are not executed by the browser.

@@ -111,8 +111,10 @@ def test_run_prediction_task_success(flow_execution_factory, user, mocker):
 
     execution.refresh_from_db()
     assert execution.status == "COMPLETED"
-    assert execution.parameters["score"] == 0.82
-    assert execution.parameters["classification"] == "Approved"
+    # BL-026: results are stored in PredictionResult, not the parameters blob
+    pr = execution.prediction_result
+    assert pr.score == 0.82
+    assert pr.classification == "Approved"
 
 
 @pytest.mark.django_db

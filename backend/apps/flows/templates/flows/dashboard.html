@@ -187,15 +187,23 @@
             }
         });
 
-        // After the HTMX swap: if the result is already final (error partial,
-        // no data-polling), re-enable the form right away.
+        // After the HTMX swap: if the result is already final (no poller
+        // marker), re-enable the form right away.
         document.addEventListener('htmx:afterSwap', function (event) {
             if (event.detail.target && event.detail.target.id === 'prediction-result') {
-                if (!event.detail.target.querySelector('[data-polling]')) {
+                if (!event.detail.target.querySelector('[data-poller-register]')) {
                     window.__enablePredictionForm();
                 }
             }
         });
+
+        // Centralized poller signals completion via poller:done
+        var predResult = document.getElementById('prediction-result');
+        if (predResult) {
+            predResult.addEventListener('poller:done', function () {
+                window.__enablePredictionForm();
+            });
+        }
     }());
     </script>
     <script>

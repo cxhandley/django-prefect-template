@@ -219,29 +219,16 @@ def test_history_datatable_pagination(authenticated_client, user, flow_execution
 
 @pytest.mark.django_db
 def test_comparison_view_with_real_data(authenticated_client, user, flow_execution_factory):
-    """comparison() returns real inputs and result from FlowExecution.parameters."""
-    params_1 = {
-        "income": 60000,
-        "age": 30,
-        "credit_score": 700,
-        "employment_years": 5,
-        "score": 0.75,
-        "classification": "Approved",
-        "confidence": 75,
-    }
-    params_2 = {
-        "income": 40000,
-        "age": 45,
-        "credit_score": 600,
-        "employment_years": 2,
-        "score": 0.35,
-        "classification": "Declined",
-        "confidence": 35,
-    }
+    """comparison() returns real inputs and result from typed FlowExecution fields."""
     ex1 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
     ex2 = make_completed(flow_execution_factory, user, flow_name="credit-prediction")
-    FlowExecution.objects.filter(pk=ex1.pk).update(parameters=params_1)
-    FlowExecution.objects.filter(pk=ex2.pk).update(parameters=params_2)
+    # BL-026: inputs are typed fields, not parameters blob
+    FlowExecution.objects.filter(pk=ex1.pk).update(
+        income=60000, age=30, credit_score=700, employment_years=5
+    )
+    FlowExecution.objects.filter(pk=ex2.pk).update(
+        income=40000, age=45, credit_score=600, employment_years=2
+    )
 
     response = authenticated_client.get(
         f"/flows/comparison/?ids={ex1.flow_run_id},{ex2.flow_run_id}"
