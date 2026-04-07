@@ -7,7 +7,7 @@ flowchart TD
     F --> G{All values\nfor key identical?}
     G -- Yes --> H[Mark key as SAME]
     G -- No --> I[Mark key as DIFFERS]
-    H & I --> J[Build comparison_data list per execution:\n· inputs = {k: params[k] for k in INPUT_KEYS}\n· result = {score, classification, confidence}\n  from parameters\n· duration from timestamps]
+    H & I --> J["Build comparison_data list per execution:\n inputs = {k: params[k] for k in INPUT_KEYS}\nresult = {score, classification, confidence}\nfrom parameters\n duration from timestamps"]
     J --> K[Pass differing_fields set to template]
     K --> L([render comparison.html])
 
