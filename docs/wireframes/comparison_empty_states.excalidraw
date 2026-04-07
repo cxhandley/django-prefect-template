@@ -151,14 +151,14 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "Django Prefect ML",
+      "text": "Django Doit ML",
       "fontSize": 13,
       "fontFamily": 1,
       "textAlign": "left",
       "verticalAlign": "top",
       "baseline": 11,
       "containerId": null,
-      "originalText": "Django Prefect ML"
+      "originalText": "Django Doit ML"
     },
     {
       "id": "page-a",
@@ -515,14 +515,14 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "Django Prefect ML",
+      "text": "Django Doit ML",
       "fontSize": 13,
       "fontFamily": 1,
       "textAlign": "left",
       "verticalAlign": "top",
       "baseline": 11,
       "containerId": null,
-      "originalText": "Django Prefect ML"
+      "originalText": "Django Doit ML"
     },
     {
       "id": "page-b",
