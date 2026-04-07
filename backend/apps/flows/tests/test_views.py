@@ -98,6 +98,38 @@ def test_history_htmx_partial(authenticated_client, user):
 
 
 # ============================================================================
+# history_all_ids
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_history_all_ids_returns_own_ids(authenticated_client, user, flow_execution_factory):
+    ex1 = make_completed(flow_execution_factory, user)
+    ex2 = make_completed(flow_execution_factory, user)
+    response = authenticated_client.get("/flows/history/all-ids/")
+    assert response.status_code == 200
+    data = response.json()
+    assert set(data["ids"]) == {str(ex1.flow_run_id), str(ex2.flow_run_id)}
+
+
+@pytest.mark.django_db
+def test_history_all_ids_excludes_other_users(
+    authenticated_client, user, flow_execution_factory, user_factory
+):
+    other = user_factory()
+    own = make_completed(flow_execution_factory, user)
+    flow_execution_factory(triggered_by=other)
+    data = authenticated_client.get("/flows/history/all-ids/").json()
+    assert data["ids"] == [str(own.flow_run_id)]
+
+
+@pytest.mark.django_db
+def test_history_all_ids_requires_login(client):
+    response = client.get("/flows/history/all-ids/")
+    assert response.status_code == 302
+
+
+# ============================================================================
 # export_history_csv
 # ============================================================================
 
@@ -724,6 +756,77 @@ def test_delete_execution_with_task(authenticated_client, user, flow_execution_f
     response = authenticated_client.post(f"/flows/execution/{run_id}/delete/")
     assert response.status_code == 302
     assert not FlowExecution.objects.filter(flow_run_id=run_id).exists()
+
+
+# ============================================================================
+# bulk_delete_executions
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_bulk_delete_executions(authenticated_client, user, flow_execution_factory):
+    """POST with multiple IDs deletes all owned executions and redirects."""
+    ex1 = flow_execution_factory(triggered_by=user, celery_task_id="")
+    ex2 = flow_execution_factory(triggered_by=user, celery_task_id="")
+    response = authenticated_client.post(
+        "/flows/executions/bulk-delete/",
+        {"ids": [str(ex1.flow_run_id), str(ex2.flow_run_id)]},
+    )
+    assert response.status_code == 302
+    assert not FlowExecution.objects.filter(
+        flow_run_id__in=[ex1.flow_run_id, ex2.flow_run_id]
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_bulk_delete_only_own_executions(
+    authenticated_client, user, flow_execution_factory, user_factory
+):
+    """IDs belonging to another user are silently ignored — not deleted."""
+    other = user_factory()
+    own = flow_execution_factory(triggered_by=user, celery_task_id="")
+    theirs = flow_execution_factory(triggered_by=other, celery_task_id="")
+    authenticated_client.post(
+        "/flows/executions/bulk-delete/",
+        {"ids": [str(own.flow_run_id), str(theirs.flow_run_id)]},
+    )
+    assert not FlowExecution.objects.filter(flow_run_id=own.flow_run_id).exists()
+    assert FlowExecution.objects.filter(flow_run_id=theirs.flow_run_id).exists()
+
+
+@pytest.mark.django_db
+def test_bulk_delete_revokes_tasks(authenticated_client, user, flow_execution_factory, mocker):
+    """Active Celery tasks are revoked before the rows are deleted."""
+    execution = flow_execution_factory(triggered_by=user, celery_task_id="task-abc")
+    mock_celery_app = MagicMock()
+    mocker.patch("config.celery.app", mock_celery_app)
+    authenticated_client.post(
+        "/flows/executions/bulk-delete/",
+        {"ids": [str(execution.flow_run_id)]},
+    )
+    mock_celery_app.control.revoke.assert_called_once_with(
+        "task-abc", terminate=True, signal="SIGTERM"
+    )
+    assert not FlowExecution.objects.filter(flow_run_id=execution.flow_run_id).exists()
+
+
+@pytest.mark.django_db
+def test_bulk_delete_empty_ids_redirects(authenticated_client):
+    """POST with no IDs is a no-op — redirects without error."""
+    response = authenticated_client.post("/flows/executions/bulk-delete/", {})
+    assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_bulk_delete_requires_login(client, user, flow_execution_factory):
+    """Unauthenticated requests are redirected to login."""
+    execution = flow_execution_factory(triggered_by=user, celery_task_id="")
+    response = client.post(
+        "/flows/executions/bulk-delete/",
+        {"ids": [str(execution.flow_run_id)]},
+    )
+    assert response.status_code == 302
+    assert FlowExecution.objects.filter(flow_run_id=execution.flow_run_id).exists()
 
 
 # ============================================================================

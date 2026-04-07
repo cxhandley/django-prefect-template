@@ -4,7 +4,7 @@
      aria-atomic="false">
     <!-- Status + Duration stats row -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {% include "core/components/ui/stat_card.html" with title="Execution ID" value=execution.flow_run_id|truncatechars:12 color="primary" %}
+        {% include "core/components/ui/stat_card.html" with title="Execution ID" value=execution.flow_run_id|stringformat:"s"|slice:":8" color="primary" %}
         {% include "core/components/ui/stat_card.html" with title="Date" value=execution.created_at|date:"M d, Y" color="secondary" %}
         <div class="stat place-items-center bg-base-200 rounded-lg">
             <div class="stat-title">Status</div>

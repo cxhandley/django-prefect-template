@@ -8,7 +8,7 @@
   refreshes until all executions complete.
 {% endcomment %}
 <tbody id="dt-history-body"
-       data-row-ids="{{ page_row_ids_json|safe }}"
+       data-row-ids='{{ page_row_ids_json }}'
        {% if has_running_rows %}data-poller-register data-poller-id="dt-history" data-poller-type="table_refresh" data-poller-target="#dt-history-body" data-poller-params='{"table_url": "{{ request.get_full_path|escapejs }}", "scope": "user"}'{% endif %}>
     {% for execution in page_obj %}
         <tr class="hover"

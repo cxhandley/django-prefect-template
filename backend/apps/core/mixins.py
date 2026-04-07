@@ -111,6 +111,9 @@ def build_table_config_json(table_config):
         "activeFilters": table_config.get("active_filters", []),
         "fieldConfigs": field_configs,
         "bulkActions": bulk_actions,
+        "allIdsUrl": table_config.get("all_ids_url"),
+        "totalCount": table_config.get("total_count", 0),
+        "pageRowIds": table_config.get("page_row_ids", []),
     }
     return json.dumps(payload)
 

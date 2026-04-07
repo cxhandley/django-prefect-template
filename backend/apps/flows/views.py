@@ -92,6 +92,19 @@ HISTORY_BULK_ACTIONS = [
         "confirm": False,
         "variant": "btn-outline btn-sm",
     },
+    {
+        "key": "delete",
+        "label": "Delete Selected",
+        "method": "POST",
+        "url": "/flows/executions/bulk-delete/",
+        "id_param": "ids",
+        "id_sep": ",",
+        "min_select": 1,
+        "max_select": None,
+        "confirm": True,
+        "confirm_message": "Delete the selected executions? This cannot be undone.",
+        "variant": "btn-error btn-outline btn-sm",
+    },
 ]
 
 # ── DataTable configuration for the admin executions view ────────────────────
@@ -245,6 +258,8 @@ def history(request):
         status__in=[ExecutionStatus.RUNNING, ExecutionStatus.PENDING]
     ).exists()
 
+    page_row_ids = [str(ex.flow_run_id) for ex in page_obj]
+
     table_config = {
         "table_id": "history",
         "hx_url": reverse("flows:history"),
@@ -253,6 +268,9 @@ def history(request):
         "bulk_actions": HISTORY_BULK_ACTIONS,
         "active_filters": build_active_filters(request),
         "sort_field": sort,
+        "all_ids_url": reverse("flows:history_all_ids"),
+        "total_count": qs.count(),
+        "page_row_ids": page_row_ids,
     }
 
     context = {
@@ -262,7 +280,7 @@ def history(request):
         "has_running_rows": has_running_rows,
         "table_config": table_config,
         "table_config_json": build_table_config_json(table_config),
-        "page_row_ids_json": json.dumps([str(ex.flow_run_id) for ex in page_obj]),
+        "page_row_ids_json": json.dumps(page_row_ids),
         "filter_query_string": build_filter_query_string(request),
         "table_body_template": "flows/partials/history_table_body.html",
     }
@@ -271,6 +289,19 @@ def history(request):
         return render(request, "flows/partials/history_table_body.html", context)
 
     return render(request, "flows/history.html", context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def history_all_ids(request):
+    """Return JSON list of all execution IDs matching the current filter (no pagination).
+    Used by the DataTable 'select all in query' feature."""
+    qs = FlowExecution.objects.filter(triggered_by=request.user)
+    qs, _ = get_filtered_queryset(
+        request, qs, HISTORY_FILTER_FIELDS, HISTORY_COLUMNS, default_sort="-created_at"
+    )
+    ids = list(qs.values_list("flow_run_id", flat=True))
+    return JsonResponse({"ids": [str(i) for i in ids]})
 
 
 @login_required
@@ -855,6 +886,27 @@ def delete_execution(request, run_id):
 
     execution.delete()
 
+    return redirect("flows:history")
+
+
+@login_required
+@require_http_methods(["POST"])
+def bulk_delete_executions(request):
+    """Delete multiple executions by ID. Only affects rows owned by the current user."""
+    run_ids = request.POST.getlist("ids")
+    if not run_ids:
+        return redirect("flows:history")
+
+    executions = FlowExecution.objects.filter(flow_run_id__in=run_ids, triggered_by=request.user)
+    # Revoke any active Celery tasks before deleting
+    task_ids = list(executions.exclude(celery_task_id="").values_list("celery_task_id", flat=True))
+    if task_ids:
+        from config.celery import app as celery_app
+
+        for task_id in task_ids:
+            celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+
+    executions.delete()
     return redirect("flows:history")
 
 

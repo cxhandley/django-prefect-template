@@ -11,7 +11,7 @@
         <div class="flex items-center justify-between">
             <div>
                 <h1 class="text-2xl font-bold">Execution Detail</h1>
-                <p class="text-base-content/60 text-sm mt-1">ID: {{ execution.flow_run_id }}</p>
+                <p class="text-base-content/60 text-sm mt-1 font-mono">{{ execution.flow_run_id|stringformat:"s"|slice:":8" }}…</p>
             </div>
             <div class="flex gap-2">
                 {% if execution.status == "FAILED" %}
@@ -31,22 +31,38 @@
                     </form>
                 {% endif %}
                 {% if execution.status == "RUNNING" or execution.status == "PENDING" %}
-                    <form method="post"
-                          action="{% url 'flows:stop_execution' execution.flow_run_id %}">
-                        {% csrf_token %}
-                        <button type="submit"
-                                class="btn btn-warning btn-sm"
-                                onclick="return confirm('Stop this execution?')">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                 class="h-4 w-4"
-                                 fill="none"
-                                 viewBox="0 0 24 24"
-                                 stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            Stop
-                        </button>
-                    </form>
+                    <button class="btn btn-warning btn-sm"
+                            onclick="document.getElementById('stop_modal').showModal()"
+                            type="button">
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             class="h-4 w-4"
+                             fill="none"
+                             viewBox="0 0 24 24"
+                             stroke="currentColor"
+                             aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Stop
+                    </button>
+                    <dialog id="stop_modal" class="modal" aria-labelledby="stop_modal_title">
+                        <div class="modal-box">
+                            <h3 id="stop_modal_title" class="font-bold text-lg">Stop Execution</h3>
+                            <p class="py-4">Stop this execution? The current step will be terminated and the execution marked as failed.</p>
+                            <div class="modal-action">
+                                <form method="dialog">
+                                    <button class="btn">Cancel</button>
+                                </form>
+                                <form method="post"
+                                      action="{% url 'flows:stop_execution' execution.flow_run_id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-warning">Stop</button>
+                                </form>
+                            </div>
+                        </div>
+                        <form method="dialog" class="modal-backdrop">
+                            <button>close</button>
+                        </form>
+                    </dialog>
                 {% endif %}
                 <button class="btn btn-error btn-sm"
                         onclick="document.getElementById('delete_modal').showModal()">

@@ -9,6 +9,8 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("history/", views.history, name="history"),
     path("history/export/", views.export_history_csv, name="export_history_csv"),
+    path("history/all-ids/", views.history_all_ids, name="history_all_ids"),
+    path("executions/bulk-delete/", views.bulk_delete_executions, name="bulk_delete_executions"),
     path("execution/<uuid:run_id>/", views.execution_detail, name="execution_detail"),
     path(
         "execution/<uuid:run_id>/live-status/",
