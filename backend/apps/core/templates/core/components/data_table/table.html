@@ -62,7 +62,8 @@
     <!-- ── TABLE ─────────────────────────────────────────────────────────────── -->
     <div class="card bg-base-100 border border-base-200 shadow-sm">
         <div class="card-body p-0">
-            <div class="overflow-x-auto">
+            <div id="dt-{{ table_config.table_id }}-scroll"
+                 class="overflow-x-auto transition-opacity duration-150">
                 <table class="table">
                     {% include "core/components/data_table/_thead.html" %}
                     <!-- tbody + tfoot swapped by HTMX on filter/sort/page changes -->
@@ -74,6 +75,24 @@
         </div>
     </div>
 </div>
+<!-- ── BULK ACTION CONFIRM MODAL ─────────────────────────────────────────── -->
+<dialog id="dt-confirm-modal"
+        class="modal"
+        aria-labelledby="dt-confirm-modal-title">
+    <div class="modal-box">
+        <h3 id="dt-confirm-modal-title" class="font-bold text-lg">Confirm</h3>
+        <p id="dt-confirm-modal-message" class="py-4"></p>
+        <div class="modal-action">
+            <form method="dialog">
+                <button class="btn">Cancel</button>
+            </form>
+            <button id="dt-confirm-modal-ok" class="btn btn-error" type="button">Confirm</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>
 <!-- ── ALPINE COMPONENT DEFINITION ──────────────────────────────────────── -->
 <script>
 function dataTable(config) {
@@ -95,6 +114,10 @@ function dataTable(config) {
 
         // Bulk selection
         selectedIds: [],
+        currentPageIds: config.pageRowIds || [],   // seeded from server; updated on each page load
+        allQuerySelected: false,
+        totalCount: config.totalCount || 0,
+        allIdsUrl: config.allIdsUrl || null,
 
         // Sort
         currentSort: config.sortField || '',
@@ -122,6 +145,7 @@ function dataTable(config) {
                 }
             }
         },
+
 
         // ── Column visibility ──────────────────────────────────────────────
         toggleCol(key) {
@@ -196,6 +220,8 @@ function dataTable(config) {
             var self = this;
             var tbody = document.querySelector(self.hxTarget);
             if (!tbody) return;
+            var scroller = document.getElementById(`dt-${self.tableId}-scroll`);
+            if (scroller) scroller.style.opacity = '0.4';
             fetch(url, { headers: { 'HX-Request': 'true' } })
                 .then(function(r) { return r.text(); })
                 .then(function(html) {
@@ -208,6 +234,11 @@ function dataTable(config) {
                         tbody.innerHTML = newTbody.innerHTML;
                         if (newTbody.dataset.rowIds) {
                             tbody.dataset.rowIds = newTbody.dataset.rowIds;
+                            try {
+                                self.currentPageIds = JSON.parse(newTbody.dataset.rowIds);
+                            } catch (e) {
+                                self.currentPageIds = [];
+                            }
                         }
                         // Sync poller registration attrs from the refreshed tbody
                         if (newTbody.hasAttribute('data-poller-register')) {
@@ -230,6 +261,7 @@ function dataTable(config) {
                         window.__poller.checkElement(tbody);
                         window.__poller.update(self.tableId, { tableUrl: url });
                     }
+                    if (scroller) scroller.style.opacity = '1';
                 });
             history.pushState({}, '', url);
         },
@@ -326,18 +358,18 @@ function dataTable(config) {
 
         // ── Bulk selection ─────────────────────────────────────────────────
         get selectedCount() { return this.selectedIds.length; },
-        get pageRowIds() {
-            const tbody = document.getElementById(`dt-${this.tableId}-body`);
-            try { return JSON.parse(tbody?.dataset?.rowIds || '[]'); } catch (e) { return []; }
-        },
         get allPageSelected() {
-            const ids = this.pageRowIds;
-            return ids.length > 0 && ids.every(id => this.isSelected(id));
+            return this.currentPageIds.length > 0 &&
+                this.currentPageIds.every(id => this.isSelected(id));
         },
         get somePageSelected() {
-            return this.pageRowIds.some(id => this.isSelected(id));
+            return this.currentPageIds.some(id => this.isSelected(id));
+        },
+        get hasMoreThanPage() {
+            return this.allIdsUrl && this.totalCount > this.currentPageIds.length;
         },
         toggleRow(id) {
+            this.allQuerySelected = false;
             const idx = this.selectedIds.indexOf(id);
             if (idx >= 0) {
                 this.selectedIds.splice(idx, 1);
@@ -345,13 +377,30 @@ function dataTable(config) {
                 this.selectedIds.push(id);
             }
         },
-        toggleAll(ids) {
+        toggleAll() {
+            this.allQuerySelected = false;
+            const ids = this.currentPageIds;
             const allSelected = ids.every(id => this.isSelected(id));
             if (allSelected) {
                 this.selectedIds = this.selectedIds.filter(id => !ids.includes(id));
             } else {
                 ids.forEach(id => { if (!this.isSelected(id)) this.selectedIds.push(id); });
             }
+        },
+        selectAllQuery() {
+            // Fetch all IDs matching current filter across all pages
+            const params = new URLSearchParams(window.location.search);
+            const url = `${this.allIdsUrl}?${params.toString()}`;
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(r => r.json())
+                .then(data => {
+                    this.selectedIds = data.ids || [];
+                    this.allQuerySelected = true;
+                });
+        },
+        clearSelection() {
+            this.selectedIds = [];
+            this.allQuerySelected = false;
         },
         isSelected(id) { return this.selectedIds.includes(id); },
         canAction(min, max) {
@@ -360,8 +409,23 @@ function dataTable(config) {
         },
         execAction(action) {
             if (action.confirm) {
-                if (!window.confirm(action.confirmMessage || 'Are you sure?')) return;
+                const modal = document.getElementById('dt-confirm-modal');
+                const msg = document.getElementById('dt-confirm-modal-message');
+                const okBtn = document.getElementById('dt-confirm-modal-ok');
+                msg.textContent = action.confirmMessage || 'Are you sure?';
+                // Replace ok button to clear previous listener
+                const freshOk = okBtn.cloneNode(true);
+                okBtn.replaceWith(freshOk);
+                freshOk.addEventListener('click', () => {
+                    modal.close();
+                    this._submitAction(action);
+                });
+                modal.showModal();
+            } else {
+                this._submitAction(action);
             }
+        },
+        _submitAction(action) {
             const ids = this.selectedIds.join(action.idSep || ',');
             if (action.method === 'GET') {
                 window.location.href = `${action.url}?${action.idParam}=${ids}`;

@@ -92,6 +92,19 @@ HISTORY_BULK_ACTIONS = [
         "confirm": False,
         "variant": "btn-outline btn-sm",
     },
+    {
+        "key": "delete",
+        "label": "Delete Selected",
+        "method": "POST",
+        "url": "/flows/executions/bulk-delete/",
+        "id_param": "ids",
+        "id_sep": ",",
+        "min_select": 1,
+        "max_select": None,
+        "confirm": True,
+        "confirm_message": "Delete the selected executions? This cannot be undone.",
+        "variant": "btn-error btn-outline btn-sm",
+    },
 ]
 
 # ── DataTable configuration for the admin executions view ────────────────────
@@ -245,6 +258,8 @@ def history(request):
         status__in=[ExecutionStatus.RUNNING, ExecutionStatus.PENDING]
     ).exists()
 
+    page_row_ids = [str(ex.flow_run_id) for ex in page_obj]
+
     table_config = {
         "table_id": "history",
         "hx_url": reverse("flows:history"),
@@ -253,6 +268,9 @@ def history(request):
         "bulk_actions": HISTORY_BULK_ACTIONS,
         "active_filters": build_active_filters(request),
         "sort_field": sort,
+        "all_ids_url": reverse("flows:history_all_ids"),
+        "total_count": qs.count(),
+        "page_row_ids": page_row_ids,
     }
 
     context = {
@@ -262,7 +280,7 @@ def history(request):
         "has_running_rows": has_running_rows,
         "table_config": table_config,
         "table_config_json": build_table_config_json(table_config),
-        "page_row_ids_json": json.dumps([str(ex.flow_run_id) for ex in page_obj]),
+        "page_row_ids_json": json.dumps(page_row_ids),
         "filter_query_string": build_filter_query_string(request),
         "table_body_template": "flows/partials/history_table_body.html",
     }
@@ -271,6 +289,19 @@ def history(request):
         return render(request, "flows/partials/history_table_body.html", context)
 
     return render(request, "flows/history.html", context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def history_all_ids(request):
+    """Return JSON list of all execution IDs matching the current filter (no pagination).
+    Used by the DataTable 'select all in query' feature."""
+    qs = FlowExecution.objects.filter(triggered_by=request.user)
+    qs, _ = get_filtered_queryset(
+        request, qs, HISTORY_FILTER_FIELDS, HISTORY_COLUMNS, default_sort="-created_at"
+    )
+    ids = list(qs.values_list("flow_run_id", flat=True))
+    return JsonResponse({"ids": [str(i) for i in ids]})
 
 
 @login_required
@@ -349,6 +380,58 @@ def execution_detail(request, run_id):
         ],
     }
     return render(request, "flows/execution_detail.html", context)
+
+
+@login_required
+@require_http_methods(["GET"])
+def execution_live_status(request, run_id):
+    """
+    HTMX partial endpoint: returns live status, step timeline, and log lines
+    for the execution detail page. Includes hx-trigger while PENDING/RUNNING so
+    HTMX keeps polling; omits it once a terminal status is reached so the loop ends.
+    """
+    execution = get_object_or_404(FlowExecution, flow_run_id=run_id, triggered_by=request.user)
+    steps = list(execution.steps.all())
+
+    duration = None
+    if execution.created_at:
+        end = execution.completed_at or timezone.now()
+        duration = round((end - execution.created_at).total_seconds(), 2)
+
+    is_terminal = execution.status in (ExecutionStatus.COMPLETED, ExecutionStatus.FAILED)
+
+    prediction_result = None
+    input_values = None
+    if execution.flow_name == "credit-prediction":
+        if execution.status == ExecutionStatus.COMPLETED:
+            try:
+                pr = execution.prediction_result
+                prediction_result = {
+                    "score": pr.score,
+                    "classification": pr.classification,
+                    "confidence": pr.confidence,
+                }
+            except execution.__class__.prediction_result.RelatedObjectDoesNotExist:
+                pass
+        input_values = {
+            "income": execution.income,
+            "age": execution.age,
+            "credit_score": execution.credit_score,
+            "employment_years": execution.employment_years,
+        }
+
+    return render(
+        request,
+        "flows/partials/execution_live_status.html",
+        {
+            "execution": execution,
+            "steps": steps,
+            "duration": duration,
+            "is_terminal": is_terminal,
+            "prediction_result": prediction_result,
+            "input_values": input_values,
+        },
+    )
 
 
 @login_required
@@ -758,12 +841,14 @@ def prediction_status(request, run_id):
             },
         )
 
-    # Still RUNNING or PENDING — return spinner (HTMX will keep polling)
+    # Still RUNNING or PENDING — return spinner with step progress (HTMX will keep polling)
+    steps = list(execution.steps.all())
     return render(
         request,
         "flows/partials/prediction_running.html",
         {
             "run_id": str(run_id),
+            "steps": steps,
         },
     )
 
@@ -801,6 +886,27 @@ def delete_execution(request, run_id):
 
     execution.delete()
 
+    return redirect("flows:history")
+
+
+@login_required
+@require_http_methods(["POST"])
+def bulk_delete_executions(request):
+    """Delete multiple executions by ID. Only affects rows owned by the current user."""
+    run_ids = request.POST.getlist("ids")
+    if not run_ids:
+        return redirect("flows:history")
+
+    executions = FlowExecution.objects.filter(flow_run_id__in=run_ids, triggered_by=request.user)
+    # Revoke any active Celery tasks before deleting
+    task_ids = list(executions.exclude(celery_task_id="").values_list("celery_task_id", flat=True))
+    if task_ids:
+        from config.celery import app as celery_app
+
+        for task_id in task_ids:
+            celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+
+    executions.delete()
     return redirect("flows:history")
 
 

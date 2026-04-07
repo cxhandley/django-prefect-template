@@ -6,7 +6,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>
             {% block title %}
-                Django Prefect ML Template
+                Django Doit ML Template
             {% endblock title %}
         </title>
         <!-- Tailwind CSS + DaisyUI (locally compiled) -->
@@ -24,6 +24,14 @@
         {% endblock extra_head %}
         {% block extra_css %}
         {% endblock extra_css %}
+        <style>
+        /* HTMX swap transitions — applied to any element using hx-swap="outerHTML" */
+        .htmx-swapping { opacity: 0; transition: opacity 120ms ease-out; }
+        .htmx-settling  { opacity: 0; }
+        /* ensure settled elements fade back in */
+        .htmx-added     { opacity: 0; }
+        .htmx-added.htmx-settling { opacity: 0; }
+        </style>
     </head>
     <body>
         <!-- Navigation -->

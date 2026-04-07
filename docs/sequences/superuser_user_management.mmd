@@ -20,7 +20,7 @@ sequenceDiagram
     Superuser->>Browser: Click toggle on a user row
     Browser->>Django: POST /accounts/users/<id>/toggle-active/\n(HX-Request header)
     Django->>Django: @user_passes_test(is_superuser) check
-    Django->>DB: user.is_active = not user.is_active; user.save()
+    Django->>DB: user.is_active = not user.is_active user.save()
     DB-->>Django: OK
     Django-->>Browser: 200 partial accounts/partials/user_row.html\n(HTMX swaps the row in-place)
 

@@ -5,9 +5,9 @@ flowchart TD
     end
 
     subgraph FILTER_BUILDER["Filter builder"]
-        D([User clicks Filters ▾]) --> E[Open filter dropdown\nfiltersOpen = true]
+        D([User clicks Filters]) --> E[Open filter dropdown\nfiltersOpen = true]
         E --> F{filterRows\nempty?}
-        F -- Yes --> G[Show empty state:\n'Add a filter to get started']
+        F -- Yes --> G[Show empty state:\nAdd a filter to get started]
         F -- No --> H[Render filter rows\nfield / op / value inputs]
         G & H --> I([User clicks Add filter])
         I --> J[Append empty row to filterRows]
@@ -16,25 +16,26 @@ flowchart TD
         L -- No --> M[Apply button disabled]
         L -- Yes --> N[Apply button enabled]
         N --> O([User clicks Apply])
-        O --> P[Build URL with f_field\[\] f_op\[\] f_val\[\] params]
-        P --> Q[htmx.ajax GET to hx_url\ntarget = #dt-{id}-body\npushUrl = built URL]
+        O --> P["Build URL with f_field\[\] f_op\[\] f_val\[\] params"]
+        P --> Q["htmx.ajax GET to hx_url\ntarget = #dt-{id}-body\npushUrl = built URL"]
         Q --> R[filtersOpen = false]
 
-        K --> S([User clicks ✕ on row])
+        K --> S([User clicks x on row])
         S --> T[removeFilter removes row\nif filterRows empty:\napplyFilters with no params]
     end
 
+
     subgraph CHIP_BAR["Active filter chips"]
-        U([Active filter chip ✕ clicked]) --> V[Find matching row in filterRows\nremove it]
+        U([Active filter chip x clicked]) --> V[Find matching row in filterRows\nremove it]
         V --> W[Call applyFilters\nrebuild URL without that filter]
     end
 
     subgraph COL_VISIBILITY["Column visibility"]
-        X([User clicks Columns ▾]) --> Y[Open column dropdown\ncolsOpen = true]
+        X([User clicks Columns]) --> Y[Open column dropdown\ncolsOpen = true]
         Y --> Z[Render checkbox per hideable column\nchecked = isVisible key]
         Z --> AA([User toggles checkbox])
         AA --> AB[toggleCol key\nupdate hiddenCols array]
-        AB --> AC[Persist to localStorage\ndt_{tableId}_cols]
+        AB --> AC["Persist to localStorage\ndt_{tableId}_cols"]
         AC --> AD[Toggle hidden class\non all th/td for that column\nno server round-trip]
     end
 

@@ -78,6 +78,20 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [x] Execution record is removed from the database
 - [x] Associated S3 files are cleaned up on deletion
 
+### US-2.5: Live Auto-Refresh on Execution Detail and Prediction Progress Panel `[x]`
+**As a** user
+**I want** the execution detail page and the inline prediction progress panel to update automatically while an execution is running
+**So that** I can watch step-by-step progress and see the final result without manually refreshing the page
+
+**Acceptance Criteria:**
+- [x] `flows/executions/<id>/` polls a status partial endpoint (every 3 s) while execution status is PENDING or RUNNING; polling stops automatically once COMPLETED or FAILED
+- [x] Status badge on the detail page updates in-place (PENDING → RUNNING → COMPLETED / FAILED)
+- [x] Pipeline Steps timeline on the detail page updates in-place: each step shows its current status (✓ / ✗ / ⟳ / —), `started_at`, and `completed_at` as they are written to `ExecutionStep`
+- [x] Execution Logs section on the detail page shows structured, step-level log lines derived from `ExecutionStep` records (step name, timestamps, error message if present) rather than placeholder text; logs update in-place each poll cycle
+- [x] The "Running prediction…" panel on the dashboard / predictions page shows live per-step progress (which steps are done, which is currently running) instead of a generic spinner, using the same polling endpoint
+- [x] Polling is removed from the DOM (not just paused) once a terminal status is returned, so no wasted requests after completion
+- [x] Duration stat on the detail page updates live while running
+
 ---
 
 ## Epic 3: Credit Prediction

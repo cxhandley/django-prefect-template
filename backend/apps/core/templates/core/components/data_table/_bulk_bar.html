@@ -2,25 +2,53 @@
   Bulk actions bar.
   Shown when selectedCount > 0.
   Actions are enabled/disabled based on min_select / max_select from config.
+  When all page rows are selected and more exist in the query, offers a
+  "Select all N results" link (Gmail-style). Once clicked, shows confirmation.
 {% endcomment %}
 <div x-show="selectedCount > 0"
      x-transition
-     class="flex items-center gap-3 px-3 py-2 bg-primary/5 border border-primary/20 rounded-box"
+     class="space-y-2"
      style="display: none">
-    <span class="text-sm font-medium text-primary"
-          x-text="`${selectedCount} selected`"></span>
-    <div class="flex gap-2 flex-wrap">
-        <template x-for="action in bulkActions" :key="action.key">
-            <button @click="canAction(action.minSelect, action.maxSelect) && execAction(action)"
-                    :disabled="!canAction(action.minSelect, action.maxSelect)"
-                    :title="!canAction(action.minSelect, action.maxSelect) ? `Select ${action.minSelect}${action.maxSelect ? '–'+action.maxSelect : '+'} rows` : ''"
-                    :class="action.variant + (!canAction(action.minSelect, action.maxSelect) ? ' btn-disabled opacity-50' : '')"
-                    class="btn btn-sm"
-                    type="button"
-                    x-text="action.label"></button>
+    <!-- Main bar -->
+    <div class="flex items-center gap-3 px-3 py-2 bg-primary/5 border border-primary/20 rounded-box">
+        <span class="text-sm font-medium text-primary"
+              x-text="`${selectedCount} selected`"></span>
+        <div class="flex gap-2 flex-wrap">
+            <template x-for="action in bulkActions" :key="action.key">
+                <button @click="canAction(action.minSelect, action.maxSelect) && execAction(action)"
+                        :disabled="!canAction(action.minSelect, action.maxSelect)"
+                        :title="!canAction(action.minSelect, action.maxSelect) ? `Select ${action.minSelect}${action.maxSelect ? '–'+action.maxSelect : '+'} rows` : ''"
+                        :class="action.variant + (!canAction(action.minSelect, action.maxSelect) ? ' btn-disabled opacity-50' : '')"
+                        class="btn btn-sm"
+                        type="button"
+                        x-text="action.label"></button>
+            </template>
+        </div>
+        <button @click="clearSelection()"
+                type="button"
+                class="btn btn-ghost btn-xs text-base-content/50 ml-auto">Clear selection</button>
+    </div>
+    <!-- Select-all-in-query affordance (shown when full page selected and more pages exist) -->
+    <div x-show="allPageSelected && hasMoreThanPage"
+         x-transition
+         class="flex items-center justify-center gap-2 px-3 py-1.5 bg-base-200 rounded-box text-sm">
+        <template x-if="!allQuerySelected">
+            <span>
+                All <strong x-text="currentPageIds.length"></strong> rows on this page are selected.
+                <button @click="selectAllQuery()"
+                        type="button"
+                        class="link link-primary font-medium ms-1">
+                    Select all <span x-text="totalCount"></span> results
+                </button>
+            </span>
+        </template>
+        <template x-if="allQuerySelected">
+            <span>
+                All <strong x-text="totalCount"></strong> results are selected.
+                <button @click="clearSelection()"
+                        type="button"
+                        class="link link-primary font-medium ms-1">Clear selection</button>
+            </span>
         </template>
     </div>
-    <button @click="selectedIds = []"
-            type="button"
-            class="btn btn-ghost btn-xs text-base-content/50 ml-auto">Clear selection</button>
 </div>

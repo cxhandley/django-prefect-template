@@ -1,15 +1,57 @@
 {% url 'flows:prediction_status' run_id as status_url %}
-<div class="flex items-center gap-4 p-4 bg-base-200 rounded-lg"
+<div class="flex flex-col gap-4 p-4 bg-base-200 rounded-lg"
      data-poller-register
      data-poller-id="pred-{{ run_id }}"
      data-poller-type="execution_status"
      data-poller-target="#prediction-result"
      data-poller-params='{"run_id": "{{ run_id }}"}'>
-    <span class="loading loading-spinner loading-md text-primary"></span>
-    <div>
-        <p class="font-medium">Running prediction…</p>
-        <p class="text-sm text-base-content/60">This usually takes 15–30 seconds.</p>
-        <a href="{% url 'flows:execution_detail' run_id %}"
-           class="text-xs text-primary underline mt-1 block">View execution details →</a>
+    <div class="flex items-center gap-4">
+        <span class="loading loading-spinner loading-md text-primary flex-shrink-0"></span>
+        <div>
+            <p class="font-medium">Running prediction…</p>
+            <p class="text-sm text-base-content/60">This usually takes 15–30 seconds.</p>
+            <a href="{% url 'flows:execution_detail' run_id %}"
+               class="text-xs text-primary underline mt-1 block">View execution details →</a>
+        </div>
     </div>
+    {% if steps %}
+        <ol class="space-y-1 ps-2 border-s border-base-300 ms-2">
+            {% for step in steps %}
+                <li class="flex items-center gap-2 text-sm">
+                    {% if step.status == 'COMPLETED' %}
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             class="h-4 w-4 text-success flex-shrink-0"
+                             viewBox="0 0 20 20"
+                             fill="currentColor"
+                             aria-hidden="true">
+                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                        </svg>
+                        <span class="text-base-content/70">{{ step.step_name }}</span>
+                    {% elif step.status == 'FAILED' %}
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             class="h-4 w-4 text-error flex-shrink-0"
+                             viewBox="0 0 20 20"
+                             fill="currentColor"
+                             aria-hidden="true">
+                            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        <span class="text-error">{{ step.step_name }}</span>
+                    {% elif step.status == 'RUNNING' %}
+                        <svg xmlns="http://www.w3.org/2000/svg"
+                             class="h-4 w-4 text-info animate-spin flex-shrink-0"
+                             viewBox="0 0 24 24"
+                             fill="none"
+                             stroke="currentColor"
+                             aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span class="font-medium text-info">{{ step.step_name }}</span>
+                    {% else %}
+                        <span class="h-4 w-4 rounded-full border border-base-300 flex-shrink-0 inline-block"></span>
+                        <span class="text-base-content/40">{{ step.step_name }}</span>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ol>
+    {% endif %}
 </div>

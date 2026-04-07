@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import polars as pl
 import pytest
-from apps.flows.models import FlowExecution
+from apps.flows.models import ExecutionStep, FlowExecution
 from django.utils import timezone
 
 # ============================================================================
@@ -95,6 +95,38 @@ def test_history_status_filter(authenticated_client, user, flow_execution_factor
 def test_history_htmx_partial(authenticated_client, user):
     response = authenticated_client.get("/flows/history/", HTTP_HX_REQUEST="true")
     assert response.status_code == 200
+
+
+# ============================================================================
+# history_all_ids
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_history_all_ids_returns_own_ids(authenticated_client, user, flow_execution_factory):
+    ex1 = make_completed(flow_execution_factory, user)
+    ex2 = make_completed(flow_execution_factory, user)
+    response = authenticated_client.get("/flows/history/all-ids/")
+    assert response.status_code == 200
+    data = response.json()
+    assert set(data["ids"]) == {str(ex1.flow_run_id), str(ex2.flow_run_id)}
+
+
+@pytest.mark.django_db
+def test_history_all_ids_excludes_other_users(
+    authenticated_client, user, flow_execution_factory, user_factory
+):
+    other = user_factory()
+    own = make_completed(flow_execution_factory, user)
+    flow_execution_factory(triggered_by=other)
+    data = authenticated_client.get("/flows/history/all-ids/").json()
+    assert data["ids"] == [str(own.flow_run_id)]
+
+
+@pytest.mark.django_db
+def test_history_all_ids_requires_login(client):
+    response = client.get("/flows/history/all-ids/")
+    assert response.status_code == 302
 
 
 # ============================================================================
@@ -724,3 +756,202 @@ def test_delete_execution_with_task(authenticated_client, user, flow_execution_f
     response = authenticated_client.post(f"/flows/execution/{run_id}/delete/")
     assert response.status_code == 302
     assert not FlowExecution.objects.filter(flow_run_id=run_id).exists()
+
+
+# ============================================================================
+# bulk_delete_executions
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_bulk_delete_executions(authenticated_client, user, flow_execution_factory):
+    """POST with multiple IDs deletes all owned executions and redirects."""
+    ex1 = flow_execution_factory(triggered_by=user, celery_task_id="")
+    ex2 = flow_execution_factory(triggered_by=user, celery_task_id="")
+    response = authenticated_client.post(
+        "/flows/executions/bulk-delete/",
+        {"ids": [str(ex1.flow_run_id), str(ex2.flow_run_id)]},
+    )
+    assert response.status_code == 302
+    assert not FlowExecution.objects.filter(
+        flow_run_id__in=[ex1.flow_run_id, ex2.flow_run_id]
+    ).exists()
+
+
+@pytest.mark.django_db
+def test_bulk_delete_only_own_executions(
+    authenticated_client, user, flow_execution_factory, user_factory
+):
+    """IDs belonging to another user are silently ignored — not deleted."""
+    other = user_factory()
+    own = flow_execution_factory(triggered_by=user, celery_task_id="")
+    theirs = flow_execution_factory(triggered_by=other, celery_task_id="")
+    authenticated_client.post(
+        "/flows/executions/bulk-delete/",
+        {"ids": [str(own.flow_run_id), str(theirs.flow_run_id)]},
+    )
+    assert not FlowExecution.objects.filter(flow_run_id=own.flow_run_id).exists()
+    assert FlowExecution.objects.filter(flow_run_id=theirs.flow_run_id).exists()
+
+
+@pytest.mark.django_db
+def test_bulk_delete_revokes_tasks(authenticated_client, user, flow_execution_factory, mocker):
+    """Active Celery tasks are revoked before the rows are deleted."""
+    execution = flow_execution_factory(triggered_by=user, celery_task_id="task-abc")
+    mock_celery_app = MagicMock()
+    mocker.patch("config.celery.app", mock_celery_app)
+    authenticated_client.post(
+        "/flows/executions/bulk-delete/",
+        {"ids": [str(execution.flow_run_id)]},
+    )
+    mock_celery_app.control.revoke.assert_called_once_with(
+        "task-abc", terminate=True, signal="SIGTERM"
+    )
+    assert not FlowExecution.objects.filter(flow_run_id=execution.flow_run_id).exists()
+
+
+@pytest.mark.django_db
+def test_bulk_delete_empty_ids_redirects(authenticated_client):
+    """POST with no IDs is a no-op — redirects without error."""
+    response = authenticated_client.post("/flows/executions/bulk-delete/", {})
+    assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_bulk_delete_requires_login(client, user, flow_execution_factory):
+    """Unauthenticated requests are redirected to login."""
+    execution = flow_execution_factory(triggered_by=user, celery_task_id="")
+    response = client.post(
+        "/flows/executions/bulk-delete/",
+        {"ids": [str(execution.flow_run_id)]},
+    )
+    assert response.status_code == 302
+    assert FlowExecution.objects.filter(flow_run_id=execution.flow_run_id).exists()
+
+
+# ============================================================================
+# execution_live_status
+# ============================================================================
+
+
+@pytest.mark.django_db
+def test_execution_live_status_pending(authenticated_client, user, flow_execution_factory):
+    """PENDING execution: returns 200 with hx-trigger to keep polling."""
+    execution = flow_execution_factory(triggered_by=user, status="PENDING")
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"every 3s" in response.content
+    assert b"live-status" in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_running(authenticated_client, user, flow_execution_factory):
+    """RUNNING execution: returns 200 with hx-trigger to keep polling."""
+    execution = flow_execution_factory(triggered_by=user, status="RUNNING")
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"every 3s" in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_completed_no_poll(
+    authenticated_client, user, flow_execution_factory
+):
+    """COMPLETED execution: hx-trigger is absent so the poll loop terminates."""
+    execution = make_completed(flow_execution_factory, user)
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"every 3s" not in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_failed_no_poll(authenticated_client, user, flow_execution_factory):
+    """FAILED execution: hx-trigger is absent so the poll loop terminates."""
+    execution = flow_execution_factory(
+        triggered_by=user, status="FAILED", error_message="Something broke"
+    )
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"every 3s" not in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_with_steps(authenticated_client, user, flow_execution_factory):
+    """Steps attached to the execution are rendered in the response."""
+    execution = flow_execution_factory(triggered_by=user, status="RUNNING")
+    ExecutionStep.objects.create(
+        execution=execution,
+        step_name="ingest",
+        step_index=0,
+        status="COMPLETED",
+        started_at=timezone.now(),
+        completed_at=timezone.now(),
+    )
+    ExecutionStep.objects.create(
+        execution=execution,
+        step_name="validate",
+        step_index=1,
+        status="RUNNING",
+        started_at=timezone.now(),
+    )
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 200
+    assert b"ingest" in response.content
+    assert b"validate" in response.content
+
+
+@pytest.mark.django_db
+def test_execution_live_status_requires_login(client, user, flow_execution_factory):
+    """Unauthenticated requests are redirected to login."""
+    execution = flow_execution_factory(triggered_by=user)
+    response = client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 302
+
+
+@pytest.mark.django_db
+def test_execution_live_status_not_found(authenticated_client):
+    """Unknown run_id returns 404."""
+    response = authenticated_client.get(f"/flows/execution/{uuid.uuid4()}/live-status/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_execution_live_status_other_user_forbidden(
+    authenticated_client, user_factory, flow_execution_factory
+):
+    """Another user's execution is not accessible (404, not 403)."""
+    other = user_factory()
+    execution = flow_execution_factory(triggered_by=other, status="RUNNING")
+    response = authenticated_client.get(f"/flows/execution/{execution.flow_run_id}/live-status/")
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_prediction_status_running_includes_steps(
+    authenticated_client, user, flow_execution_factory
+):
+    """prediction_status returns step data in the running partial when steps exist."""
+    execution = flow_execution_factory(
+        triggered_by=user,
+        flow_name="credit-prediction",
+        status="RUNNING",
+    )
+    ExecutionStep.objects.create(
+        execution=execution,
+        step_name="predict_01_prepare",
+        step_index=0,
+        status="COMPLETED",
+        started_at=timezone.now(),
+        completed_at=timezone.now(),
+    )
+    ExecutionStep.objects.create(
+        execution=execution,
+        step_name="predict_02_score",
+        step_index=1,
+        status="RUNNING",
+        started_at=timezone.now(),
+    )
+    response = authenticated_client.get(f"/flows/prediction-status/{execution.flow_run_id}/")
+    assert response.status_code == 200
+    assert b"predict_01_prepare" in response.content
+    assert b"predict_02_score" in response.content

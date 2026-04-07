@@ -1,0 +1,188 @@
+<div id="live-status"
+     {% if not is_terminal %} hx-get="{% url 'flows:execution_live_status' execution.flow_run_id %}" hx-trigger="every 3s" hx-swap="outerHTML" {% endif %}
+     aria-live="polite"
+     aria-atomic="false">
+    <!-- Status + Duration stats row -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {% include "core/components/ui/stat_card.html" with title="Execution ID" value=execution.flow_run_id|stringformat:"s"|slice:":8" color="primary" %}
+        {% include "core/components/ui/stat_card.html" with title="Date" value=execution.created_at|date:"M d, Y" color="secondary" %}
+        <div class="stat place-items-center bg-base-200 rounded-lg">
+            <div class="stat-title">Status</div>
+            <div class="stat-value text-sm py-1">{% include "core/components/ui/badge.html" with status=execution.status %}</div>
+        </div>
+        {% if duration %}
+            {% include "core/components/ui/stat_card.html" with title="Duration" value=duration description="seconds" color="accent" %}
+        {% else %}
+            {% include "core/components/ui/stat_card.html" with title="Duration" value="-" color="accent" %}
+        {% endif %}
+    </div>
+    {% if steps %}
+        <!-- Pipeline Step Progress -->
+        <div class="card bg-base-100 border border-base-200 shadow-sm mt-6">
+            <div class="card-body">
+                <h2 class="card-title text-lg">Pipeline Steps</h2>
+                <ol class="space-y-3 mt-4">
+                    {% for step in steps %}
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full {% if step.status == 'COMPLETED' %}bg-success text-success-content {% elif step.status == 'FAILED' %}bg-error text-error-content {% elif step.status == 'RUNNING' %}bg-info text-info-content {% else %}bg-base-300 text-base-content{% endif %}">
+                                {% if step.status == 'COMPLETED' %}
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                         class="h-3 w-3"
+                                         viewBox="0 0 20 20"
+                                         fill="currentColor"
+                                         aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                    </svg>
+                                {% elif step.status == 'FAILED' %}
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                         class="h-3 w-3"
+                                         viewBox="0 0 20 20"
+                                         fill="currentColor"
+                                         aria-hidden="true">
+                                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                {% elif step.status == 'RUNNING' %}
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                         class="h-3 w-3 animate-spin"
+                                         viewBox="0 0 24 24"
+                                         fill="none"
+                                         stroke="currentColor"
+                                         aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                {% else %}
+                                    <span class="text-xs">{{ step.step_index|add:1 }}</span>
+                                {% endif %}
+                            </span>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-baseline justify-between gap-4">
+                                    <span class="font-medium text-sm">{{ step.step_name }}</span>
+                                    <span class="text-xs text-base-content/50 whitespace-nowrap">
+                                        {% if step.started_at %}{{ step.started_at|date:"H:i:s" }}{% endif %}
+                                        {% if step.completed_at %}– {{ step.completed_at|date:"H:i:s" }}{% endif %}
+                                    </span>
+                                </div>
+                                {% if step.error_message %}
+                                    <p class="mt-1 text-xs text-error font-mono break-all">{{ step.error_message|truncatechars:300 }}</p>
+                                {% endif %}
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </div>
+    {% endif %}
+    <!-- Execution Logs -->
+    <div class="card bg-base-100 border border-base-200 shadow-sm mt-6">
+        <div class="card-body">
+            <h2 class="card-title text-lg">Execution Logs</h2>
+            <div class="bg-base-200 rounded-lg p-4 mt-4 max-h-64 overflow-y-auto font-mono text-sm space-y-0.5">
+                <p class="text-base-content/60">
+                    [{{ execution.created_at|date:"Y-m-d H:i:s" }}] Execution started — {{ execution.flow_name }}
+                </p>
+                {% for step in steps %}
+                    {% if step.started_at %}
+                        <p class="{% if step.status == 'FAILED' %}text-error{% elif step.status == 'RUNNING' %}text-info{% else %}text-base-content/60{% endif %}">
+                            [{{ step.started_at|date:"Y-m-d H:i:s" }}] Step {{ step.step_index|add:1 }}: {{ step.step_name }} — started
+                        </p>
+                    {% endif %}
+                    {% if step.completed_at %}
+                        {% if step.status == 'COMPLETED' %}
+                            <p class="text-success">
+                                [{{ step.completed_at|date:"Y-m-d H:i:s" }}] Step {{ step.step_index|add:1 }}: {{ step.step_name }} — completed
+                            </p>
+                        {% elif step.status == 'FAILED' %}
+                            <p class="text-error">
+                                [{{ step.completed_at|date:"Y-m-d H:i:s" }}] Step {{ step.step_index|add:1 }}: {{ step.step_name }} — failed
+                            </p>
+                            {% if step.error_message %}<p class="text-error ps-4">↳ {{ step.error_message|truncatechars:200 }}</p>{% endif %}
+                        {% endif %}
+                    {% endif %}
+                {% empty %}
+                    {% if execution.status == 'RUNNING' or execution.status == 'PENDING' %}
+                        <p class="text-info">[…] Waiting for first step to begin…</p>
+                    {% endif %}
+                {% endfor %}
+                {% if execution.status == 'COMPLETED' %}
+                    <p class="text-success">[{{ execution.completed_at|date:"Y-m-d H:i:s" }}] Execution completed successfully</p>
+                {% elif execution.status == 'FAILED' %}
+                    {% if execution.error_message %}
+                        <p class="text-error">[{{ execution.completed_at|date:"Y-m-d H:i:s"|default:"—" }}] {{ execution.error_message }}</p>
+                    {% else %}
+                        <p class="text-error">[—] Execution failed</p>
+                    {% endif %}
+                {% elif execution.status == 'RUNNING' %}
+                    <p class="text-info">[…] Execution in progress…</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <!-- Prediction Result + Input Values (credit-prediction only) -->
+    {% if input_values %}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-lg">Prediction Result</h2>
+                    {% if prediction_result %}
+                        <div class="space-y-4 mt-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-base-content/60">Score</span>
+                                <span class="text-2xl font-bold text-primary">{{ prediction_result.score }}</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-base-content/60">Classification</span>
+                                {% if prediction_result.classification == "Approved" %}
+                                    <span class="badge badge-success badge-lg">{{ prediction_result.classification }}</span>
+                                {% elif prediction_result.classification == "Review" %}
+                                    <span class="badge badge-warning badge-lg">{{ prediction_result.classification }}</span>
+                                {% else %}
+                                    <span class="badge badge-error badge-lg">{{ prediction_result.classification }}</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-base-content/60">Confidence</span>
+                                    <span class="text-sm font-semibold">{{ prediction_result.confidence }}%</span>
+                                </div>
+                                <progress class="progress progress-primary w-full"
+                                          value="{{ prediction_result.confidence }}"
+                                          max="100"></progress>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="mt-4">
+                            {% include "core/components/ui/empty_state.html" with title="No results yet" message="This execution has not completed." %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-lg">Input Values</h2>
+                    <div class="overflow-x-auto mt-4">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Parameter</th>
+                                    <th scope="col">Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for key, val in input_values.items %}
+                                    <tr>
+                                        <td class="font-medium">{{ key }}</td>
+                                        <td class="text-base-content/70">{{ val }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="2" class="text-center text-base-content/50">No input data available</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>

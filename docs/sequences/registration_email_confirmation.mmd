@@ -27,9 +27,9 @@ sequenceDiagram
     Browser->>Django: GET /accounts/confirm-email/<token>/
     Django->>Signing: TimestampSigner().unsign(token, max_age=86400)
     alt Token valid (≤ 24 h, untampered)
-        Django->>DB: User.objects.get(pk=user_pk)\nuser.is_active = True; user.save()
-        Django-->>Browser: 302 → /accounts/login/?confirmed=1
-        Browser->>Django: GET /accounts/login/?confirmed=1
+        Django->>DB: "User.objects.get(pk=user_pk)\nuser.is_active = True user.save()"
+        Django-->>Browser: "302 -> /accounts/login/?confirmed=1"
+        Browser->>Django: "GET /accounts/login/?confirmed=1"
         Django-->>Browser: 200 login.html with success banner\n("Email confirmed — you can now log in")
     else Token expired or invalid
         Django-->>Browser: 200 accounts/confirm_email.html\n(error state: "Link expired or invalid")
@@ -39,11 +39,11 @@ sequenceDiagram
     %% ── Login guard for unconfirmed accounts ─────────────────────
     User->>Browser: Try to log in before confirming
     Browser->>Django: POST /accounts/login/ (email + password)
-    Django->>DB: Get user by email; authenticate credentials
+    Django->>DB: Get user by email authenticate credentials
     alt Credentials correct but is_active=False
         Django-->>Browser: 200 login form\n(error: "Please confirm your email before logging in.")
     else Credentials wrong
         Django-->>Browser: 200 login form\n(error: "Invalid email or password.")
     else Credentials correct and is_active=True
-        Django-->>Browser: 302 → /flows/dashboard/
+        Django-->>Browser: 302 -> /flows/dashboard/
     end

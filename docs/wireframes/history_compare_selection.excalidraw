@@ -52,14 +52,14 @@
       "updated": 1,
       "link": null,
       "locked": false,
-      "text": "Django Prefect ML",
+      "text": "Django Doit ML",
       "fontSize": 16,
       "fontFamily": 1,
       "textAlign": "left",
       "verticalAlign": "top",
       "baseline": 14,
       "containerId": null,
-      "originalText": "Django Prefect ML"
+      "originalText": "Django Doit ML"
     },
     {
       "id": "sidebar",

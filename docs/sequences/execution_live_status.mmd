@@ -1,0 +1,53 @@
+sequenceDiagram
+    participant B as Browser (HTMX)
+    participant D as Django View
+    participant DB as PostgreSQL
+    participant T as Celery Worker
+
+    Note over B,T: Execution detail page load (any status)
+
+    B->>D: GET /flows/execution/<id>/
+    D->>DB: FlowExecution + ExecutionStep.all()
+    DB-->>D: execution, steps
+    D-->>B: execution_detail.html<br/>(includes #live-status div with hx-get if PENDING/RUNNING)
+
+    alt Status is PENDING or RUNNING
+        Note over B,T: HTMX poll loop (every 3 s)
+
+        loop Until terminal status returned
+            B->>D: GET /flows/execution/<id>/live-status/ (HX-Request: true)
+            D->>DB: FlowExecution (status, completed_at)<br/>ExecutionStep.all() ordered by step_index
+            DB-->>D: current execution + steps
+            D-->>B: execution_live_status.html partial<br/>(includes hx-trigger="every 3s" while PENDING/RUNNING)
+            B->>B: HTMX swaps #live-status outerHTML
+        end
+
+        Note over B,T: Celery task updates DB concurrently
+
+        T->>DB: ExecutionStep.transition(RUNNING)
+        T->>DB: ExecutionStep.transition(COMPLETED)
+        T->>DB: FlowExecution.transition(COMPLETED)
+
+        B->>D: GET /flows/execution/<id>/live-status/ (next poll)
+        D->>DB: FlowExecution (status=COMPLETED)<br/>ExecutionStep.all()
+        DB-->>D: terminal execution + steps
+        D-->>B: execution_live_status.html partial<br/>(NO hx-trigger — poll loop ends)
+        B->>B: HTMX swaps #live-status outerHTML<br/>(static, no further requests)
+
+    else Status is COMPLETED or FAILED
+        Note over B: No hx-trigger rendered — zero poll requests
+    end
+
+    Note over B,T: prediction_running.html panel (dashboard)
+
+    B->>D: GET /flows/prediction-status/<id>/ (existing HTMX poller)
+    D->>DB: FlowExecution status check
+    alt PENDING or RUNNING
+        D->>DB: ExecutionStep.all()
+        DB-->>D: steps (may be empty early on)
+        D-->>B: prediction_running.html<br/>(step progress list + spinner)
+    else COMPLETED
+        D-->>B: prediction_result.html
+    else FAILED
+        D-->>B: prediction_error.html
+    end
