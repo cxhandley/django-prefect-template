@@ -4,7 +4,7 @@
 <nav aria-label="Dashboard navigation">
     <ul class="menu bg-base-200 min-h-full w-64 p-4 pt-20">
         <li class="menu-title">
-            <span>Navigation</span>
+            <span class="text-base-content">Navigation</span>
         </li>
         <li>
             <a href="{% url 'flows:dashboard' %}"
@@ -53,7 +53,7 @@
         </li>
         {% if request.user.is_superuser or request.user.is_staff %}
             <li class="menu-title mt-4">
-                <span>Admin</span>
+                <span class="text-base-content">Admin</span>
             </li>
             {% if request.user.is_superuser %}
                 <li>

@@ -57,7 +57,7 @@
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-baseline justify-between gap-4">
                                     <span class="font-medium text-sm">{{ step.step_name }}</span>
-                                    <span class="text-xs text-base-content/50 whitespace-nowrap">
+                                    <span class="text-xs text-base-content/70 whitespace-nowrap">
                                         {% if step.started_at %}{{ step.started_at|date:"H:i:s" }}{% endif %}
                                         {% if step.completed_at %}– {{ step.completed_at|date:"H:i:s" }}{% endif %}
                                     </span>
@@ -146,7 +146,8 @@
                                 </div>
                                 <progress class="progress progress-primary w-full"
                                           value="{{ prediction_result.confidence }}"
-                                          max="100"></progress>
+                                          max="100"
+                                          aria-label="Confidence: {{ prediction_result.confidence }}%"></progress>
                             </div>
                         </div>
                     {% else %}
@@ -175,7 +176,7 @@
                                     </tr>
                                 {% empty %}
                                     <tr>
-                                        <td colspan="2" class="text-center text-base-content/50">No input data available</td>
+                                        <td colspan="2" class="text-center text-base-content/70">No input data available</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>

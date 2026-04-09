@@ -13,13 +13,13 @@
             {% endif %}
             <span class="flex-1 text-sm leading-tight">
                 {{ notif.message|truncatechars:60 }}
-                <span class="block text-xs text-base-content/50 font-normal mt-0.5">{{ notif.created_at|timesince }} ago</span>
+                <span class="block text-xs text-base-content/70 font-normal mt-0.5">{{ notif.created_at|timesince }} ago</span>
             </span>
         </a>
     </li>
 {% empty %}
     <li>
-        <span class="text-sm text-base-content/50 px-2">No notifications yet.</span>
+        <span class="text-sm text-base-content/70 px-2">No notifications yet.</span>
     </li>
 {% endfor %}
 <li class="border-t border-base-200 mt-1 pt-1">

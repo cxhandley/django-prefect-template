@@ -7,7 +7,7 @@
      x-transition
      class="flex flex-wrap items-center gap-2 py-1"
      style="display: none">
-    <span class="text-xs text-base-content/50 font-medium">Active filters:</span>
+    <span class="text-xs text-base-content/70 font-medium">Active filters:</span>
     <template x-for="(filter, i) in activeFilters" :key="i">
         <span class="badge badge-outline gap-1 text-xs py-3">
             <span x-text="filterLabel(filter)"></span>
@@ -28,5 +28,5 @@
     <button x-show="activeFilters.length > 1"
             @click="clearFilters()"
             type="button"
-            class="text-xs text-base-content/40 underline hover:text-base-content">Clear all</button>
+            class="text-xs text-base-content/70 underline hover:text-base-content">Clear all</button>
 </div>

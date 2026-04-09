@@ -4,7 +4,7 @@
             <li class="flex items-center justify-between py-2 border-b border-base-200 last:border-0">
                 <div>
                     <span class="font-medium text-sm">{{ preset.name }}</span>
-                    <span class="text-xs text-base-content/50 ml-2">{{ preset.created_at|date:"M d, Y" }}</span>
+                    <span class="text-xs text-base-content/70 ml-2">{{ preset.created_at|date:"M d, Y" }}</span>
                 </div>
                 <form method="post"
                       action="{% url 'flows:delete_preset' preset.id %}"
@@ -19,5 +19,5 @@
         {% endfor %}
     </ul>
 {% else %}
-    <p class="text-sm text-base-content/50">No saved presets.</p>
+    <p class="text-sm text-base-content/70">No saved presets.</p>
 {% endif %}

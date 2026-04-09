@@ -27,7 +27,8 @@
                              class="h-4 w-4"
                              fill="none"
                              viewBox="0 0 24 24"
-                             stroke="currentColor">
+                             stroke="currentColor"
+                             aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                         Export CSV
@@ -81,8 +82,8 @@
                                 <h3 class="card-title text-base">Execution #{{ forloop.counter }}</h3>
                                 {% include "core/components/ui/badge.html" with status=item.execution.status size="badge-sm" %}
                             </div>
-                            <p class="text-xs text-base-content/50 font-mono">{{ item.execution.flow_run_id|truncatechars:20 }}</p>
-                            <p class="text-xs text-base-content/50">{{ item.execution.created_at|date:"M d, Y H:i" }}</p>
+                            <p class="text-xs text-base-content/70 font-mono">{{ item.execution.flow_run_id|truncatechars:20 }}</p>
+                            <p class="text-xs text-base-content/70">{{ item.execution.created_at|date:"M d, Y H:i" }}</p>
                             <div class="divider my-2"></div>
                             <!-- Input Values -->
                             <h4 class="text-sm font-semibold text-base-content/70">Inputs</h4>
@@ -94,12 +95,12 @@
                                             {% if val is not None %}
                                                 {{ val }}
                                             {% else %}
-                                                <span class="text-base-content/30">—</span>
+                                                <span class="text-base-content/30" aria-hidden="true">—</span>
                                             {% endif %}
                                         </span>
                                     </div>
                                 {% empty %}
-                                    <p class="text-xs text-base-content/40">No input data</p>
+                                    <p class="text-xs text-base-content/70">No input data</p>
                                 {% endfor %}
                             </div>
                             <div class="divider my-2"></div>
@@ -112,7 +113,7 @@
                                         {% if item.result.score is not None %}
                                             {{ item.result.score }}
                                         {% else %}
-                                            <span class="text-base-content/30">—</span>
+                                            <span class="text-base-content/30" aria-hidden="true">—</span>
                                         {% endif %}
                                     </span>
                                 </div>
@@ -126,7 +127,7 @@
                                         {% elif cls == "Declined" %}
                                             <span class="badge badge-error badge-sm">{{ cls }}</span>
                                         {% else %}
-                                            <span class="text-base-content/30">—</span>
+                                            <span class="text-base-content/30" aria-hidden="true">—</span>
                                         {% endif %}
                                     {% endwith %}
                                 </div>
@@ -136,14 +137,15 @@
                                         {% if item.result.confidence is not None %}
                                             {{ item.result.confidence }}%
                                         {% else %}
-                                            <span class="text-base-content/30">—</span>
+                                            <span class="text-base-content/30" aria-hidden="true">—</span>
                                         {% endif %}
                                     </span>
                                 </div>
                                 {% if item.result.confidence is not None %}
                                     <progress class="progress progress-primary w-full"
                                               value="{{ item.result.confidence }}"
-                                              max="100"></progress>
+                                              max="100"
+                                              aria-label="Confidence: {{ item.result.confidence }}%"></progress>
                                 {% endif %}
                             </div>
                             {% if item.duration %}
