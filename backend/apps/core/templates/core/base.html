@@ -34,10 +34,15 @@
         </style>
     </head>
     <body>
+        <!-- Skip navigation link (WCAG 2.4.1) -->
+        <a href="#main-content"
+           class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-base-100 focus:text-base-content focus:rounded-lg focus:shadow-lg focus:outline-none">
+            Skip to main content
+        </a>
         <!-- Navigation -->
         {% include "core/components/navbar.html" %}
         <!-- Page Content -->
-        <main>
+        <main id="main-content">
             {% block content %}
             {% endblock content %}
         </main>
@@ -269,9 +274,9 @@
 </script>
 {% if user.is_authenticated %}
 <!-- Logout confirmation modal -->
-<dialog id="logout_modal" class="modal">
+<dialog id="logout_modal" class="modal" aria-labelledby="logout_modal_title">
 <div class="modal-box">
-<h3 class="font-bold text-lg">Sign Out</h3>
+<h3 id="logout_modal_title" class="font-bold text-lg">Sign Out</h3>
 <p class="py-4">Are you sure you want to sign out of your account?</p>
 <div class="modal-action">
 <form method="dialog">

@@ -24,7 +24,10 @@
                                class="btn btn-primary btn-sm">View Details</a>
                         </div>
                     </div>
-                    <progress class="progress progress-primary w-full mt-2" value="65" max="100"></progress>
+                    <progress class="progress progress-primary w-full mt-2"
+                              value="65"
+                              max="100"
+                              aria-label="Prediction in progress"></progress>
                 </div>
             </div>
         {% endif %}
@@ -60,7 +63,8 @@
                                  class="h-5 w-5"
                                  fill="none"
                                  viewBox="0 0 24 24"
-                                 stroke="currentColor">
+                                 stroke="currentColor"
+                                 aria-hidden="true">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
                             Run Prediction
@@ -69,14 +73,19 @@
                     </div>
                     <span id="prediction-loading"
                           class="loading loading-spinner loading-md htmx-indicator mt-4"></span>
-                    <div id="prediction-result" class="mt-4"></div>
+                    <div id="prediction-result"
+                         class="mt-4"
+                         aria-live="polite"
+                         aria-atomic="true"></div>
                 </form>
             </div>
         </div>
         <!-- Save Preset Modal -->
-        <dialog id="save_preset_modal" class="modal">
+        <dialog id="save_preset_modal"
+                class="modal"
+                aria-labelledby="save_preset_modal_title">
             <div class="modal-box">
-                <h3 class="font-bold text-lg">Save as Preset</h3>
+                <h3 id="save_preset_modal_title" class="font-bold text-lg">Save as Preset</h3>
                 <p class="text-sm text-base-content/60 mt-1">Give this set of inputs a name so you can reload them later.</p>
                 <div id="save-preset-result">
                     <form id="save-preset-form"
@@ -124,11 +133,11 @@
                     <table class="table">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th>Input Summary</th>
-                                <th>Prediction</th>
-                                <th>Status</th>
-                                <th></th>
+                                <th scope="col">Date</th>
+                                <th scope="col">Input Summary</th>
+                                <th scope="col">Prediction</th>
+                                <th scope="col">Status</th>
+                                <th scope="col" class="sr-only">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -224,15 +233,17 @@
             const input = form.querySelector('[name="' + name + '"]');
             if (!input) return;
             const fc = input.closest('.form-control');
+            const errId = 'err-' + name;
             let errLabel = fc.querySelector('.field-error-label');
             if (!errLabel) {
                 errLabel = document.createElement('label');
                 errLabel.className = 'label field-error-label';
-                errLabel.innerHTML = '<span class="label-text-alt text-error"></span>';
+                errLabel.innerHTML = '<span id="' + errId + '" class="label-text-alt text-error"></span>';
                 fc.appendChild(errLabel);
             }
             errLabel.querySelector('span').textContent = message;
             input.classList.add('input-error');
+            input.setAttribute('aria-describedby', errId);
         }
 
         function clearFieldError(form, name) {
@@ -242,6 +253,7 @@
             const errLabel = fc.querySelector('.field-error-label');
             if (errLabel) errLabel.remove();
             input.classList.remove('input-error');
+            input.removeAttribute('aria-describedby');
         }
 
         function validatePredictionForm(form) {
