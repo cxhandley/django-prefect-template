@@ -2,14 +2,14 @@
 <tr id="user-row-{{ u.pk }}">
     <td>
         <div class="font-medium">{{ u.email }}</div>
-        <div class="text-xs text-base-content/50">{{ u.username }}</div>
+        <div class="text-xs text-base-content/70">{{ u.username }}</div>
     </td>
     <td class="text-sm text-base-content/70">{{ u.date_joined|date:"Y-m-d" }}</td>
     <td class="text-sm text-base-content/70">
         {% if u.last_login %}
             {{ u.last_login|date:"Y-m-d" }}
         {% else %}
-            <span class="text-base-content/40">Never</span>
+            <span class="text-base-content/70">Never</span>
         {% endif %}
     </td>
     <td>
@@ -21,7 +21,7 @@
     </td>
     <td>
         {% if u == current_user %}
-            <span class="text-xs text-base-content/40">You</span>
+            <span class="text-xs text-base-content/70">You</span>
         {% else %}
             <div class="flex gap-2 items-center">
                 <form hx-post="{% url 'accounts:user_toggle_active' u.pk %}"

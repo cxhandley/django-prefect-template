@@ -1,5 +1,6 @@
 {% if presets %}
     <div class="flex items-center gap-2">
+        <label for="preset-select" class="sr-only">Load a saved preset</label>
         <select id="preset-select"
                 class="select select-bordered select-sm"
                 hx-get="{% url 'flows:load_preset' %}"
@@ -18,5 +19,5 @@
         </select>
     </div>
 {% else %}
-    <span class="text-sm text-base-content/50">No saved presets yet.</span>
+    <span class="text-sm text-base-content/70">No saved presets yet.</span>
 {% endif %}

@@ -27,12 +27,12 @@
                     {% endif %}
                     <div class="flex-1 min-w-0">
                         <p class="text-sm {% if not notif.is_read %}font-semibold{% endif %}">{{ notif.message }}</p>
-                        <p class="text-xs text-base-content/50 mt-1">{{ notif.created_at|timesince }} ago</p>
+                        <p class="text-xs text-base-content/70 mt-1">{{ notif.created_at|timesince }} ago</p>
                     </div>
                     {% if not notif.is_read %}<span class="badge badge-primary badge-xs self-center">New</span>{% endif %}
                 </a>
             {% empty %}
-                <div class="text-center py-16 text-base-content/50">
+                <div class="text-center py-16 text-base-content/70">
                     <p class="text-lg">No notifications yet.</p>
                     <p class="text-sm mt-1">You'll see alerts here when your executions complete or fail.</p>
                 </div>

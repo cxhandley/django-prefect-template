@@ -4,13 +4,13 @@
         <table class="table table-zebra w-full text-sm">
             <thead>
                 <tr>
-                    <th>User</th>
-                    <th>Flow</th>
-                    <th>Status</th>
-                    <th>Started</th>
-                    <th>Duration</th>
-                    <th>Error</th>
-                    <th></th>
+                    <th scope="col">User</th>
+                    <th scope="col">Flow</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Started</th>
+                    <th scope="col">Duration</th>
+                    <th scope="col">Error</th>
+                    <th scope="col" class="sr-only">Actions</th>
                 </tr>
             </thead>
             <tbody id="admin-exec-table-body">
@@ -19,7 +19,7 @@
                         <tr>
                             <td>
                                 <div class="font-medium">{{ ex.triggered_by.email }}</div>
-                                <div class="text-xs text-base-content/50">{{ ex.triggered_by.username }}</div>
+                                <div class="text-xs text-base-content/70">{{ ex.triggered_by.username }}</div>
                             </td>
                             <td class="font-mono">{{ ex.flow_name }}</td>
                             <td>

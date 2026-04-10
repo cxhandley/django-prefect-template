@@ -22,7 +22,7 @@
                     <form method="post">
                         {% csrf_token %}
                         <div class="space-y-3">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50">Events</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-base-content/70">Events</p>
                             <div class="form-control">
                                 <label class="label cursor-pointer justify-start gap-4">
                                     <input type="checkbox"
@@ -31,7 +31,7 @@
                                            {% if profile.notify_on_failure %}checked{% endif %} />
                                     <span class="label-text">
                                         Notify me when an execution fails
-                                        <span class="block text-xs text-base-content/50 mt-0.5">Sent once after all retries are exhausted.</span>
+                                        <span class="block text-xs text-base-content/70 mt-0.5">Sent once after all retries are exhausted.</span>
                                     </span>
                                 </label>
                             </div>
@@ -43,11 +43,11 @@
                                            {% if profile.notify_on_success %}checked{% endif %} />
                                     <span class="label-text">
                                         Notify me when an execution succeeds
-                                        <span class="block text-xs text-base-content/50 mt-0.5">Off by default — useful for long-running pipelines.</span>
+                                        <span class="block text-xs text-base-content/70 mt-0.5">Off by default — useful for long-running pipelines.</span>
                                     </span>
                                 </label>
                             </div>
-                            <p class="text-xs font-semibold uppercase tracking-wide text-base-content/50 pt-2">Channels</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-base-content/70 pt-2">Channels</p>
                             <div class="form-control">
                                 <label class="label cursor-pointer justify-start gap-4">
                                     <input type="checkbox"
@@ -56,7 +56,7 @@
                                            {% if profile.notify_in_app %}checked{% endif %} />
                                     <span class="label-text">
                                         Show in-app notifications
-                                        <span class="block text-xs text-base-content/50 mt-0.5">Appears in the bell icon in the top nav.</span>
+                                        <span class="block text-xs text-base-content/70 mt-0.5">Appears in the bell icon in the top nav.</span>
                                     </span>
                                 </label>
                             </div>
@@ -68,7 +68,7 @@
                                            {% if profile.notify_via_email %}checked{% endif %} />
                                     <span class="label-text">
                                         Send email notifications
-                                        <span class="block text-xs text-base-content/50 mt-0.5">Emails are sent to {{ user.email }}.</span>
+                                        <span class="block text-xs text-base-content/70 mt-0.5">Emails are sent to {{ user.email }}.</span>
                                     </span>
                                 </label>
                             </div>
@@ -99,7 +99,7 @@
                 </div>
                 <!-- Danger Zone -->
                 <div class="border-t border-error/30 pt-8">
-                    <h2 class="text-lg font-semibold mb-4 text-error">Danger Zone</h2>
+                    <h2 class="text-lg font-semibold mb-4 text-base-content">Danger Zone</h2>
                     <button class="btn btn-error btn-sm">Delete Account</button>
                 </div>
             </div>

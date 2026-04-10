@@ -1,9 +1,11 @@
 <!-- Modal component
      Parameters: modal_id (string), title (string)
      Content is loaded via htmx into the modal-body div -->
-<dialog id="{{ modal_id }}" class="modal">
+<dialog id="{{ modal_id }}"
+        class="modal"
+        aria-labelledby="{{ modal_id }}-title">
     <div class="modal-box">
-        {% if title %}<h3 class="text-lg font-bold">{{ title }}</h3>{% endif %}
+        {% if title %}<h3 id="{{ modal_id }}-title" class="text-lg font-bold">{{ title }}</h3>{% endif %}
         <div id="{{ modal_id }}-body" class="py-4">
             {% block modal_content %}
             {% endblock modal_content %}

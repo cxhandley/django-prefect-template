@@ -46,7 +46,7 @@
                     {% elif cls == "Declined" %}
                         <span class="badge badge-error badge-sm">{{ cls }}</span>
                     {% else %}
-                        <span class="text-base-content/30">—</span>
+                        <span class="text-base-content/30" aria-hidden="true">—</span>
                     {% endif %}
                 {% endwith %}
             </td>

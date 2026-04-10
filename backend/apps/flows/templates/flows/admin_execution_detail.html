@@ -14,20 +14,20 @@
                 <h2 class="card-title text-base">Metadata</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                     <div>
-                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">User</span>
+                        <span class="text-base-content/70 block text-xs font-semibold uppercase tracking-wide">User</span>
                         <span>{{ execution.triggered_by.email }}</span>
-                        <span class="text-base-content/50 ml-1">({{ execution.triggered_by.username }})</span>
+                        <span class="text-base-content/70 ml-1">({{ execution.triggered_by.username }})</span>
                     </div>
                     <div>
-                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Flow</span>
+                        <span class="text-base-content/70 block text-xs font-semibold uppercase tracking-wide">Flow</span>
                         <span class="font-mono">{{ execution.flow_name }}</span>
                     </div>
                     <div>
-                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Run ID</span>
+                        <span class="text-base-content/70 block text-xs font-semibold uppercase tracking-wide">Run ID</span>
                         <span class="font-mono text-xs">{{ execution.flow_run_id }}</span>
                     </div>
                     <div>
-                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Status</span>
+                        <span class="text-base-content/70 block text-xs font-semibold uppercase tracking-wide">Status</span>
                         {% if execution.status == "COMPLETED" %}
                             <span class="badge badge-success badge-sm">{{ execution.status }}</span>
                         {% elif execution.status == "FAILED" %}
@@ -39,21 +39,21 @@
                         {% endif %}
                     </div>
                     <div>
-                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Started</span>
+                        <span class="text-base-content/70 block text-xs font-semibold uppercase tracking-wide">Started</span>
                         <span>{{ execution.created_at|date:"Y-m-d H:i:s" }}</span>
                     </div>
                     <div>
-                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Completed</span>
+                        <span class="text-base-content/70 block text-xs font-semibold uppercase tracking-wide">Completed</span>
                         <span>{{ execution.completed_at|date:"Y-m-d H:i:s"|default:"—" }}</span>
                     </div>
                     {% if duration %}
                         <div>
-                            <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Duration</span>
+                            <span class="text-base-content/70 block text-xs font-semibold uppercase tracking-wide">Duration</span>
                             <span>{{ duration }}s</span>
                         </div>
                     {% endif %}
                     <div>
-                        <span class="text-base-content/50 block text-xs font-semibold uppercase tracking-wide">Celery Task ID</span>
+                        <span class="text-base-content/70 block text-xs font-semibold uppercase tracking-wide">Celery Task ID</span>
                         {% if execution.celery_task_id %}
                             <span class="font-mono text-xs">{{ execution.celery_task_id }}</span>
                             <a href="{{ flower_url }}task/{{ execution.celery_task_id }}"
@@ -61,7 +61,7 @@
                                rel="noopener noreferrer"
                                class="link link-primary text-xs ml-2">Flower ↗</a>
                         {% else %}
-                            <span class="text-base-content/40">—</span>
+                            <span class="text-base-content/40" aria-hidden="true">—</span>
                         {% endif %}
                     </div>
                 </div>
