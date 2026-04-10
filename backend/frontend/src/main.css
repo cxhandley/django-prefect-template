@@ -92,6 +92,11 @@ main {
     border-color: color-mix(in oklch, var(--color-primary) 85%, black);
 }
 
+/* Override DaisyUI's dark error-content default — white on #ff627d is ~4.6:1 (WCAG AA) */
+:root {
+    --color-error-content: white;
+}
+
 .btn-error {
     background-color: var(--color-error);
     border-color: var(--color-error);

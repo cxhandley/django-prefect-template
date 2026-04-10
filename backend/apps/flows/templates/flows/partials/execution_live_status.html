@@ -11,9 +11,9 @@
             <div class="stat-value text-sm py-1">{% include "core/components/ui/badge.html" with status=execution.status %}</div>
         </div>
         {% if duration %}
-            {% include "core/components/ui/stat_card.html" with title="Duration" value=duration description="seconds" color="accent" %}
+            {% include "core/components/ui/stat_card.html" with title="Duration" value=duration description="seconds" color="primary" %}
         {% else %}
-            {% include "core/components/ui/stat_card.html" with title="Duration" value="-" color="accent" %}
+            {% include "core/components/ui/stat_card.html" with title="Duration" value="-" color="primary" %}
         {% endif %}
     </div>
     {% if steps %}
@@ -88,7 +88,7 @@
                     {% endif %}
                     {% if step.completed_at %}
                         {% if step.status == 'COMPLETED' %}
-                            <p class="text-success">
+                            <p class="text-base-content">
                                 [{{ step.completed_at|date:"Y-m-d H:i:s" }}] Step {{ step.step_index|add:1 }}: {{ step.step_name }} — completed
                             </p>
                         {% elif step.status == 'FAILED' %}
@@ -104,7 +104,7 @@
                     {% endif %}
                 {% endfor %}
                 {% if execution.status == 'COMPLETED' %}
-                    <p class="text-success">[{{ execution.completed_at|date:"Y-m-d H:i:s" }}] Execution completed successfully</p>
+                    <p class="text-base-content">[{{ execution.completed_at|date:"Y-m-d H:i:s" }}] Execution completed successfully</p>
                 {% elif execution.status == 'FAILED' %}
                     {% if execution.error_message %}
                         <p class="text-error">[{{ execution.completed_at|date:"Y-m-d H:i:s"|default:"—" }}] {{ execution.error_message }}</p>
