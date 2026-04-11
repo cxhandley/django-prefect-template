@@ -263,7 +263,7 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 
 ---
 
-### BL-032 · Synthetic Training Dataset Generation `M` `[ ]`
+### ~~BL-032 · Synthetic Training Dataset Generation~~ `M` ✓ Complete
 
 **User story:** US-13.1
 **Value:** There is currently no labelled dataset to train or backtest a scoring model against. Real applicant data cannot be used for experimentation. Faker-generated synthetic data with a deterministic ground-truth label function gives the training pipeline a reproducible, realistic input without privacy risk.
@@ -300,7 +300,7 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 
 ---
 
-### BL-033 · Model Training Run — Weight & Threshold Optimisation `L` `[ ]`
+### BL-033 · Model Training Run — Weight & Threshold Optimisation `L` `[~]`
 
 **User story:** US-13.2
 **Value:** Currently the only way to change scoring weights is to edit a notebook manually. This item gives admins a reproducible, logged optimisation pipeline that searches the weight and threshold space, records every round, and stores artefacts in S3 — so experimentation is data-driven and auditable rather than ad hoc.
@@ -529,12 +529,12 @@ All items below are done and closed.
 | ~~BL-028~~ | ~~`ScoringModel` — versioned scoring algorithm~~ | Complete | M | BL-026 |
 | ~~BL-029~~ | ~~Notebook result protocol — write `result.json` to S3~~ | Complete | S | — |
 | ~~BL-030~~ | ~~Status as enforced `TextChoices` state machine~~ | Complete | S | BL-026 |
-| BL-025 | WCAG 2.1 AA accessibility audit & remediation | Not started | M | — |
+| ~~BL-025~~ | ~~WCAG 2.1 AA accessibility audit & remediation~~ | Complete | M | — |
 | ~~BL-022~~ | ~~Secrets management audit~~ | Complete | M | — |
 | ~~BL-023~~ | ~~Infrastructure as Code & 1Password secrets~~ | Complete | L | — |
 | BL-024 | Reusable advanced DataTable component | Not started | L | BL-026 |
-| BL-032 | Synthetic training dataset generation | Not started | M | BL-028 |
-| BL-033 | Model training run — weight & threshold optimisation | Not started | L | BL-032 |
+| ~~BL-032~~ | ~~Synthetic training dataset generation~~ | ~~Not started~~ | M | BL-028 |
+| BL-033 | Model training run — weight & threshold optimisation | In progress | L | BL-032 |
 | BL-034 | Backtest engine — held-out evaluation | Not started | M | BL-033 |
 | BL-035 | Admin visual diagnostics — Altair charts | Not started | M | BL-033, BL-034 |
 | BL-036 | Model promotion workflow | Not started | S | BL-033, BL-034, BL-035 |

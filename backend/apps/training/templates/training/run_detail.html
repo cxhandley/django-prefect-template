@@ -1,0 +1,172 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    Run {{ run.label }} — {{ dataset.slug }}
+{% endblock title %}
+{% block breadcrumbs %}
+    <div class="breadcrumbs text-sm px-4 pt-4">
+        <ul>
+            <li>
+                <a href="{% url 'flows:admin_dashboard' %}">Admin</a>
+            </li>
+            <li>
+                <a href="{% url 'training:dataset_list' %}">Training Datasets</a>
+            </li>
+            <li>
+                <a href="{% url 'training:detail' dataset.slug %}">{{ dataset.slug }}</a>
+            </li>
+            <li>
+                <a href="{% url 'training:run_list' dataset.slug %}">Runs</a>
+            </li>
+            <li>{{ run.label }}</li>
+        </ul>
+    </div>
+{% endblock breadcrumbs %}
+{% block dashboard_content %}
+    <div class="space-y-6">
+        <!-- Header -->
+        <div>
+            <h1 class="text-2xl font-bold font-mono">{{ run.label }}</h1>
+            <p class="text-base-content/60 text-sm mt-1">
+                Dataset: <a href="{% url 'training:detail' dataset.slug %}"
+    class="link link-primary font-mono">{{ dataset.slug }}</a>
+                &nbsp;·&nbsp; Target: {{ run.get_optimisation_target_display }}
+                {% if run.umap_enabled %}&nbsp;·&nbsp; UMAP enabled{% endif %}
+            </p>
+        </div>
+        <!-- Status card (HTMX live polling) -->
+        <div class="card bg-base-100 border border-base-200 shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title text-base">Status</h2>
+                {% include "training/partials/run_status.html" %}
+            </div>
+        </div>
+        <!-- Metadata -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
+                <div class="stat-title text-xs">Created By</div>
+                <div class="stat-value text-lg">{{ run.created_by.email|default:run.created_by.username|default:"—" }}</div>
+            </div>
+            <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
+                <div class="stat-title text-xs">Created At</div>
+                <div class="stat-value text-lg">{{ run.created_at|date:"Y-m-d H:i" }}</div>
+            </div>
+            <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
+                <div class="stat-title text-xs">Optimisation Target</div>
+                <div class="stat-value text-lg">{{ run.get_optimisation_target_display }}</div>
+            </div>
+            <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
+                <div class="stat-title text-xs">UMAP</div>
+                <div class="stat-value text-lg">
+                    {% if run.umap_enabled %}
+                        Enabled
+                    {% else %}
+                        Disabled
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% if run.status == "COMPLETED" %}
+            <!-- Validation metrics -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">Validation Metrics</h2>
+                    <div class="grid grid-cols-3 gap-4 mt-2">
+                        <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
+                            <div class="stat-title text-xs">Gini Coefficient</div>
+                            <div class="stat-value text-2xl font-mono">
+                                {% if run.val_gini is not None %}
+                                    {{ run.val_gini|floatformat:4 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
+                            <div class="stat-title text-xs">KS Statistic</div>
+                            <div class="stat-value text-2xl font-mono">
+                                {% if run.val_ks is not None %}
+                                    {{ run.val_ks|floatformat:4 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
+                            <div class="stat-title text-xs">F1 (Review Class)</div>
+                            <div class="stat-value text-2xl font-mono">
+                                {% if run.val_f1_review is not None %}
+                                    {{ run.val_f1_review|floatformat:4 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Candidate weights -->
+            {% if run.candidate_weights %}
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body">
+                        <h2 class="card-title text-base">Candidate Weights</h2>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                            {% for feature, weight in run.candidate_weights.items %}
+                                <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
+                                    <div class="stat-title text-xs">{{ feature }}</div>
+                                    <div class="stat-value text-xl font-mono">{{ weight|floatformat:4 }}</div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+            <!-- Candidate thresholds -->
+            {% if run.candidate_thresholds %}
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body">
+                        <h2 class="card-title text-base">Candidate Thresholds</h2>
+                        <div class="grid grid-cols-2 gap-4 mt-2">
+                            {% for label, value in run.candidate_thresholds.items %}
+                                <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
+                                    <div class="stat-title text-xs capitalize">{{ label }} cutpoint</div>
+                                    <div class="stat-value text-xl font-mono">{{ value|floatformat:2 }}</div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+            <!-- Next steps -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">Next Steps</h2>
+                    <p class="text-sm text-base-content/60 mt-1">
+                        Run a backtest to evaluate these candidate weights against the held-out test fold (BL-034),
+                        then review visual diagnostics (BL-035) before promoting to production (BL-036).
+                    </p>
+                    <div class="flex gap-3 mt-4">
+                        <button class="btn btn-outline btn-sm"
+                                disabled
+                                aria-label="Backtest not yet implemented">Backtest (coming soon)</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Artefacts path -->
+            {% if run.artefacts_s3_path %}
+                <div class="card bg-base-100 border border-base-200 shadow-sm">
+                    <div class="card-body">
+                        <h2 class="card-title text-base">S3 Artefacts</h2>
+                        <p class="font-mono text-sm text-base-content/70 mt-1">{{ run.artefacts_s3_path }}/</p>
+                        <ul class="list-disc list-inside text-sm text-base-content/60 mt-2 space-y-1">
+                            <li>weights.json</li>
+                            <li>thresholds.json</li>
+                            <li>val_metrics.json</li>
+                            <li>score_distributions.parquet</li>
+                            {% if run.umap_enabled %}<li>umap.parquet</li>{% endif %}
+                        </ul>
+                    </div>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+{% endblock dashboard_content %}

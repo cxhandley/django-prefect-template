@@ -549,7 +549,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [ ] Admin can view a statistical summary of the generated dataset (feature distributions, class balance)
 - [ ] Admin can delete a dataset (with confirmation); associated S3 file is cleaned up
 
-### US-13.2: Run a Model Training Round `[ ]`
+### US-13.2: Run a Model Training Round `[~]`
 **As an** admin
 **I want to** run a weight-and-threshold optimisation against a training dataset
 **So that** I can discover better-performing scoring configurations without guessing by hand

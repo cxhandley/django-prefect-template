@@ -4,9 +4,15 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
-from .models import DatasetStatus, TrainingDataset
+from .models import (
+    DatasetStatus,
+    ModelTrainingRun,
+    OptimisationTarget,
+    TrainingDataset,
+    TrainingRunStatus,
+)
 from .services.analytics import TrainingAnalytics
-from .tasks import generate_training_dataset_task
+from .tasks import generate_training_dataset_task, run_model_training_task
 
 
 @staff_member_required
@@ -121,3 +127,125 @@ def delete_dataset(request, slug):
     dataset = get_object_or_404(TrainingDataset, slug=slug)
     dataset.delete()
     return redirect("training:dataset_list")
+
+
+# ── Training Run views ────────────────────────────────────────────────────────
+
+
+@staff_member_required
+def run_list(request, slug):
+    """List all training runs for a dataset, sortable by metric."""
+    dataset = get_object_or_404(TrainingDataset.objects.select_related("created_by"), slug=slug)
+    sort_by = request.GET.get("sort", "-created_at")
+    allowed_sorts = {
+        "val_gini": "val_gini",
+        "-val_gini": "-val_gini",
+        "val_ks": "val_ks",
+        "-val_ks": "-val_ks",
+        "created_at": "created_at",
+        "-created_at": "-created_at",
+    }
+    order_field = allowed_sorts.get(sort_by, "-created_at")
+    runs = (
+        ModelTrainingRun.objects.filter(dataset=dataset)
+        .select_related("created_by")
+        .order_by(order_field)
+    )
+    return render(
+        request,
+        "training/run_list.html",
+        {
+            "dataset": dataset,
+            "runs": runs,
+            "sort_by": sort_by,
+            "optimisation_targets": OptimisationTarget,
+            "active_page": "training_datasets",
+        },
+    )
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def start_run(request, slug):
+    """Validate form, create ModelTrainingRun, dispatch Celery task."""
+    dataset = get_object_or_404(TrainingDataset, slug=slug)
+
+    if dataset.status != DatasetStatus.COMPLETED:
+        return redirect("training:run_list", slug=slug)
+
+    errors = {}
+    label = request.POST.get("label", "").strip()
+    if not label:
+        errors["label"] = "Label is required."
+    elif len(label) > 100:
+        errors["label"] = "Label must be 100 characters or fewer."
+
+    optimisation_target = request.POST.get("optimisation_target", "")
+    if optimisation_target not in OptimisationTarget.values:
+        errors["optimisation_target"] = "Select a valid optimisation target."
+
+    umap_enabled = request.POST.get("umap_enabled") == "on"
+
+    if errors:
+        runs = (
+            ModelTrainingRun.objects.filter(dataset=dataset)
+            .select_related("created_by")
+            .order_by("-created_at")
+        )
+        return render(
+            request,
+            "training/run_list.html",
+            {
+                "dataset": dataset,
+                "runs": runs,
+                "sort_by": "-created_at",
+                "optimisation_targets": OptimisationTarget,
+                "form_errors": errors,
+                "form_values": request.POST,
+                "active_page": "training_datasets",
+            },
+            status=422,
+        )
+
+    run = ModelTrainingRun.objects.create(
+        label=label,
+        dataset=dataset,
+        optimisation_target=optimisation_target,
+        umap_enabled=umap_enabled,
+        status=TrainingRunStatus.PENDING,
+        created_by=request.user,
+    )
+
+    result = run_model_training_task.apply_async(args=[run.pk])
+    ModelTrainingRun.objects.filter(pk=run.pk).update(celery_task_id=result.id)
+
+    return redirect("training:run_detail", run_id=run.pk)
+
+
+@staff_member_required
+def run_detail(request, run_id):
+    """Training run detail page."""
+    run = get_object_or_404(
+        ModelTrainingRun.objects.select_related("dataset", "created_by"),
+        pk=run_id,
+    )
+    return render(
+        request,
+        "training/run_detail.html",
+        {
+            "run": run,
+            "dataset": run.dataset,
+            "active_page": "training_datasets",
+        },
+    )
+
+
+@staff_member_required
+def run_status(request, run_id):
+    """HTMX polling endpoint — returns the run status partial."""
+    run = get_object_or_404(ModelTrainingRun, pk=run_id)
+    return render(
+        request,
+        "training/partials/run_status.html",
+        {"run": run},
+    )

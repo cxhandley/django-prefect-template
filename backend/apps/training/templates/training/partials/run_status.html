@@ -1,0 +1,33 @@
+{% load tz %}
+<div id="run-status"
+     {% if not run.is_terminal %} hx-get="{% url 'training:run_status' run.pk %}" hx-trigger="every 3s" hx-swap="outerHTML" {% endif %}
+     aria-live="polite">
+    <div class="flex items-center gap-3">
+        {% if run.status == "COMPLETED" %}
+            <span class="badge badge-success">Completed</span>
+        {% elif run.status == "RUNNING" %}
+            <span class="badge badge-warning gap-1">
+                <span class="loading loading-spinner loading-xs"></span>
+                Running…
+            </span>
+        {% elif run.status == "FAILED" %}
+            <span class="badge badge-error">Failed</span>
+        {% else %}
+            <span class="badge badge-ghost">Pending</span>
+        {% endif %}
+        <span class="text-sm text-base-content/60">Started {{ run.created_at|date:"H:i:s" }} UTC</span>
+    </div>
+    {% if run.status == "FAILED" and run.error_message %}
+        <div class="alert alert-error mt-3 text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-5 w-5 shrink-0"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor"
+                 aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{{ run.error_message|truncatechars:300 }}</span>
+        </div>
+    {% endif %}
+</div>

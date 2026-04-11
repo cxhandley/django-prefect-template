@@ -37,6 +37,22 @@
                 {% include "training/partials/dataset_status.html" %}
             </div>
         </div>
+        <!-- Training runs link -->
+        {% if dataset.status == "COMPLETED" %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body flex-row items-center justify-between gap-4">
+                    <div>
+                        <h2 class="card-title text-base">Training Runs</h2>
+                        <p class="text-sm text-base-content/60 mt-1">
+                            Optimise scoring weights and thresholds against this dataset.
+                            {{ dataset.training_runs.count }} run{{ dataset.training_runs.count|pluralize }} so far.
+                        </p>
+                    </div>
+                    <a href="{% url 'training:run_list' dataset.slug %}"
+                       class="btn btn-primary btn-sm whitespace-nowrap">View Runs</a>
+                </div>
+            </div>
+        {% endif %}
         <!-- Metadata -->
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div class="stat bg-base-100 border border-base-200 rounded-box p-4">
