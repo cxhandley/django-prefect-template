@@ -1,0 +1,131 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    Training Datasets — Admin
+{% endblock title %}
+{% block breadcrumbs %}
+    <div class="breadcrumbs text-sm px-4 pt-4">
+        <ul>
+            <li>
+                <a href="{% url 'flows:admin_dashboard' %}">Admin</a>
+            </li>
+            <li>Training Datasets</li>
+        </ul>
+    </div>
+{% endblock breadcrumbs %}
+{% block dashboard_content %}
+    <div class="space-y-6">
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold">Training Datasets</h1>
+                <p class="text-base-content/60 text-sm mt-1">Synthetic labelled datasets for scoring model optimisation.</p>
+            </div>
+        </div>
+        <!-- Generate form -->
+        <div class="card bg-base-100 border border-base-200 shadow-sm">
+            <div class="card-body">
+                <h2 class="card-title text-base">Generate New Dataset</h2>
+                <form method="post" action="{% url 'training:generate' %}">
+                    {% csrf_token %}
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                        <div class="md:col-span-3">
+                            <label class="label" for="id_description">
+                                <span class="label-text">Description <span class="text-base-content/50">(optional)</span></span>
+                            </label>
+                            <input type="text"
+                                   id="id_description"
+                                   name="description"
+                                   class="input input-bordered w-full"
+                                   placeholder="e.g. Baseline v1 — 10k rows"
+                                   value="{{ form_values.description|default:'' }}">
+                        </div>
+                        <div>
+                            <label class="label" for="id_row_count">
+                                <span class="label-text">Row Count</span>
+                            </label>
+                            <input type="number"
+                                   id="id_row_count"
+                                   name="row_count"
+                                   class="input input-bordered w-full {% if form_errors.row_count %}input-error{% endif %}"
+                                   min="100"
+                                   max="1000000"
+                                   value="{{ form_values.row_count|default:'10000' }}"
+                                   required>
+                            {% if form_errors.row_count %}<p class="text-error text-xs mt-1">{{ form_errors.row_count }}</p>{% endif %}
+                        </div>
+                        <div>
+                            <label class="label" for="id_seed">
+                                <span class="label-text">Random Seed <span class="text-base-content/50">(optional)</span></span>
+                            </label>
+                            <input type="number"
+                                   id="id_seed"
+                                   name="seed"
+                                   class="input input-bordered w-full {% if form_errors.seed %}input-error{% endif %}"
+                                   min="0"
+                                   placeholder="Leave blank for random"
+                                   value="{{ form_values.seed|default:'' }}">
+                            {% if form_errors.seed %}<p class="text-error text-xs mt-1">{{ form_errors.seed }}</p>{% endif %}
+                        </div>
+                        <div class="flex items-end">
+                            <button type="submit" class="btn btn-primary w-full">Generate</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- Dataset table -->
+        {% if datasets %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th scope="col">Slug</th>
+                            <th scope="col">Description</th>
+                            <th scope="col" class="text-right">Rows</th>
+                            <th scope="col" class="text-right">Seed</th>
+                            <th scope="col">Status</th>
+                            <th scope="col">Created By</th>
+                            <th scope="col">Created At</th>
+                            <th scope="col" class="sr-only">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ds in datasets %}
+                            <tr>
+                                <td class="font-mono text-sm">
+                                    <a href="{% url 'training:detail' ds.slug %}" class="link link-primary">{{ ds.slug }}</a>
+                                </td>
+                                <td class="text-sm text-base-content/70 max-w-xs truncate">{{ ds.description|default:"—" }}</td>
+                                <td class="text-right font-mono text-sm">{{ ds.row_count|default:"—" }}</td>
+                                <td class="text-right font-mono text-sm">{{ ds.seed|default:"—" }}</td>
+                                <td>
+                                    {% if ds.status == "COMPLETED" %}
+                                        <span class="badge badge-success badge-sm">Completed</span>
+                                    {% elif ds.status == "GENERATING" %}
+                                        <span class="badge badge-warning badge-sm">Generating…</span>
+                                    {% elif ds.status == "FAILED" %}
+                                        <span class="badge badge-error badge-sm">Failed</span>
+                                    {% else %}
+                                        <span class="badge badge-ghost badge-sm">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-sm">{{ ds.created_by.email|default:ds.created_by.username|default:"—" }}</td>
+                                <td class="text-sm text-base-content/70">{{ ds.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <a href="{% url 'training:detail' ds.slug %}"
+                                       class="btn btn-ghost btn-xs">View</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body text-center py-12">
+                    <p class="text-base-content/60">No training datasets yet. Generate one above.</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock dashboard_content %}

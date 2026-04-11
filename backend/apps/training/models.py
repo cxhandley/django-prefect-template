@@ -1,0 +1,94 @@
+import uuid
+
+import boto3
+from botocore.client import Config
+from botocore.exceptions import ClientError
+from django.conf import settings
+from django.db import models
+
+
+class DatasetStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    GENERATING = "GENERATING", "Generating"
+    COMPLETED = "COMPLETED", "Completed"
+    FAILED = "FAILED", "Failed"
+
+
+class TrainingDataset(models.Model):
+    """A labelled synthetic dataset used to train and backtest scoring models."""
+
+    slug = models.CharField(max_length=50, unique=True, db_index=True)
+    description = models.TextField(blank=True)
+    row_count = models.PositiveIntegerField(
+        help_text="Target number of rows requested at generation time."
+    )
+    seed = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Random seed for reproducibility. Leave blank for a random seed.",
+    )
+    s3_path = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text="S3 key (without bucket prefix) for the generated data.parquet.",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=DatasetStatus.choices,
+        default=DatasetStatus.PENDING,
+    )
+    celery_task_id = models.CharField(max_length=255, blank=True)
+    error_message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="training_datasets",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["status"]),
+            models.Index(fields=["-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.slug} ({self.get_status_display()})"
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = f"ds-{uuid.uuid4().hex[:12]}"
+        super().save(*args, **kwargs)
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in (DatasetStatus.COMPLETED, DatasetStatus.FAILED)
+
+    @property
+    def s3_full_path(self) -> str | None:
+        if not self.s3_path:
+            return None
+        return f"s3://{settings.DATA_LAKE_BUCKET}/{self.s3_path}"
+
+    def delete(self, *args, **kwargs):
+        self._delete_s3_file()
+        super().delete(*args, **kwargs)
+
+    def _delete_s3_file(self):
+        if not self.s3_path:
+            return
+        s3_client = boto3.client(
+            "s3",
+            endpoint_url=settings.AWS_S3_ENDPOINT_URL,
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            region_name=settings.AWS_S3_REGION_NAME,
+            config=Config(signature_version="s3v4"),
+        )
+        try:
+            s3_client.delete_object(Bucket=settings.DATA_LAKE_BUCKET, Key=self.s3_path)
+        except ClientError:
+            pass

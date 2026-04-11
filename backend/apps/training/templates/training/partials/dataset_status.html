@@ -1,0 +1,32 @@
+{% load tz %}
+<div id="dataset-status"
+     {% if not dataset.is_terminal %} hx-get="{% url 'training:status' dataset.slug %}" hx-trigger="every 3s" hx-swap="outerHTML" {% endif %}>
+    <div class="flex items-center gap-3">
+        {% if dataset.status == "COMPLETED" %}
+            <span class="badge badge-success">Completed</span>
+        {% elif dataset.status == "GENERATING" %}
+            <span class="badge badge-warning gap-1">
+                <span class="loading loading-spinner loading-xs"></span>
+                Generating…
+            </span>
+        {% elif dataset.status == "FAILED" %}
+            <span class="badge badge-error">Failed</span>
+        {% else %}
+            <span class="badge badge-ghost">Pending</span>
+        {% endif %}
+        <span class="text-sm text-base-content/60">Started {{ dataset.created_at|date:"H:i:s" }} UTC</span>
+    </div>
+    {% if dataset.status == "FAILED" and dataset.error_message %}
+        <div class="alert alert-error mt-3 text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-5 w-5 shrink-0"
+                 fill="none"
+                 viewBox="0 0 24 24"
+                 stroke="currentColor"
+                 aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{{ dataset.error_message|truncatechars:300 }}</span>
+        </div>
+    {% endif %}
+</div>

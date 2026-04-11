@@ -533,7 +533,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 > Enables admin users to generate synthetic training data, run optimisation rounds, review quality through graphical diagnostics, and promote a winning model to production — all without editing notebook code or touching weights by hand.
 
-### US-13.1: Generate a Synthetic Training Dataset `[ ]`
+### US-13.1: Generate a Synthetic Training Dataset `[~]`
 **As an** admin
 **I want to** generate a labelled synthetic dataset of credit applicants
 **So that** I have realistic, reproducible ground-truth data to train and backtest scoring models against

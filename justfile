@@ -48,7 +48,7 @@ dbshell:
 
 # Run migrations
 migrate:
-    python backend/manage.py migrate
+    OTEL_SDK_DISABLED=true python backend/manage.py migrate
 
 # Collect static files
 collectstatic:
@@ -61,14 +61,14 @@ startapp name:
 # Create migrations
 makemigrations app="":
     @if [ -z "{{app}}" ]; then \
-        python backend/manage.py makemigrations; \
+        OTEL_SDK_DISABLED=true python backend/manage.py makemigrations; \
     else \
-        python backend/manage.py makemigrations {{app}}; \
+        OTEL_SDK_DISABLED=true python backend/manage.py makemigrations {{app}}; \
     fi
 
 # Create superuser
 createsuperuser:
-    python backend/manage.py createsuperuser
+    OTEL_SDK_DISABLED=true python backend/manage.py createsuperuser
 
 
 # ============================================================================
