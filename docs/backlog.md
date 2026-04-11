@@ -257,6 +257,211 @@ Security items are prioritised above features. Both should be resolved before ne
 
 ---
 
+## Tier 3 — Scoring Model Training & Promotion (Admin Epic 13)
+
+These five items collectively deliver the end-to-end model-training workflow: synthetic data → optimisation → backtest → visual review → promotion. They must be sequenced in dependency order; parallelism is possible between BL-034 (backtest engine) and BL-035 (charts scaffold) once BL-033 is complete.
+
+---
+
+### BL-032 · Synthetic Training Dataset Generation `M` `[ ]`
+
+**User story:** US-13.1
+**Value:** There is currently no labelled dataset to train or backtest a scoring model against. Real applicant data cannot be used for experimentation. Faker-generated synthetic data with a deterministic ground-truth label function gives the training pipeline a reproducible, realistic input without privacy risk.
+
+**Scope:**
+
+*New model — `TrainingDataset`:*
+- `id` PK, `slug` (auto-generated UUID prefix), `description`, `row_count`, `seed`, `s3_path`, `status` (`TextChoices`: PENDING / RUNNING / COMPLETED / FAILED), `created_at`, `created_by FK → USER`
+- Admin registration
+
+*Celery task — `generate_training_dataset_task`:*
+- Accepts `dataset_id`; updates status to RUNNING
+- Uses **Faker** (locale `en_US`) to generate: `income` (LogNormal ~ $45 k, σ=0.6), `age` (Normal ~ 38, σ=12, clipped 18–80), `credit_score` (Normal ~ 650, σ=80, clipped 300–850), `employment_years` (Gamma shape=2, scale=4, clipped 0–40)
+- Applies the same normalisation logic as `predict_02_score.ipynb` plus injected Gaussian noise (σ=0.03) to derive a continuous `ground_truth_score`; converts to `ground_truth_label` using the current active `ScoringModel` thresholds
+- All manipulation in **Polars** — no pandas
+- Writes Parquet to `s3://{bucket}/training/datasets/{dataset_id}/data.parquet`
+- Updates `TrainingDataset.row_count`, `s3_path`, `status = COMPLETED`
+
+*Django views (admin-only, `@staff_member_required`):*
+- `GET /admin-tools/training/datasets/` — list with status badges and row count; HTMX polling while status is RUNNING
+- `POST /admin-tools/training/datasets/generate/` — form submission → dispatch task → redirect to list
+- `GET /admin-tools/training/datasets/<id>/` — detail with statistical summary (feature means/stddev/quantiles via DuckDB, class balance pie via Altair)
+- `DELETE /admin-tools/training/datasets/<id>/delete/` — with confirmation; S3 cleanup
+
+*Data notes:*
+- Class balance target: ~55 % Approved / ~25 % Review / ~20 % Declined (realistic portfolio distribution)
+- Seed must be stored on the record so datasets are exactly reproducible
+
+**Docs required before starting:**
+- Update `docs/data-model.mmd` with `TrainingDataset`
+- Sequence diagram: `docs/sequences/training_dataset_generation.mmd`
+
+**Depends on:** BL-028 (`ScoringModel` must exist — complete)
+
+---
+
+### BL-033 · Model Training Run — Weight & Threshold Optimisation `L` `[ ]`
+
+**User story:** US-13.2
+**Value:** Currently the only way to change scoring weights is to edit a notebook manually. This item gives admins a reproducible, logged optimisation pipeline that searches the weight and threshold space, records every round, and stores artefacts in S3 — so experimentation is data-driven and auditable rather than ad hoc.
+
+**Scope:**
+
+*New model — `ModelTrainingRun`:*
+- `id` PK, `label` VARCHAR, `dataset FK → TrainingDataset`, `optimisation_target` (`TextChoices`: GINI / KS / F1_REVIEW), `status` (`TextChoices`: PENDING / RUNNING / COMPLETED / FAILED), `candidate_weights` JSON (null until complete), `candidate_thresholds` JSON (null until complete), `val_gini` FLOAT, `val_ks` FLOAT, `val_f1_review` FLOAT, `umap_enabled` BOOLEAN, `artefacts_s3_path`, `error_message`, `created_at`, `created_by FK → USER`
+- Index on `(dataset, created_at DESC)` for list queries
+- Admin registration
+
+*Celery task — `run_model_training_task`:*
+- Accepts `run_id`; updates status to RUNNING
+- Reads dataset Parquet from S3 into a **Polars** DataFrame
+- Reproducible 80/20 stratified split using the stored dataset `seed`
+- Normalises the four features using the same ranges as the live scoring notebook (no `sklearn.preprocessing`)
+- Uses **scipy.optimize.minimize** (L-BFGS-B) or **optuna** (TPE sampler) to search weights subject to: `sum(weights) == 1.0`, each weight ∈ `[0.05, 0.70]`; objective = negative of chosen target metric computed on the validation fold via **DuckDB** SQL over in-memory Parquet
+- Threshold grid search: evaluates the Cartesian product of approval cutpoints `[0.55..0.85, step=0.05]` × review cutpoints `[0.30..0.60, step=0.05]` on the validation fold; picks the pair that maximises the optimisation target
+- If `umap_enabled`: computes a 2-D **UMAP** embedding (n_neighbors=15, min_dist=0.1) of the 4-feature training fold; writes coordinates + ground_truth_label as `umap.parquet` to the artefact path
+- Writes artefacts to `s3://{bucket}/training/runs/{run_id}/`:
+  - `weights.json` — optimal weights dict
+  - `thresholds.json` — optimal thresholds dict
+  - `val_metrics.json` — validation metrics summary
+  - `umap.parquet` — UMAP coordinates (if enabled)
+  - `score_distributions.parquet` — score per sample + ground_truth_label (validation fold)
+- Updates `ModelTrainingRun` with candidate weights, thresholds, val metrics, `status = COMPLETED`
+
+*Django views (admin-only):*
+- `GET /admin-tools/training/datasets/<dataset_id>/runs/` — list of runs for dataset, sortable by val_gini / val_ks
+- `POST /admin-tools/training/datasets/<dataset_id>/runs/start/` — form → dispatch task → HTMX polling
+- `GET /admin-tools/training/runs/<run_id>/` — training run detail page (links to BL-034 backtest, BL-035 charts, BL-036 promotion)
+
+**Docs required before starting:**
+- Update `docs/data-model.mmd` with `ModelTrainingRun`
+- Sequence diagram: `docs/sequences/model_training_run.mmd`
+- Flow control diagram: `docs/flow-control/weight_optimisation.mmd`
+
+**Depends on:** BL-032 (`TrainingDataset` must exist)
+
+---
+
+### BL-034 · Backtest Engine — Held-Out Evaluation `M` `[ ]`
+
+**User story:** US-13.3
+**Value:** Validation metrics from the training fold can be optimistic due to overfit. An independent backtest on the held-out 20 % split provides the real generalisation estimate that determines whether a model is fit for promotion.
+
+**Scope:**
+
+*New model — `ModelBacktestResult`:*
+- `id` PK, `training_run FK → ModelTrainingRun` (OneToOne), `status` TextChoices, `accuracy` FLOAT, `precision_approved` / `precision_review` / `precision_declined` FLOAT, `recall_approved` / `recall_review` / `recall_declined` FLOAT, `f1_approved` / `f1_review` / `f1_declined` FLOAT, `gini` FLOAT, `ks_statistic` FLOAT, `confusion_matrix` JSON (3×3, row=actual, col=predicted), `artefacts_s3_path`, `completed_at`
+- All metric fields are computed without scikit-learn — implemented in **Polars** expressions and **DuckDB** SQL
+
+*Celery task — `run_model_backtest_task`:*
+- Reads dataset Parquet; reconstructs identical 80/20 split (same seed → same rows)
+- Applies candidate weights and thresholds from `ModelTrainingRun` to the **test fold only**
+- Computes all metrics via Polars/DuckDB:
+  - Confusion matrix: `GROUP BY (ground_truth_label, predicted_label)` in DuckDB
+  - Precision/recall/F1: derived from confusion matrix in Polars (no sklearn)
+  - Gini: `2 × AUC − 1` where AUC computed via trapezoid rule over sorted score ranks in Polars
+  - KS statistic: max separation between CDF of positive and negative score distributions — computed in Polars with `cum_sum` over sorted score
+- Writes `test_scores.parquet` (score + ground_truth + predicted per test row) to `s3://{bucket}/training/runs/{run_id}/backtest/`
+- Creates / updates `ModelBacktestResult` record
+
+*Django views (admin-only):*
+- `POST /admin-tools/training/runs/<run_id>/backtest/` — trigger backtest task; HTMX polling
+- Backtest metrics section on training run detail page (updated in-place once complete)
+- `GET /admin-tools/training/runs/<run_id>/backtest/export/` — download `test_scores.parquet` as CSV
+
+**Docs required before starting:**
+- Update `docs/data-model.mmd` with `ModelBacktestResult`
+
+**Depends on:** BL-033 (`ModelTrainingRun` must be COMPLETED)
+
+---
+
+### BL-035 · Admin Visual Diagnostics — Altair Charts `M` `[ ]`
+
+**User story:** US-13.4
+**Value:** Numerical metrics alone are insufficient for model review — a chart can reveal score clustering, threshold placement issues, or unexpected class separation that a table of numbers hides. Altair charts rendered via Vega-Embed give admins interactive, shareable diagnostics without server-side image generation.
+
+**Scope:**
+
+*Chart endpoints — all return Altair JSON spec (`Content-Type: application/json`), no HTML; rendered client-side via Vega-Embed:*
+
+- `GET /admin-tools/training/runs/<run_id>/charts/umap/` — UMAP scatter
+  - Source: `umap.parquet` from S3 via DuckDB
+  - Encoding: x=`umap_x`, y=`umap_y`, colour=`ground_truth_label` (3-class categorical palette), tooltip=`[income, age, credit_score, employment_years, ground_truth_label]`
+  - Falls back to `{"error": "UMAP not computed for this run"}` JSON when `umap_enabled=False`
+
+- `GET /admin-tools/training/runs/<run_id>/charts/score-distribution/` — score histogram by outcome
+  - Source: `test_scores.parquet` (backtest fold) via DuckDB
+  - Layered Altair chart: one density/histogram layer per `ground_truth_label`; vertical rules at approval and review threshold values
+  - Requires backtest to be COMPLETED
+
+- `GET /admin-tools/training/runs/<run_id>/charts/confusion-matrix/` — 3×3 heatmap
+  - Source: `ModelBacktestResult.confusion_matrix` JSON field
+  - Altair rect mark with colour=count, text overlay with cell count and row-normalised percentage
+
+- `GET /admin-tools/training/runs/<run_id>/charts/class-metrics/` — precision/recall/F1 per class
+  - Source: `ModelBacktestResult` typed columns
+  - Grouped bar chart: x=class, colour=metric type (precision / recall / F1), y=value [0–1]
+
+- `GET /admin-tools/training/datasets/<dataset_id>/charts/gini-trend/` — Gini & KS across rounds
+  - Source: DuckDB query joining `ModelTrainingRun` + `ModelBacktestResult` for the dataset
+  - Dual-line chart: x=`created_at` (run timestamp), y=metric value, colour=metric (Gini vs KS), interactive tooltip showing run label
+
+- `GET /admin-tools/training/runs/compare/charts/metrics/` — multi-run metric comparison
+  - Accepts `?run_ids=<id1>,<id2>,...` (2–4 runs)
+  - Grouped bar chart comparing Gini, KS, F1_review across selected runs
+
+*Frontend integration:*
+- Training run detail template includes `<div id="chart-{name}">` containers loaded via HTMX `hx-get` on page load
+- Each container uses `vegaEmbed('#chart-{name}', spec)` (Vega-Embed CDN or vendored JS)
+- Chart containers show a skeleton loader while fetching; error state if endpoint returns `{"error": ...}`
+
+*Implementation notes:*
+- All data read from S3 Parquet via `duckdb.connect().execute("SELECT ... FROM read_parquet('s3://...')")` — no file loaded into Django memory
+- Altair specs built using the Python `altair` library installed in the virtualenv; serialised with `chart.to_dict()`
+- No Matplotlib, no Seaborn, no Plotly
+
+**Docs required before starting:**
+- Wireframe: `docs/wireframes/training_run_detail.excalidraw`
+
+**Depends on:** BL-033 (training run artefacts), BL-034 (backtest metrics) — charts degrade gracefully when backtest is absent
+
+---
+
+### BL-036 · Model Promotion Workflow `S` `[ ]`
+
+**User story:** US-13.5, US-13.6
+**Value:** Without a formal promotion gate, the only way to update the live model is to edit `ScoringModel` in `/admin/` manually — bypassing the training audit trail entirely. This item wires the training pipeline to the live scoring model so that promotion is a deliberate, logged action with side-by-side evidence.
+
+**Scope:**
+
+*New model — `ModelPromotion`:*
+- `id` PK, `training_run FK → ModelTrainingRun` (OneToOne), `resulting_scoring_model FK → ScoringModel`, `promoted_by FK → USER`, `promoted_at` DateTimeField, `notes` TextField (optional admin rationale)
+
+*Django view — `POST /admin-tools/training/runs/<run_id>/promote/`:*
+- Guard: `training_run.backtest.status == COMPLETED` — returns 409 otherwise
+- Wraps in `transaction.atomic()`:
+  1. Deactivate current active `ScoringModel` (`is_active = False`)
+  2. Create new `ScoringModel` with: `version` = auto-incremented (e.g. `"1.1"` from `"1.0"`), `weights = training_run.candidate_weights`, `thresholds = training_run.candidate_thresholds`, `is_active = True`, `created_by = request.user`
+  3. Create `ModelPromotion` record
+- HTMX response swaps training run detail page status section to show "Promoted → ScoringModel v1.1"
+
+*Training history page — `GET /admin-tools/training/runs/`:*
+- Lists all `ModelTrainingRun` records across all datasets
+- Columns: dataset, label, target, Gini, KS, F1_review, status, promotion badge, created_at
+- Sortable via URL params; DuckDB-backed aggregate query
+- "Compare" checkbox action (2–4 runs) → navigates to `GET /admin-tools/training/runs/compare/?run_ids=...` which renders side-by-side metrics table + Altair comparison chart (BL-035)
+
+*Navigation:*
+- Add "Model Training" link to the admin sidebar section; visible only to `is_staff` users
+
+**Docs required before starting:**
+- Update `docs/data-model.mmd` with `ModelPromotion`
+
+**Depends on:** BL-033, BL-034, BL-035
+
+---
+
 ## Tier 4 — Developer Experience
 
 ---
@@ -328,3 +533,8 @@ All items below are done and closed.
 | ~~BL-022~~ | ~~Secrets management audit~~ | Complete | M | — |
 | ~~BL-023~~ | ~~Infrastructure as Code & 1Password secrets~~ | Complete | L | — |
 | BL-024 | Reusable advanced DataTable component | Not started | L | BL-026 |
+| BL-032 | Synthetic training dataset generation | Not started | M | BL-028 |
+| BL-033 | Model training run — weight & threshold optimisation | Not started | L | BL-032 |
+| BL-034 | Backtest engine — held-out evaluation | Not started | M | BL-033 |
+| BL-035 | Admin visual diagnostics — Altair charts | Not started | M | BL-033, BL-034 |
+| BL-036 | Model promotion workflow | Not started | S | BL-033, BL-034, BL-035 |

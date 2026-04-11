@@ -527,6 +527,105 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
+---
+
+## Epic 13: Scoring Model Training & Promotion (Admin) `[ ]`
+
+> Enables admin users to generate synthetic training data, run optimisation rounds, review quality through graphical diagnostics, and promote a winning model to production — all without editing notebook code or touching weights by hand.
+
+### US-13.1: Generate a Synthetic Training Dataset `[ ]`
+**As an** admin
+**I want to** generate a labelled synthetic dataset of credit applicants
+**So that** I have realistic, reproducible ground-truth data to train and backtest scoring models against
+
+**Acceptance Criteria:**
+- [ ] Admin can navigate to a "Training Datasets" page under the admin area
+- [ ] A "Generate Dataset" form accepts: row count (100–100 000), random seed, and an optional description
+- [ ] Generation runs as a Celery task; admin sees a "generating…" progress indicator
+- [ ] Dataset is produced using **Faker** for demographic fields and a configurable ground-truth scoring function (same normalisation logic as the live model) to derive synthetic outcome labels (`Approved` / `Review` / `Declined`)
+- [ ] All data manipulation (generation, validation, storage) uses **Polars** — no pandas
+- [ ] Output is written as a Parquet file to `s3://{bucket}/training/datasets/{dataset_id}/data.parquet`
+- [ ] A `TrainingDataset` record is created with: version slug, description, row count, S3 path, generation seed, `created_at`, `created_by`
+- [ ] Admin can view a statistical summary of the generated dataset (feature distributions, class balance)
+- [ ] Admin can delete a dataset (with confirmation); associated S3 file is cleaned up
+
+### US-13.2: Run a Model Training Round `[ ]`
+**As an** admin
+**I want to** run a weight-and-threshold optimisation against a training dataset
+**So that** I can discover better-performing scoring configurations without guessing by hand
+
+**Acceptance Criteria:**
+- [ ] Admin can start a training run from the dataset detail page
+- [ ] Training run form accepts: a label (e.g. "round_1"), optimisation target (`gini` / `ks_statistic` / `f1_review`), and a UMAP visualisation toggle
+- [ ] Training runs as a Celery task using **Polars** for all data manipulation and **DuckDB** for intermediate analytics queries — no pandas, no scikit-learn
+- [ ] Optimisation uses **scipy.optimize** (or **optuna**) to search weight space; constraints: weights sum to 1.0, each weight ∈ [0.05, 0.70]
+- [ ] Threshold optimisation searches the approval/review cutpoints to maximise the chosen target metric on a held-out 20 % validation split
+- [ ] If the UMAP toggle is on, a 2-D **UMAP** embedding of the 4-feature space (coloured by ground-truth outcome) is computed and its coordinates stored for chart rendering
+- [ ] Training artefacts (optimal weights, thresholds, UMAP coordinates, metric curves) written to `s3://{bucket}/training/runs/{run_id}/` as Parquet / JSON
+- [ ] A `ModelTrainingRun` record is created with: label, dataset FK, status, optimisation target, candidate weights JSON, candidate thresholds JSON, S3 artefact path, `created_at`, `created_by`
+- [ ] Admin can view all training runs for a dataset in a list, sortable by key quality metric
+
+### US-13.3: Backtest a Training Run `[ ]`
+**As an** admin
+**I want to** evaluate a training run's candidate model against a held-out test set
+**So that** I can measure real generalisation performance before deciding whether to promote it
+
+**Acceptance Criteria:**
+- [ ] Admin can trigger a backtest from the training run detail page
+- [ ] Backtest uses the 20 % held-out split (seeded identically to training) — not the training fold
+- [ ] Backtest computes (using Polars / DuckDB, no scikit-learn):
+  - Accuracy, precision, recall, F1 per class (`Approved` / `Review` / `Declined`)
+  - Gini coefficient and KS statistic (rank-ordering power)
+  - Confusion matrix (3 × 3)
+  - Score distribution histogram per outcome class
+- [ ] All backtest metrics persisted to a `ModelBacktestResult` record linked to the training run
+- [ ] Admin can compare backtest metrics across multiple training runs in a summary table (DuckDB-backed)
+
+### US-13.4: Review Model Quality with Visual Diagnostics `[ ]`
+**As an** admin
+**I want to** see graphical quality and risk summaries for a training run
+**So that** I can make an informed, evidence-based decision about whether to promote it
+
+**Acceptance Criteria:**
+- [ ] Training run detail page renders **Altair** charts served as JSON specs (Vega-Embed on the frontend — no server-side image rendering):
+  - **UMAP scatter** — 2-D applicant embedding coloured by ground-truth outcome (shown only when UMAP toggle was enabled at training time)
+  - **Score distribution** — overlapping density/histogram of scores by outcome class, with threshold markers
+  - **Confusion matrix heatmap** — 3 × 3 grid with colour intensity proportional to cell count
+  - **Metric bar chart** — precision / recall / F1 per class, side-by-side bars
+  - **Gini / KS trend** — line chart of Gini and KS across all completed training rounds for the same dataset (model comparison view)
+- [ ] All charts are derived from Parquet artefacts in S3 via DuckDB — no raw data loaded into Django memory
+- [ ] Charts degrade gracefully: if UMAP coordinates are absent, the UMAP panel shows a "not computed" message
+- [ ] Admin can download the backtest result as CSV from the detail page
+
+### US-13.5: Promote a Training Run to Active Scoring Model `[ ]`
+**As an** admin
+**I want to** promote a successful training run to become the live scoring model
+**So that** all subsequent predictions use the newly optimised weights and thresholds
+
+**Acceptance Criteria:**
+- [ ] A "Promote" button appears on training run detail page only when backtest status is `COMPLETED`
+- [ ] Clicking Promote shows a confirmation modal displaying the candidate weights, thresholds, and key backtest metrics side-by-side with the currently active `ScoringModel`
+- [ ] On confirmation, the system:
+  1. Creates a new `ScoringModel` record using the candidate weights and thresholds, with a version slug auto-incremented from the current active model (e.g. `v1.0` → `v1.1`)
+  2. Sets the new model's `is_active = True` and deactivates the previous active model
+  3. Creates a `ModelPromotion` audit record linking training run → new scoring model, with `promoted_by` and `promoted_at`
+- [ ] All subsequent prediction executions pick up the new active `ScoringModel` automatically (no restart required)
+- [ ] The training run detail page shows "Promoted → ScoringModel v1.1" with a link to the admin scoring model view
+
+### US-13.6: View Training History and Compare Rounds `[ ]`
+**As an** admin
+**I want to** see all training rounds across all datasets with their key metrics at a glance
+**So that** I can track experimentation history and understand how model quality has evolved
+
+**Acceptance Criteria:**
+- [ ] A "Training History" page lists all `ModelTrainingRun` records: dataset, round label, optimisation target, Gini, KS, F1 (review class), status, promotion status, `created_at`
+- [ ] Table is sortable by any metric column; backed by a DuckDB query over `ModelBacktestResult`
+- [ ] Promoted runs are visually distinguished (badge showing the resulting `ScoringModel` version)
+- [ ] Admin can delete a training run (with confirmation) provided it has not been promoted; associated S3 artefacts are cleaned up
+- [ ] "Compare" action allows selecting 2–4 runs and rendering a side-by-side Altair bar chart of key metrics
+
+---
+
 ## MVP Scope Summary
 
 | Area | Status |
@@ -548,3 +647,4 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 | Structural design — model split, step tracking, scoring model | Not started |
 | Accessibility (WCAG 2.1 AA) | Not started |
 | Secrets management audit | Not started |
+| Scoring model training & promotion (admin) | Not started |
