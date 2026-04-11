@@ -534,3 +534,170 @@ def run_model_training_task(self, run_id: int) -> dict:
             error_message=error_str,
         )
         raise
+
+
+# ---------------------------------------------------------------------------
+# Confusion matrix (DuckDB) + per-class metrics (Polars)
+# ---------------------------------------------------------------------------
+_LABELS = ["Approved", "Review", "Declined"]
+
+
+def _confusion_matrix(df: pl.DataFrame) -> dict:
+    """
+    Return {actual_label: {predicted_label: count}} computed via DuckDB SQL.
+    All three labels are always present (zero-filled).
+    """
+    import duckdb
+
+    conn = duckdb.connect()
+    conn.register("scored", df.to_arrow())
+    rows = conn.execute(
+        """
+        SELECT ground_truth_label, predicted_label, COUNT(*) AS cnt
+        FROM scored
+        GROUP BY ground_truth_label, predicted_label
+        """
+    ).fetchall()
+    conn.close()
+
+    matrix: dict[str, dict[str, int]] = {a: dict.fromkeys(_LABELS, 0) for a in _LABELS}
+    for actual, predicted, cnt in rows:
+        if actual in matrix and predicted in matrix[actual]:
+            matrix[actual][predicted] = int(cnt)
+    return matrix
+
+
+def _class_metrics(matrix: dict) -> dict[str, dict[str, float]]:
+    """
+    Derive precision, recall, F1, and accuracy from the confusion matrix.
+    Returns {label: {precision, recall, f1}} plus an 'accuracy' key.
+    """
+    total = sum(matrix[a][p] for a in _LABELS for p in _LABELS)
+    correct = sum(matrix[a][a] for a in _LABELS)
+    accuracy = correct / total if total > 0 else 0.0
+
+    metrics: dict[str, dict[str, float]] = {}
+    for cls in _LABELS:
+        tp = matrix[cls][cls]
+        fp = sum(matrix[a][cls] for a in _LABELS if a != cls)
+        fn = sum(matrix[cls][p] for p in _LABELS if p != cls)
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+        metrics[cls] = {"precision": precision, "recall": recall, "f1": f1}
+
+    metrics["_accuracy"] = {"accuracy": accuracy}  # type: ignore[assignment]
+    return metrics
+
+
+# ---------------------------------------------------------------------------
+# Backtest task
+# ---------------------------------------------------------------------------
+@app.task(bind=True, max_retries=0, time_limit=1800, soft_time_limit=1700)
+def run_model_backtest_task(self, backtest_id: int) -> dict:
+    """
+    Evaluate a completed ModelTrainingRun's candidate model against the held-out test fold.
+
+    Steps:
+    1. Reconstruct the identical 80/20 stratified split from the dataset seed.
+    2. Apply candidate weights and thresholds to the test fold only.
+    3. Compute all metrics via Polars + DuckDB (no sklearn).
+    4. Write test_scores.parquet to S3.
+    5. Update ModelBacktestResult record.
+    """
+    from apps.training.models import BacktestStatus, ModelBacktestResult
+    from django.utils import timezone
+
+    backtest = ModelBacktestResult.objects.select_related("training_run__dataset").get(
+        pk=backtest_id
+    )
+    run = backtest.training_run
+    dataset = run.dataset
+
+    try:
+        ModelBacktestResult.objects.filter(pk=backtest_id).update(status=BacktestStatus.RUNNING)
+
+        # ── Validate training run has completed artefacts ────────────────────
+        if not run.candidate_weights or not run.candidate_thresholds:
+            raise ValueError("Training run has no candidate weights/thresholds — cannot backtest.")
+
+        weights = [
+            run.candidate_weights["credit_score"],
+            run.candidate_weights["income"],
+            run.candidate_weights["employment_years"],
+            run.candidate_weights["age"],
+        ]
+        t_approve = float(run.candidate_thresholds["approved"])
+        t_review = float(run.candidate_thresholds["review"])
+
+        # ── Read dataset from S3 ─────────────────────────────────────────────
+        fs = _make_fs()
+        s3_full = f"{settings.DATA_LAKE_BUCKET}/{dataset.s3_path}"
+        with fs.open(s3_full, "rb") as fh:
+            df = pl.read_parquet(fh)
+
+        # ── Reconstruct identical split — test fold only ─────────────────────
+        _, test_df = _stratified_split(df, seed=dataset.seed)
+        test_df = _normalise(test_df)
+
+        # ── Score and classify test fold ─────────────────────────────────────
+        scored = _score(test_df, weights)
+        scored = _classify(scored, t_approve, t_review)
+
+        # ── Confusion matrix (DuckDB) ────────────────────────────────────────
+        cm = _confusion_matrix(scored)
+
+        # ── Per-class precision / recall / F1 + accuracy (Polars) ────────────
+        class_m = _class_metrics(cm)
+        accuracy = class_m["_accuracy"]["accuracy"]
+
+        # ── Gini and KS (reuse BL-033 helpers) ──────────────────────────────
+        gini = _compute_gini(scored)
+        ks = _compute_ks(scored)
+
+        # ── Write test_scores.parquet ────────────────────────────────────────
+        artefacts_prefix = f"training/runs/{run.pk}/backtest"
+        out_df = scored.select(["score", "ground_truth_label", "predicted_label"])
+        buf = io.BytesIO()
+        out_df.write_parquet(buf, compression="snappy", use_pyarrow=True)
+        buf.seek(0)
+        with fs.open(
+            f"{settings.DATA_LAKE_BUCKET}/{artefacts_prefix}/test_scores.parquet", "wb"
+        ) as fh:
+            fh.write(buf.read())
+
+        # ── Update DB record ─────────────────────────────────────────────────
+        ModelBacktestResult.objects.filter(pk=backtest_id).update(
+            status=BacktestStatus.COMPLETED,
+            accuracy=accuracy,
+            gini=gini,
+            ks_statistic=ks,
+            precision_approved=class_m["Approved"]["precision"],
+            precision_review=class_m["Review"]["precision"],
+            precision_declined=class_m["Declined"]["precision"],
+            recall_approved=class_m["Approved"]["recall"],
+            recall_review=class_m["Review"]["recall"],
+            recall_declined=class_m["Declined"]["recall"],
+            f1_approved=class_m["Approved"]["f1"],
+            f1_review=class_m["Review"]["f1"],
+            f1_declined=class_m["Declined"]["f1"],
+            confusion_matrix=cm,
+            artefacts_s3_path=artefacts_prefix,
+            completed_at=timezone.now(),
+            error_message="",
+        )
+
+        return {
+            "backtest_id": backtest_id,
+            "accuracy": accuracy,
+            "gini": gini,
+            "ks_statistic": ks,
+        }
+
+    except Exception as exc:
+        error_str = str(exc)[:2000]
+        ModelBacktestResult.objects.filter(pk=backtest_id).update(
+            status=BacktestStatus.FAILED,
+            error_message=error_str,
+        )
+        raise

@@ -136,21 +136,8 @@
                     </div>
                 </div>
             {% endif %}
-            <!-- Next steps -->
-            <div class="card bg-base-100 border border-base-200 shadow-sm">
-                <div class="card-body">
-                    <h2 class="card-title text-base">Next Steps</h2>
-                    <p class="text-sm text-base-content/60 mt-1">
-                        Run a backtest to evaluate these candidate weights against the held-out test fold (BL-034),
-                        then review visual diagnostics (BL-035) before promoting to production (BL-036).
-                    </p>
-                    <div class="flex gap-3 mt-4">
-                        <button class="btn btn-outline btn-sm"
-                                disabled
-                                aria-label="Backtest not yet implemented">Backtest (coming soon)</button>
-                    </div>
-                </div>
-            </div>
+            <!-- Backtest section -->
+            {% include "training/partials/backtest_section.html" with run=run backtest=run.backtest_result %}
             <!-- Artefacts path -->
             {% if run.artefacts_s3_path %}
                 <div class="card bg-base-100 border border-base-200 shadow-sm">

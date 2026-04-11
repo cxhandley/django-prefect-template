@@ -342,7 +342,7 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 
 ---
 
-### BL-034 · Backtest Engine — Held-Out Evaluation `M` `[ ]`
+### BL-034 · Backtest Engine — Held-Out Evaluation `M` `[~]`
 
 **User story:** US-13.3
 **Value:** Validation metrics from the training fold can be optimistic due to overfit. An independent backtest on the held-out 20 % split provides the real generalisation estimate that determines whether a model is fit for promotion.
@@ -535,6 +535,6 @@ All items below are done and closed.
 | BL-024 | Reusable advanced DataTable component | Not started | L | BL-026 |
 | ~~BL-032~~ | ~~Synthetic training dataset generation~~ | ~~Not started~~ | M | BL-028 |
 | BL-033 | Model training run — weight & threshold optimisation | In progress | L | BL-032 |
-| BL-034 | Backtest engine — held-out evaluation | Not started | M | BL-033 |
+| BL-034 | Backtest engine — held-out evaluation | In progress | M | BL-033 |
 | BL-035 | Admin visual diagnostics — Altair charts | Not started | M | BL-033, BL-034 |
 | BL-036 | Model promotion workflow | Not started | S | BL-033, BL-034, BL-035 |

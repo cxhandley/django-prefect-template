@@ -1,18 +1,23 @@
+import csv
+import io
 import random
 
 from django.contrib.admin.views.decorators import staff_member_required
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from .models import (
+    BacktestStatus,
     DatasetStatus,
+    ModelBacktestResult,
     ModelTrainingRun,
     OptimisationTarget,
     TrainingDataset,
     TrainingRunStatus,
 )
 from .services.analytics import TrainingAnalytics
-from .tasks import generate_training_dataset_task, run_model_training_task
+from .tasks import generate_training_dataset_task, run_model_backtest_task, run_model_training_task
 
 
 @staff_member_required
@@ -226,7 +231,7 @@ def start_run(request, slug):
 def run_detail(request, run_id):
     """Training run detail page."""
     run = get_object_or_404(
-        ModelTrainingRun.objects.select_related("dataset", "created_by"),
+        ModelTrainingRun.objects.select_related("dataset", "created_by", "backtest_result"),
         pk=run_id,
     )
     return render(
@@ -249,3 +254,107 @@ def run_status(request, run_id):
         "training/partials/run_status.html",
         {"run": run},
     )
+
+
+# ── Backtest views ────────────────────────────────────────────────────────────
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def trigger_backtest(request, run_id):
+    """
+    Create (or reset) a ModelBacktestResult for the given run and dispatch the task.
+    Returns the backtest section partial for HTMX swap.
+    """
+    run = get_object_or_404(ModelTrainingRun, pk=run_id)
+
+    if run.status != TrainingRunStatus.COMPLETED:
+        return render(
+            request,
+            "training/partials/backtest_section.html",
+            {"run": run, "backtest": None, "error": "Training run is not yet completed."},
+            status=422,
+        )
+
+    # Create fresh record (or reset an existing failed one)
+    backtest, _ = ModelBacktestResult.objects.get_or_create(training_run=run)
+    if backtest.status not in (BacktestStatus.PENDING, BacktestStatus.FAILED):
+        # Already running or completed — just re-render the section
+        return render(
+            request,
+            "training/partials/backtest_section.html",
+            {"run": run, "backtest": backtest},
+        )
+
+    backtest.status = BacktestStatus.PENDING
+    backtest.error_message = ""
+    backtest.save(update_fields=["status", "error_message"])
+
+    result = run_model_backtest_task.apply_async(args=[backtest.pk])
+    ModelBacktestResult.objects.filter(pk=backtest.pk).update(celery_task_id=result.id)
+    backtest.refresh_from_db()
+
+    return render(
+        request,
+        "training/partials/backtest_section.html",
+        {"run": run, "backtest": backtest},
+    )
+
+
+@staff_member_required
+def backtest_section(request, run_id):
+    """HTMX polling endpoint — returns the full backtest section partial."""
+    run = get_object_or_404(ModelTrainingRun, pk=run_id)
+    backtest = getattr(run, "backtest_result", None)
+    return render(
+        request,
+        "training/partials/backtest_section.html",
+        {"run": run, "backtest": backtest},
+    )
+
+
+@staff_member_required
+def backtest_export(request, run_id):
+    """Stream test_scores.parquet from S3 as a CSV download."""
+    import duckdb
+    from apps.training.tasks import _make_fs
+    from django.conf import settings
+
+    run = get_object_or_404(ModelTrainingRun, pk=run_id)
+    backtest = get_object_or_404(
+        ModelBacktestResult, training_run=run, status=BacktestStatus.COMPLETED
+    )
+
+    fs = _make_fs()
+    with fs.open(
+        f"{settings.DATA_LAKE_BUCKET}/{backtest.artefacts_s3_path}/test_scores.parquet", "rb"
+    ) as fh:
+        parquet_bytes = fh.read()
+
+    conn = duckdb.connect()
+    conn.execute("CREATE TABLE scores AS SELECT * FROM read_parquet('/dev/stdin')")
+
+    # Use in-memory parquet via BytesIO registered as arrow
+    import polars as pl
+
+    df = pl.read_parquet(io.BytesIO(parquet_bytes))
+    conn.register("scores_arrow", df.to_arrow())
+    rows = conn.execute("SELECT * FROM scores_arrow ORDER BY score DESC").fetchall()
+    cols = [desc[0] for desc in conn.execute("DESCRIBE scores_arrow").fetchall()]
+    conn.close()
+
+    def csv_rows():
+        buf = io.StringIO()
+        writer = csv.writer(buf)
+        writer.writerow(cols)
+        yield buf.getvalue()
+        for row in rows:
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(row)
+            yield buf.getvalue()
+
+    filename = f"test_scores_run_{run.pk}.csv"
+    response = StreamingHttpResponse(csv_rows(), content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response

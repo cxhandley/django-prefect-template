@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ModelTrainingRun, TrainingDataset
+from .models import ModelBacktestResult, ModelTrainingRun, TrainingDataset
 
 
 @admin.register(TrainingDataset)
@@ -41,3 +41,37 @@ class ModelTrainingRunAdmin(admin.ModelAdmin):
     ordering = ("-created_at",)
     search_fields = ("label",)
     raw_id_fields = ("dataset", "created_by")
+
+
+@admin.register(ModelBacktestResult)
+class ModelBacktestResultAdmin(admin.ModelAdmin):
+    list_display = (
+        "training_run",
+        "status",
+        "accuracy",
+        "gini",
+        "ks_statistic",
+        "f1_review",
+        "completed_at",
+    )
+    list_filter = ("status",)
+    readonly_fields = (
+        "completed_at",
+        "celery_task_id",
+        "artefacts_s3_path",
+        "accuracy",
+        "gini",
+        "ks_statistic",
+        "precision_approved",
+        "precision_review",
+        "precision_declined",
+        "recall_approved",
+        "recall_review",
+        "recall_declined",
+        "f1_approved",
+        "f1_review",
+        "f1_declined",
+        "confusion_matrix",
+        "error_message",
+    )
+    raw_id_fields = ("training_run",)

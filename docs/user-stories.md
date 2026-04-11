@@ -565,7 +565,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [ ] A `ModelTrainingRun` record is created with: label, dataset FK, status, optimisation target, candidate weights JSON, candidate thresholds JSON, S3 artefact path, `created_at`, `created_by`
 - [ ] Admin can view all training runs for a dataset in a list, sortable by key quality metric
 
-### US-13.3: Backtest a Training Run `[ ]`
+### US-13.3: Backtest a Training Run `[~]`
 **As an** admin
 **I want to** evaluate a training run's candidate model against a held-out test set
 **So that** I can measure real generalisation performance before deciding whether to promote it

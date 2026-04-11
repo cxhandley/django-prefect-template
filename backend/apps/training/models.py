@@ -168,3 +168,61 @@ class ModelTrainingRun(models.Model):
     @property
     def is_terminal(self) -> bool:
         return self.status in (TrainingRunStatus.COMPLETED, TrainingRunStatus.FAILED)
+
+
+class BacktestStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    RUNNING = "RUNNING", "Running"
+    COMPLETED = "COMPLETED", "Completed"
+    FAILED = "FAILED", "Failed"
+
+
+class ModelBacktestResult(models.Model):
+    """Held-out (20 %) evaluation of a ModelTrainingRun's candidate weights and thresholds."""
+
+    training_run = models.OneToOneField(
+        ModelTrainingRun,
+        on_delete=models.CASCADE,
+        related_name="backtest_result",
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=BacktestStatus.choices,
+        default=BacktestStatus.PENDING,
+    )
+    # Per-class precision
+    precision_approved = models.FloatField(null=True, blank=True)
+    precision_review = models.FloatField(null=True, blank=True)
+    precision_declined = models.FloatField(null=True, blank=True)
+    # Per-class recall
+    recall_approved = models.FloatField(null=True, blank=True)
+    recall_review = models.FloatField(null=True, blank=True)
+    recall_declined = models.FloatField(null=True, blank=True)
+    # Per-class F1
+    f1_approved = models.FloatField(null=True, blank=True)
+    f1_review = models.FloatField(null=True, blank=True)
+    f1_declined = models.FloatField(null=True, blank=True)
+    # Overall metrics
+    accuracy = models.FloatField(null=True, blank=True)
+    gini = models.FloatField(null=True, blank=True)
+    ks_statistic = models.FloatField(null=True, blank=True)
+    # 3×3 confusion matrix: {actual_label: {predicted_label: count}}
+    confusion_matrix = models.JSONField(null=True, blank=True)
+    artefacts_s3_path = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text="S3 prefix for backtest artefacts (test_scores.parquet).",
+    )
+    celery_task_id = models.CharField(max_length=255, blank=True)
+    error_message = models.TextField(blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-training_run__created_at"]
+
+    def __str__(self):
+        return f"Backtest for {self.training_run.label} ({self.get_status_display()})"
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in (BacktestStatus.COMPLETED, BacktestStatus.FAILED)

@@ -16,4 +16,8 @@ urlpatterns = [
     path("<slug:slug>/runs/start/", views.start_run, name="start_run"),
     path("runs/<int:run_id>/", views.run_detail, name="run_detail"),
     path("runs/<int:run_id>/status/", views.run_status, name="run_status"),
+    # Backtest
+    path("runs/<int:run_id>/backtest/", views.trigger_backtest, name="trigger_backtest"),
+    path("runs/<int:run_id>/backtest/section/", views.backtest_section, name="backtest_section"),
+    path("runs/<int:run_id>/backtest/export/", views.backtest_export, name="backtest_export"),
 ]
