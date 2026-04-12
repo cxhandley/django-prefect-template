@@ -1,0 +1,65 @@
+sequenceDiagram
+    actor User
+    participant Django as Django (web)
+    participant CeleryWorker as Celery Worker
+    participant PipelineRunner
+    participant PrefectBackend
+    participant PrefectServer as Prefect Server
+    participant PrefectWorker as Prefect Worker
+    participant DB as PostgreSQL
+    participant S3
+
+    User->>Django: POST /flows/upload-and-process/
+    Django->>DB: FlowExecution.create(status=PENDING)
+    Django->>CeleryWorker: run_pipeline_task.delay(flow_run_id, input_s3_path)
+    Django-->>User: 302 → execution detail page
+
+    CeleryWorker->>PipelineRunner: run_pipeline(run_id, input_s3_path)
+    Note over PipelineRunner: settings.PIPELINE_BACKEND == "prefect"
+    PipelineRunner->>PrefectBackend: run(execution)
+
+    PrefectBackend->>PrefectServer: POST /api/deployments/{id}/create_flow_run
+    PrefectServer-->>PrefectBackend: {id: "<prefect-flow-run-uuid>"}
+    PrefectBackend->>DB: FlowExecution.external_run_id = "<prefect-flow-run-uuid>"
+
+    loop Poll every 2 s until terminal state
+        PrefectBackend->>PrefectServer: GET /api/flow_runs/<prefect-flow-run-uuid>
+        PrefectServer-->>PrefectBackend: {state: {type: "RUNNING"|"COMPLETED"|"FAILED"}}
+    end
+
+    Note over PrefectWorker: Worker picks up flow run from work pool
+
+    loop Each pipeline step (01_ingest → 02_validate → 03_transform → 04_aggregate)
+        PrefectWorker->>PrefectServer: Claim task run
+        PrefectWorker->>Django: POST /internal/step-status/ {status: "RUNNING", …} [Bearer token]
+        Django->>DB: ExecutionStep.status = RUNNING, started_at = now()
+
+        PrefectWorker->>S3: Read input Parquet (previous step output)
+        PrefectWorker->>PrefectWorker: papermill.execute_notebook(step_name, params)
+        PrefectWorker->>S3: Write output Parquet + result.json (final step only)
+
+        alt Step succeeds
+            PrefectWorker->>Django: POST /internal/step-status/ {status: "COMPLETED", …}
+            Django->>DB: ExecutionStep.status = COMPLETED, completed_at = now()
+        else Step fails
+            PrefectWorker->>Django: POST /internal/step-status/ {status: "FAILED", error_message: …}
+            Django->>DB: ExecutionStep.status = FAILED, error_message = …
+        end
+    end
+
+    PrefectServer-->>PrefectBackend: state.type == "COMPLETED"
+    PrefectBackend->>S3: Read result.json
+    S3-->>PrefectBackend: {row_count, s3_output_path, …}
+    PrefectBackend-->>PipelineRunner: metadata dict
+    PipelineRunner-->>CeleryWorker: metadata dict
+
+    CeleryWorker->>DB: FlowExecution.status = COMPLETED, row_count, s3_output_path
+
+    Note over User,Django: User polls execution_live_status (HTMX)\nand sees steps update in real time via POST /internal/step-status/ callbacks
+
+    opt User cancels (RUNNING execution)
+        User->>Django: POST /flows/execution/<run_id>/stop/
+        Django->>PrefectServer: DELETE /api/flow_runs/<prefect-flow-run-uuid>/cancel
+        Django->>DB: FlowExecution.status = FAILED, error_message = "Stopped by user."
+        Django-->>User: 302 → execution detail
+    end

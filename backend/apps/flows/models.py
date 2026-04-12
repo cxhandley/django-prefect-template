@@ -85,6 +85,10 @@ class FlowExecution(models.Model):
     celery_task_id = models.CharField(max_length=255, blank=True)
     error_message = models.TextField(blank=True)
 
+    # External orchestrator run identifier — null when using the doit backend,
+    # populated with the Prefect flow-run UUID when using the Prefect backend.
+    external_run_id = models.CharField(max_length=64, null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 

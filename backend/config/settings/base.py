@@ -210,6 +210,18 @@ SITE_URL = env("SITE_URL", default="http://localhost:8000")
 NOTEBOOKS_DIR = BASE_DIR.parent / env("NOTEBOOKS_DIR", default="notebooks")
 NOTEBOOK_OUTPUT_DIR = BASE_DIR.parent / env("NOTEBOOK_OUTPUT_DIR", default="data/notebook_outputs")
 
+# Pipeline backend — "doit" (default) or "prefect"
+PIPELINE_BACKEND = env("PIPELINE_BACKEND", default="doit")
+
+# Prefect backend settings (only required when PIPELINE_BACKEND=prefect)
+PREFECT_API_URL = env("PREFECT_API_URL", default="http://prefect-server:4200/api")
+# Shared secret used to authenticate /internal/step-status/ callbacks from the Prefect worker
+PREFECT_INTERNAL_SECRET = env("PREFECT_INTERNAL_SECRET", default="")
+# Base URL the Prefect worker uses to reach this Django instance (internal Docker network)
+DJANGO_INTERNAL_URL = env("DJANGO_INTERNAL_URL", default="http://web:8000")
+# Prefect UI base URL — used to build the "View in Prefect" link in the execution detail page
+PREFECT_UI_URL = env("PREFECT_UI_URL", default="http://localhost:4200")
+
 # Redis
 REDIS_URL = env("REDIS_URL")
 CACHES = {

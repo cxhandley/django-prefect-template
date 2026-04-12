@@ -1,0 +1,45 @@
+flowchart TD
+    A[Celery task\nrun_pipeline_task / run_prediction_task] --> B[PipelineRunner.run_pipeline]
+    B --> C{settings.PIPELINE_BACKEND}
+
+    C -->|doit| D[DoitBackend.run]
+    C -->|prefect| E[PrefectBackend.run]
+
+    subgraph DoitBackend
+        D --> D1[Build PIPELINE_PARAMS env]
+        D1 --> D2[Create ExecutionStep rows — PENDING]
+        D2 --> D3[subprocess: python -m doit run pipeline]
+        D3 --> D4{doit exit code}
+        D4 -->|0 — success| D5[_sync_step_records\nRead disk markers → update ExecutionStep]
+        D4 -->|non-zero| D6[_sync_step_records then raise RuntimeError]
+        D5 --> D7[_read_result_json from S3]
+        D6 --> FAIL1[RuntimeError propagates to Celery]
+        D7 --> RET[Return metadata dict]
+    end
+
+    subgraph PrefectBackend
+        E --> E1[Load FlowExecution from DB]
+        E1 --> E2[_ensure_deployment\nCreate / update Prefect deployment]
+        E2 --> E3[POST /api/flow_runs/\nCreate Prefect flow run]
+        E3 --> E4[Store flow_run.id → FlowExecution.external_run_id]
+        E4 --> E5{Poll GET /api/flow_runs/id\nuntil terminal state}
+        E5 -->|RUNNING / PENDING| E5
+        E5 -->|COMPLETED| E6[_read_result_json from S3]
+        E5 -->|FAILED / CRASHED| FAIL2[raise RuntimeError]
+        E6 --> RET
+    end
+
+    subgraph PrefectWorker [Prefect Worker — separate container]
+        W1[Worker picks up flow run]
+        W1 --> W2[pipeline_flow starts]
+        W2 --> W3[execute_step task — step N]
+        W3 --> W4[State hook: RUNNING\nPOST /internal/step-status/]
+        W4 --> W5[Run notebook via papermill]
+        W5 -->|success| W6[State hook: COMPLETED\nPOST /internal/step-status/]
+        W5 -->|failure| W7[State hook: FAILED\nPOST /internal/step-status/]
+        W6 --> W3
+        W7 --> W3
+        W3 -->|all steps done| W8[Write result.json to S3]
+    end
+
+    W4 & W6 & W7 -. HTTP Bearer auth .-> DjangoDB[(ExecutionStep updated\nin Django DB)]

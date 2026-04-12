@@ -95,20 +95,20 @@ run-pipeline run_id input_s3_path:
 
 test:
     @echo "Running tests..."
-    pytest backend/apps/ -v
+    OTEL_SDK_DISABLED=true pytest backend/apps/ -v
     @echo "All tests passed!"
 
 # Run tests with coverage report and regenerate badges/tests.svg + badges/coverage.svg
 test-cov:
-    cd backend && pytest apps/ \
+    cd backend && OTEL_SDK_DISABLED=true pytest apps/ \
         --cov=apps \
         --cov-report=html:../htmlcov \
         --cov-report=term-missing \
         --cov-report=xml:../coverage.xml \
         --junitxml=../junit.xml \
         -v
-    genbadge tests -i junit.xml -o badges/tests.svg -n Tests
-    genbadge coverage -i coverage.xml -o badges/coverage.svg -n Coverage
+    OTEL_SDK_DISABLED=true genbadge tests -i junit.xml -o badges/tests.svg -n Tests
+    OTEL_SDK_DISABLED=true genbadge coverage -i coverage.xml -o badges/coverage.svg -n Coverage
 
 
 # ============================================================================

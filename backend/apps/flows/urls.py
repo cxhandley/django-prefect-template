@@ -42,6 +42,8 @@ urlpatterns = [
     path("presets/save/", views.save_preset, name="save_preset"),
     path("presets/load/", views.load_preset, name="load_preset"),
     path("presets/<int:preset_id>/delete/", views.delete_preset, name="delete_preset"),
+    # Pipeline backend health indicator (navbar partial)
+    path("backend-health/", views.backend_health, name="backend_health"),
     # Admin monitoring (staff-only)
     path("admin/dashboard/", views.admin_dashboard, name="admin_dashboard"),
     path("admin/executions/", views.admin_executions, name="admin_executions"),

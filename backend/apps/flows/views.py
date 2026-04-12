@@ -373,6 +373,7 @@ def execution_detail(request, run_id):
         "prediction_result": prediction_result,
         "input_values": input_values,
         "steps": steps,
+        "prefect_ui_url": getattr(settings, "PREFECT_UI_URL", ""),
         "breadcrumbs": [
             {"name": "Dashboard", "url": "/flows/dashboard/"},
             {"name": "History", "url": "/flows/history/"},
@@ -856,13 +857,19 @@ def prediction_status(request, run_id):
 @login_required
 @require_http_methods(["POST"])
 def stop_execution(request, run_id):
-    """Revoke the Celery task and mark the execution as stopped."""
+    """Revoke the Celery task (and cancel any Prefect run) then mark as stopped."""
     execution = get_object_or_404(FlowExecution, flow_run_id=run_id, triggered_by=request.user)
 
     if execution.celery_task_id:
         from config.celery import app as celery_app
 
         celery_app.control.revoke(execution.celery_task_id, terminate=True, signal="SIGTERM")
+
+    # Cancel the external orchestrator run if one exists (Prefect backend)
+    if execution.external_run_id:
+        from apps.flows.backends import get_backend
+
+        get_backend().cancel(execution)
 
     FlowExecution.objects.filter(flow_run_id=run_id).update(
         status=ExecutionStatus.FAILED,
@@ -1158,6 +1165,129 @@ def retry_execution(request, run_id):
     new_execution.save(update_fields=["celery_task_id"])
 
     return redirect("flows:execution_detail", run_id=new_run_id)
+
+
+@require_http_methods(["GET"])
+def backend_health(request):
+    """
+    Return an HTML partial showing which pipeline backend is configured and
+    whether it is reachable.
+
+    For the doit backend there is no external service, so health is always
+    reported as OK.  For the Prefect backend a lightweight GET to the Prefect
+    API /health endpoint is made; the result is cached for 30 seconds so that
+    every navbar render does not add latency.
+    """
+    import urllib.error
+    import urllib.request
+
+    from django.core.cache import cache
+
+    backend_name = getattr(settings, "PIPELINE_BACKEND", "doit")
+
+    if backend_name == "prefect":
+        cache_key = "prefect_api_health"
+        healthy = cache.get(cache_key)
+        if healthy is None:
+            try:
+                api_url = getattr(settings, "PREFECT_API_URL", "").rstrip("/")
+                req = urllib.request.Request(f"{api_url}/health", method="GET")
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    healthy = resp.status == 200
+            except Exception:
+                healthy = False
+            cache.set(cache_key, healthy, 30)
+        detail = "Prefect API reachable" if healthy else "Prefect API unreachable"
+    else:
+        healthy = True
+        detail = "local subprocess"
+
+    return render(
+        request,
+        "flows/partials/backend_health_indicator.html",
+        {"backend_name": backend_name, "healthy": healthy, "detail": detail},
+    )
+
+
+@require_http_methods(["POST"])
+def internal_step_status(request):
+    """
+    Receive step-status callbacks from the Prefect Worker.
+
+    Authentication: Bearer token in the Authorization header, matched against
+    settings.PREFECT_INTERNAL_SECRET.  Returns 403 on mismatch.
+
+    Request body (JSON):
+        run_id       — FlowExecution.flow_run_id (UUID string)
+        step_index   — int
+        step_name    — str
+        status       — "RUNNING" | "COMPLETED" | "FAILED"
+        error_message — str (optional)
+
+    This endpoint is intentionally not authenticated via Django sessions — it is
+    called by the Prefect Worker over the internal Docker network only.
+    """
+    from django.utils import timezone
+
+    from .models import ExecutionStep, FlowExecution
+
+    # --- bearer token check ---
+    expected_secret = getattr(settings, "PREFECT_INTERNAL_SECRET", "")
+    if not expected_secret:
+        return JsonResponse({"error": "internal callbacks disabled"}, status=403)
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer ") or auth_header[7:] != expected_secret:
+        return JsonResponse({"error": "forbidden"}, status=403)
+
+    # --- parse body ---
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "invalid JSON"}, status=400)
+
+    run_id_str = data.get("run_id", "")
+    step_index = data.get("step_index")
+    step_name = data.get("step_name", "")
+    status = data.get("status", "")
+    error_message = data.get("error_message", "")[:2000]
+
+    if status not in ("RUNNING", "COMPLETED", "FAILED"):
+        return JsonResponse({"error": f"unknown status: {status!r}"}, status=400)
+
+    try:
+        run_id = uuid.UUID(run_id_str)
+    except (ValueError, AttributeError):
+        return JsonResponse({"error": "invalid run_id"}, status=400)
+
+    try:
+        execution = FlowExecution.objects.get(flow_run_id=run_id)
+    except FlowExecution.DoesNotExist:
+        return JsonResponse({"error": "execution not found"}, status=404)
+
+    now = timezone.now()
+    update_fields: dict = {"status": status}
+
+    if status == "RUNNING":
+        update_fields["started_at"] = now
+    else:
+        update_fields["completed_at"] = now
+        if status == "FAILED":
+            update_fields["error_message"] = error_message
+
+    updated = ExecutionStep.objects.filter(execution=execution, step_index=step_index).update(
+        **update_fields
+    )
+
+    if not updated:
+        # Step row doesn't exist yet — create it on the fly
+        ExecutionStep.objects.get_or_create(
+            execution=execution,
+            step_index=step_index,
+            defaults={"step_name": step_name, **update_fields},
+        )
+
+    return JsonResponse({"ok": True})
 
 
 @staff_member_required(login_url="/accounts/login/")
