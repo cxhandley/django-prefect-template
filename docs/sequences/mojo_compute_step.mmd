@@ -1,0 +1,37 @@
+sequenceDiagram
+    participant CR as Celery Worker<br/>(PipelineRunner)
+    participant DB as PostgreSQL<br/>(ExecutionStep)
+    participant MC as mojo-compute<br/>HTTP API
+    participant S3 as S3 / RustFS
+
+    Note over CR: step_type == "MOJO" detected
+
+    CR->>DB: UPDATE ExecutionStep<br/>status=RUNNING, started_at=now
+
+    CR->>MC: POST /execute<br/>{"run_id", "script", "s3_input", "s3_output"}
+
+    MC->>S3: GET s3_input (Parquet)
+    S3-->>MC: input data
+
+    Note over MC: Execute Mojo script<br/>fn main() raises
+
+    MC->>S3: PUT s3_output (Parquet)<br/>PUT s3_output/result.json
+    S3-->>MC: 200 OK
+
+    MC-->>CR: 200 {"status": "ok",<br/>"row_count": N, "duration_ms": N}
+
+    CR->>DB: UPDATE ExecutionStep<br/>status=COMPLETED, completed_at=now
+
+    Note over CR: Continue to next step
+
+    alt Mojo script error
+        MC-->>CR: 200 {"status": "error",<br/>"message": "..."}
+        CR->>DB: UPDATE ExecutionStep<br/>status=FAILED, error_message=message
+        CR->>CR: raise RuntimeError
+    end
+
+    alt mojo-compute unreachable
+        MC-->>CR: Connection error / timeout
+        CR->>DB: UPDATE ExecutionStep<br/>status=FAILED, error_message=connection error
+        CR->>CR: raise RuntimeError
+    end

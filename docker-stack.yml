@@ -207,6 +207,33 @@ services:
         delay: 5s
         max_attempts: 3
 
+  # ─── Mojo compute container ─────────────────────────────────────────────────
+  # Runs MOJO-type pipeline steps; dispatched via HTTP POST /execute.
+  # AWS credentials flow through the environment via the standard credential chain.
+  mojo-compute:
+    image: ghcr.io/${GHCR_REPO}/mojo-compute:${IMAGE_TAG:-latest}
+    env_file:
+      - .env.production
+    environment:
+      SCRIPTS_DIR: /mojo
+      PORT: "8080"
+    volumes:
+      - mojo_scripts:/mojo:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
   # ─── PostgreSQL backup (run-once service triggered by cron) ───────────────
   # Cron on the manager node:
   #   0 2 * * * docker service update --force app_pg-backup
@@ -233,6 +260,7 @@ volumes:
   redis_data:
   rustfs_data:
   notebook_outputs:
+  mojo_scripts:
   traefik_acme:
 
 networks:

@@ -222,6 +222,9 @@ DJANGO_INTERNAL_URL = env("DJANGO_INTERNAL_URL", default="http://web:8000")
 # Prefect UI base URL — used to build the "View in Prefect" link in the execution detail page
 PREFECT_UI_URL = env("PREFECT_UI_URL", default="http://localhost:4200")
 
+# Mojo compute container URL (only required when any ExecutionStep has step_type=MOJO)
+MOJO_COMPUTE_URL = env("MOJO_COMPUTE_URL", default="http://mojo-compute:8080")
+
 # Redis
 REDIS_URL = env("REDIS_URL")
 CACHES = {

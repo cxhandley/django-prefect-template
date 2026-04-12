@@ -106,11 +106,67 @@ def _build_step_params(
     return params
 
 
-def _make_step_task(step_name: str, step_index: int):
+def _dispatch_mojo_step_remote(
+    run_id: str,
+    step_index: int,
+    step_name: str,
+    s3_input: str,
+    s3_output: str,
+) -> None:
+    """
+    Dispatch a MOJO step to the mojo-compute container from inside a Prefect task.
+
+    Posts step-status callbacks to Django identically to notebook steps so that
+    ExecutionStep tracking is consistent regardless of step_type.
+    """
+    import json
+    import urllib.error
+    import urllib.request
+
+    from django.conf import settings
+
+    _post_step_status(run_id, step_index, step_name, "RUNNING")
+
+    script_name = f"compute/{step_name}.mojo"
+    payload = json.dumps(
+        {
+            "run_id": run_id,
+            "script": script_name,
+            "s3_input": s3_input,
+            "s3_output": s3_output,
+        }
+    ).encode()
+
+    mojo_url = settings.MOJO_COMPUTE_URL.rstrip("/")
+    req = urllib.request.Request(
+        f"{mojo_url}/execute",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=600) as resp:
+            body = json.loads(resp.read())
+    except Exception as exc:
+        error_msg = f"mojo-compute unreachable: {exc}"[:2000]
+        _post_step_status(run_id, step_index, step_name, "FAILED", error_msg)
+        raise RuntimeError(error_msg) from exc
+
+    if body.get("status") == "ok":
+        _post_step_status(run_id, step_index, step_name, "COMPLETED")
+    else:
+        error_msg = body.get("message", "Unknown mojo-compute error")[:2000]
+        _post_step_status(run_id, step_index, step_name, "FAILED", error_msg)
+        raise RuntimeError(f"mojo-compute step '{step_name}' failed: {error_msg}")
+
+
+def _make_step_task(step_name: str, step_index: int, step_type: str = "NOTEBOOK"):
     """
     Factory that returns a Prefect @task for a single pipeline step.
 
     Defined as a factory so each step gets a distinct task name in Prefect UI.
+    Dispatches to papermill (NOTEBOOK) or mojo-compute (MOJO) based on step_type.
     """
     # Import inside function to avoid loading prefect at module import time
     from prefect import task
@@ -120,7 +176,18 @@ def _make_step_task(step_name: str, step_index: int):
         run_id: str,
         input_s3_path: str,
         extra_params: dict,
+        s3_output: str = "",
     ) -> None:
+        if step_type == "MOJO":
+            _dispatch_mojo_step_remote(
+                run_id=run_id,
+                step_index=step_index,
+                step_name=step_name,
+                s3_input=input_s3_path,
+                s3_output=s3_output,
+            )
+            return
+
         import sys
 
         _post_step_status(run_id, step_index, step_name, "RUNNING")
@@ -170,13 +237,19 @@ def _get_pipeline_flow():
         doit_task: str,
         extra_params: dict,
     ) -> None:
+        from django.conf import settings
+
         steps = _STEPS_BY_TASK.get(doit_task, [])
-        for step_name, step_index, _s3_pattern in steps:
-            task_fn = _make_step_task(step_name, step_index)
+        for step in steps:
+            s3_output = (
+                f"s3://{settings.DATA_LAKE_BUCKET}/{step.s3_output_pattern.format(run_id=run_id)}"
+            )
+            task_fn = _make_step_task(step.step_name, step.step_index, step.step_type)
             task_fn(
                 run_id=run_id,
                 input_s3_path=input_s3_path,
                 extra_params=extra_params,
+                s3_output=s3_output,
             )
 
     return pipeline_flow
@@ -261,14 +334,17 @@ class PrefectBackend(PipelineBackend):
         from apps.flows.runner import _STEPS_BY_TASK
 
         steps = _STEPS_BY_TASK.get(doit_task, [])
-        for step_name, step_index, s3_pattern in steps:
+        for step in steps:
             ExecutionStep.objects.get_or_create(
                 execution=execution,
-                step_index=step_index,
+                step_index=step.step_index,
                 defaults={
-                    "step_name": step_name,
+                    "step_name": step.step_name,
+                    "step_type": step.step_type,
                     "status": "PENDING",
-                    "output_s3_path": s3_pattern.format(run_id=str(execution.flow_run_id)),
+                    "output_s3_path": step.s3_output_pattern.format(
+                        run_id=str(execution.flow_run_id)
+                    ),
                 },
             )
 
