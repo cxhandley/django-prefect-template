@@ -128,3 +128,83 @@ erDiagram
 
     %% EXECUTION_COMPARISON — persist named comparisons (Epic 4)
     %% ADMIN_ACTION_LOG — audit trail for admin actions (Epic 5)
+
+    %% ============================================
+    %% EPIC 13 — Scoring Model Training & Promotion
+    %% ============================================
+
+    TRAINING_DATASET {
+        int id PK
+        string slug UK "auto-generated e.g. ds-<uuid4-prefix>"
+        text description
+        int row_count
+        int seed "random seed for reproducibility"
+        string s3_path "s3 key for data.parquet"
+        string status "PENDING|RUNNING|COMPLETED|FAILED"
+        datetime created_at
+        int created_by_id FK "nullable → USER"
+    }
+
+    MODEL_TRAINING_RUN {
+        int id PK
+        string label "e.g. round_1"
+        int dataset_id FK "references TRAINING_DATASET"
+        string optimisation_target "GINI|KS|F1_REVIEW"
+        string status "PENDING|RUNNING|COMPLETED|FAILED"
+        json candidate_weights "null until complete"
+        json candidate_thresholds "null until complete"
+        float val_gini "validation Gini coefficient"
+        float val_ks "validation KS statistic"
+        float val_f1_review "validation F1 for Review class"
+        boolean umap_enabled
+        string artefacts_s3_path "s3 prefix for run artefacts"
+        text error_message
+        datetime created_at
+        int created_by_id FK "nullable → USER"
+    }
+
+    MODEL_BACKTEST_RESULT {
+        int id PK
+        int training_run_id FK "OneToOne → MODEL_TRAINING_RUN"
+        string status "PENDING|RUNNING|COMPLETED|FAILED"
+        float accuracy
+        float precision_approved
+        float precision_review
+        float precision_declined
+        float recall_approved
+        float recall_review
+        float recall_declined
+        float f1_approved
+        float f1_review
+        float f1_declined
+        float gini "Gini coefficient on test fold"
+        float ks_statistic "KS statistic on test fold"
+        json confusion_matrix "3x3 row=actual col=predicted"
+        string artefacts_s3_path "s3 prefix for backtest artefacts"
+        datetime completed_at
+    }
+
+    MODEL_PROMOTION {
+        int id PK
+        int training_run_id FK "OneToOne → MODEL_TRAINING_RUN"
+        int resulting_scoring_model_id FK "references SCORING_MODEL"
+        int promoted_by_id FK "references USER"
+        datetime promoted_at
+        text notes "optional admin rationale"
+    }
+
+    USER ||--o{ TRAINING_DATASET : "creates"
+    USER ||--o{ MODEL_TRAINING_RUN : "initiates"
+    USER ||--o{ MODEL_PROMOTION : "approves"
+    TRAINING_DATASET ||--o{ MODEL_TRAINING_RUN : "used in"
+    MODEL_TRAINING_RUN ||--o| MODEL_BACKTEST_RESULT : "evaluated by"
+    MODEL_TRAINING_RUN ||--o| MODEL_PROMOTION : "promoted via"
+    MODEL_PROMOTION ||--|| SCORING_MODEL : "creates"
+
+    %% ============================================
+    %% IMPLEMENTED — Epic 13 models added to DB
+    %% ============================================
+    %% TRAINING_DATASET — implemented (BL-032)
+    %% MODEL_TRAINING_RUN — implemented (BL-033)
+    %% MODEL_BACKTEST_RESULT — implemented (BL-034)
+    %% MODEL_PROMOTION — implemented (BL-036)

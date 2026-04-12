@@ -1,0 +1,125 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    Training History
+{% endblock title %}
+{% block breadcrumbs %}
+    <div class="breadcrumbs text-sm px-4 pt-4">
+        <ul>
+            <li>
+                <a href="{% url 'flows:admin_dashboard' %}">Admin</a>
+            </li>
+            <li>Training History</li>
+        </ul>
+    </div>
+{% endblock breadcrumbs %}
+{% block dashboard_content %}
+    <div class="space-y-6">
+        <!-- Header -->
+        <div>
+            <h1 class="text-2xl font-bold">Training History</h1>
+            <p class="text-base-content/60 text-sm mt-1">All training runs across all datasets.</p>
+        </div>
+        {% if runs %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th scope="col">Dataset</th>
+                            <th scope="col">Label</th>
+                            <th scope="col">Target</th>
+                            <th scope="col">Status</th>
+                            <th scope="col" class="text-right">
+                                <a href="?sort={% if sort_by == '-gini' %}gini{% else %}-gini{% endif %}"
+                                   class="link link-hover">Backtest Gini</a>
+                            </th>
+                            <th scope="col" class="text-right">
+                                <a href="?sort={% if sort_by == '-ks' %}ks{% else %}-ks{% endif %}"
+                                   class="link link-hover">Backtest KS</a>
+                            </th>
+                            <th scope="col" class="text-right">
+                                <a href="?sort={% if sort_by == '-f1' %}f1{% else %}-f1{% endif %}"
+                                   class="link link-hover">F1 Review</a>
+                            </th>
+                            <th scope="col">Promotion</th>
+                            <th scope="col">
+                                <a href="?sort={% if sort_by == '-created_at' %}created_at{% else %}-created_at{% endif %}"
+                                   class="link link-hover">Created</a>
+                            </th>
+                            <th scope="col" class="sr-only">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for run in runs %}
+                            <tr>
+                                <td class="font-mono text-xs text-base-content/70">
+                                    <a href="{% url 'training:detail' run.dataset.slug %}"
+                                       class="link link-hover">{{ run.dataset.slug }}</a>
+                                </td>
+                                <td class="font-mono text-sm font-medium">{{ run.label }}</td>
+                                <td class="text-sm">{{ run.get_optimisation_target_display }}</td>
+                                <td>
+                                    {% if run.status == "COMPLETED" %}
+                                        <span class="badge badge-success badge-sm">Completed</span>
+                                    {% elif run.status == "RUNNING" %}
+                                        <span class="badge badge-warning badge-sm">Running…</span>
+                                    {% elif run.status == "FAILED" %}
+                                        <span class="badge badge-error badge-sm">Failed</span>
+                                    {% else %}
+                                        <span class="badge badge-ghost badge-sm">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-right font-mono text-sm">
+                                    {% with bt=run.backtest_result %}
+                                        {% if bt and bt.gini is not None %}
+                                            {{ bt.gini|floatformat:4 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                                <td class="text-right font-mono text-sm">
+                                    {% with bt=run.backtest_result %}
+                                        {% if bt and bt.ks_statistic is not None %}
+                                            {{ bt.ks_statistic|floatformat:4 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                                <td class="text-right font-mono text-sm">
+                                    {% with bt=run.backtest_result %}
+                                        {% if bt and bt.f1_review is not None %}
+                                            {{ bt.f1_review|floatformat:4 }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                                <td>
+                                    {% if run.promotion %}
+                                        <span class="badge badge-primary badge-sm font-mono">v{{ run.promotion.resulting_scoring_model.version }}</span>
+                                    {% else %}
+                                        <span class="text-base-content/40 text-sm">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-sm text-base-content/70">{{ run.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <a href="{% url 'training:run_detail' run.pk %}"
+                                       class="btn btn-ghost btn-xs">View</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body text-center py-12">
+                    <p class="text-base-content/60">No training runs yet.</p>
+                    <a href="{% url 'training:dataset_list' %}"
+                       class="btn btn-primary btn-sm mt-4">Go to Training Datasets</a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock dashboard_content %}

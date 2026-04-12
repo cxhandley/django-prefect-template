@@ -1,0 +1,142 @@
+<div id="promote-section">
+    {% with promotion=run.promotion %}
+        {% if promotion %}
+            <!-- Already promoted -->
+            <div class="alert alert-success text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg"
+                     class="h-5 w-5 shrink-0"
+                     fill="none"
+                     viewBox="0 0 24 24"
+                     stroke="currentColor"
+                     aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>
+                    Promoted to
+                    <strong>ScoringModel v{{ promotion.resulting_scoring_model.version }}</strong>
+                    by {{ promotion.promoted_by.email|default:promotion.promoted_by.username }}
+                    on {{ promotion.promoted_at|date:"Y-m-d H:i" }}.
+                    {% if promotion.notes %}<em class="block mt-1 text-base-content/70">{{ promotion.notes }}</em>{% endif %}
+                </span>
+            </div>
+        {% elif backtest and backtest.status == "COMPLETED" %}
+            <!-- Ready to promote — confirmation dialog -->
+            <dialog id="promote-modal"
+                    class="modal"
+                    aria-labelledby="promote-modal-title">
+                <div class="modal-box max-w-2xl">
+                    <h3 id="promote-modal-title" class="font-bold text-lg mb-4">Confirm Promotion</h3>
+                    <!-- Side-by-side: current active vs candidate -->
+                    <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                        <div>
+                            <p class="text-xs font-semibold text-base-content/60 uppercase mb-2">Current Active Model</p>
+                            {% if active_scoring_model %}
+                                <p class="font-mono font-medium">v{{ active_scoring_model.version }}</p>
+                                <div class="mt-2 space-y-1 text-xs text-base-content/70">
+                                    {% for feature, weight in active_scoring_model.weights.items %}
+                                        <div class="flex justify-between">
+                                            <span>{{ feature }}</span><span class="font-mono">{{ weight }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="mt-2 space-y-1 text-xs text-base-content/70">
+                                    <div class="flex justify-between">
+                                        <span>Approve ≥</span><span class="font-mono">{{ active_scoring_model.thresholds.approved }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Review ≥</span><span class="font-mono">{{ active_scoring_model.thresholds.review }}</span>
+                                    </div>
+                                </div>
+                            {% else %}
+                                <p class="text-base-content/40 italic">No active model</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p class="text-xs font-semibold text-base-content/60 uppercase mb-2">Candidate ({{ run.label }})</p>
+                            <p class="font-mono font-medium">v{{ next_version }}</p>
+                            {% if run.candidate_weights %}
+                                <div class="mt-2 space-y-1 text-xs text-base-content/70">
+                                    {% for feature, weight in run.candidate_weights.items %}
+                                        <div class="flex justify-between">
+                                            <span>{{ feature }}</span><span class="font-mono">{{ weight|floatformat:4 }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                <div class="mt-2 space-y-1 text-xs text-base-content/70">
+                                    <div class="flex justify-between">
+                                        <span>Approve ≥</span><span class="font-mono">{{ run.candidate_thresholds.approved }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>Review ≥</span><span class="font-mono">{{ run.candidate_thresholds.review }}</span>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <!-- Backtest metrics -->
+                    <div class="bg-base-200 rounded-box p-3 mb-4 grid grid-cols-3 gap-3 text-center">
+                        <div>
+                            <p class="text-xs text-base-content/60">Backtest Gini</p>
+                            <p class="font-mono font-semibold text-sm">
+                                {% if backtest.gini is not None %}
+                                    {{ backtest.gini|floatformat:4 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-base-content/60">Backtest KS</p>
+                            <p class="font-mono font-semibold text-sm">
+                                {% if backtest.ks_statistic is not None %}
+                                    {{ backtest.ks_statistic|floatformat:4 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-base-content/60">F1 (Review)</p>
+                            <p class="font-mono font-semibold text-sm">
+                                {% if backtest.f1_review is not None %}
+                                    {{ backtest.f1_review|floatformat:4 }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    <!-- Optional notes -->
+                    <div class="mb-4">
+                        <label class="label" for="promote-notes">
+                            <span class="label-text text-sm">Rationale (optional)</span>
+                        </label>
+                        <textarea id="promote-notes"
+                                  name="notes"
+                                  class="textarea textarea-bordered w-full text-sm"
+                                  rows="2"
+                                  placeholder="e.g. Improved Gini over current model"
+                                  form="promote-form"></textarea>
+                    </div>
+                    <div class="modal-action">
+                        <form method="dialog">
+                            <button class="btn btn-ghost">Cancel</button>
+                        </form>
+                        <form id="promote-form"
+                              hx-post="{% url 'training:promote_run' run.pk %}"
+                              hx-target="#promote-section"
+                              hx-swap="outerHTML">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary">Promote to Active Model</button>
+                        </form>
+                    </div>
+                </div>
+                <form method="dialog" class="modal-backdrop">
+                    <button>close</button>
+                </form>
+            </dialog>
+            <button class="btn btn-primary btn-sm"
+                    onclick="document.getElementById('promote-modal').showModal()">Promote to Active Model</button>
+        {% endif %}
+    {% endwith %}
+</div>

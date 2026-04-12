@@ -87,6 +87,36 @@
                     Monitoring
                 </a>
             </li>
+            <li>
+                <a href="{% url 'training:dataset_list' %}"
+                   class="{% if active_page == 'training_datasets' %}active{% endif %}"
+                   {% if active_page == 'training_datasets' %}aria-current="page"{% endif %}>
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-5 w-5"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7c0-2 1-3 3-3h10c2 0 3 1 3 3M4 7h16M10 12h4" />
+                    </svg>
+                    Training Data
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'training:training_history' %}"
+                   class="{% if active_page == 'training_history' %}active{% endif %}"
+                   {% if active_page == 'training_history' %}aria-current="page"{% endif %}>
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-5 w-5"
+                         fill="none"
+                         viewBox="0 0 24 24"
+                         stroke="currentColor"
+                         aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    Model Training
+                </a>
+            </li>
         {% endif %}
     </ul>
 </nav>

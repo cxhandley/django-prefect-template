@@ -1,0 +1,61 @@
+sequenceDiagram
+    actor Admin
+    participant Browser
+    participant Django
+    participant Celery
+    participant Polars
+    participant SciPy
+    participant DuckDB
+    participant UMAP
+    participant S3
+
+    Admin->>Browser: Navigate to dataset detail page
+    Browser->>Django: GET /training/<slug>/runs/
+    Django-->>Browser: Render run list (empty or existing runs)
+
+    Admin->>Browser: Fill start-run form (label, target, UMAP toggle)
+    Browser->>Django: POST /training/<slug>/runs/start/
+    Django->>Django: Validate form fields
+    Django->>Django: Create ModelTrainingRun (status=PENDING)
+    Django->>Celery: run_model_training_task.apply_async(run_id)
+    Django-->>Browser: Redirect to /training/runs/<run_id>/
+
+    Browser->>Django: GET /training/runs/<run_id>/
+    Django-->>Browser: Render run detail page (status=PENDING)
+    Browser->>Django: GET /training/runs/<run_id>/status/ [HTMX poll every 3s]
+    Django-->>Browser: Status partial (PENDING)
+
+    Note over Celery,S3: Async execution begins
+    Celery->>Django: Update status → RUNNING
+    Celery->>S3: Read dataset Parquet via s3fs
+    S3-->>Celery: DataFrame bytes
+    Celery->>Polars: Build DataFrame, normalise features
+    Polars-->>Celery: Normalised train/val splits (80/20 stratified)
+
+    loop Weight optimisation (L-BFGS-B / SLSQP)
+        Celery->>SciPy: minimize(objective, x0, method=SLSQP, constraints, bounds)
+        SciPy->>DuckDB: Compute target metric on val fold (Gini / KS / F1_Review)
+        DuckDB-->>SciPy: Metric value
+        SciPy-->>Celery: Candidate weights (converged)
+    end
+
+    Celery->>Celery: Threshold grid search (Cartesian product)
+    Celery->>DuckDB: Evaluate each (t_approve, t_review) pair on val fold
+    DuckDB-->>Celery: Best threshold pair
+
+    opt umap_enabled == True
+        Celery->>UMAP: Fit 2-D embedding on 4-feature train fold
+        UMAP-->>Celery: (x, y) coordinates per sample
+        Celery->>S3: Write umap.parquet
+    end
+
+    Celery->>S3: Write weights.json
+    Celery->>S3: Write thresholds.json
+    Celery->>S3: Write val_metrics.json
+    Celery->>S3: Write score_distributions.parquet
+    Celery->>Django: Update ModelTrainingRun (status=COMPLETED, metrics, artefacts_s3_path)
+
+    Browser->>Django: GET /training/runs/<run_id>/status/ [HTMX poll]
+    Django-->>Browser: Status partial (COMPLETED — stops polling)
+    Browser->>Django: GET /training/runs/<run_id>/
+    Django-->>Browser: Run detail with metrics, links to backtest & promotion

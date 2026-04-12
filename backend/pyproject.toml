@@ -13,6 +13,7 @@ dependencies = [
     "s3fs==2026.2.0",
     "duckdb==1.4.4",
     "polars==1.38.1",
+    "numpy>=2.0",
     "pyarrow==23.0.0",
     "gunicorn==23.0.0",
     "opentelemetry-api==1.28.0",
@@ -34,6 +35,9 @@ dependencies = [
     "jupyter-client==8.6.3",
     "ipykernel==6.29.5",
     "argon2-cffi==25.1.0",
+    "scipy>=1.14",
+    "umap-learn>=0.5",
+    "altair>=5.0,<6",
 ]
 
 [project.optional-dependencies]

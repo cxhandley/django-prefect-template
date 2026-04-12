@@ -1,0 +1,49 @@
+flowchart TD
+    A([Start: run_model_training_task]) --> B[Load ModelTrainingRun]
+    B --> C[Set status = RUNNING]
+    C --> D[Read dataset Parquet from S3 via s3fs]
+    D --> E{Dataset readable?}
+    E -- No --> FAIL([Set status = FAILED, store error_message])
+    E -- Yes --> F[Normalise 4 features\ncredit_score_norm, income_norm,\nemployment_norm, age_norm]
+    F --> G[Stratified 80/20 split\nby ground_truth_label using dataset seed]
+
+    G --> H[Define objective function\nnegative of optimisation target\non val fold via DuckDB]
+
+    H --> I[scipy.optimize.minimize\nmethod=SLSQP\nconstraints: sum=1.0\nbounds: each weight in 0.05–0.70\nx0 = uniform weights 0.25]
+
+    I --> J{Converged?}
+    J -- No --> K[Use best-found weights\nlog non-convergence warning]
+    J -- Yes --> L[optimal_weights from result.x]
+    K --> L
+
+    L --> M[Threshold grid search\napproval cutpoints 0.55–0.85 step 0.05\nreview cutpoints 0.30–0.60 step 0.05]
+    M --> N[Score val fold with optimal_weights]
+    N --> O[For each threshold pair\nevaluate optimisation target via DuckDB]
+    O --> P[Select threshold pair with best metric]
+
+    P --> Q[Compute val metrics on best\nconfiguration weights + thresholds\nGini, KS, F1_Review]
+
+    Q --> R{umap_enabled?}
+    R -- Yes --> S[Fit UMAP 2-D embedding\nn_neighbors=15, min_dist=0.1\non 4-feature training fold]
+    S --> T[Write umap.parquet to S3]
+    T --> U[Write remaining artefacts to S3]
+    R -- No --> U
+
+    U --> V[Write weights.json]
+    V --> W[Write thresholds.json]
+    W --> X[Write val_metrics.json]
+    X --> Y[Write score_distributions.parquet\nscore + ground_truth_label for val fold]
+
+    Y --> Z[Update ModelTrainingRun\ncandidate_weights, candidate_thresholds\nval_gini, val_ks, val_f1_review\nartefacts_s3_path\nstatus = COMPLETED]
+    Z --> DONE([End])
+
+    subgraph Objective Function
+        OF1[Apply weights to val fold\ncompute composite score]
+        OF2{Target metric}
+        OF2 -- GINI --> OF3[AUC via trapezoid rule\nGini = 2·AUC − 1]
+        OF2 -- KS --> OF4[max CDF separation\nApproved vs non-Approved]
+        OF2 -- F1_REVIEW --> OF5[Classify with current thresholds\nF1 for Review class via DuckDB]
+        OF3 --> OF6[return −metric]
+        OF4 --> OF6
+        OF5 --> OF6
+    end

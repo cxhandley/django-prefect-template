@@ -1,0 +1,300 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    Training Runs — {{ dataset.slug }}
+{% endblock title %}
+{% block extra_head %}
+    <!-- Vega-Embed (CDN — for Gini/KS trend and comparison charts) -->
+    <script src="https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6.26.0/build/vega-embed.min.js"></script>
+{% endblock extra_head %}
+{% block breadcrumbs %}
+    <div class="breadcrumbs text-sm px-4 pt-4">
+        <ul>
+            <li>
+                <a href="{% url 'flows:admin_dashboard' %}">Admin</a>
+            </li>
+            <li>
+                <a href="{% url 'training:dataset_list' %}">Training Datasets</a>
+            </li>
+            <li>
+                <a href="{% url 'training:detail' dataset.slug %}">{{ dataset.slug }}</a>
+            </li>
+            <li>Training Runs</li>
+        </ul>
+    </div>
+{% endblock breadcrumbs %}
+{% block dashboard_content %}
+    <div class="space-y-6">
+        <!-- Header -->
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold">Training Runs</h1>
+                <p class="text-base-content/60 text-sm mt-1">
+                    Dataset: <span class="font-mono">{{ dataset.slug }}</span>
+                    &nbsp;·&nbsp; {{ dataset.row_count|default:"—" }} rows
+                </p>
+            </div>
+        </div>
+        <!-- Start run form (only when dataset is completed) -->
+        {% if dataset.status == "COMPLETED" %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">Start New Training Run</h2>
+                    <form method="post" action="{% url 'training:start_run' dataset.slug %}">
+                        {% csrf_token %}
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-2">
+                            <div class="md:col-span-1">
+                                <label class="label" for="id_label">
+                                    <span class="label-text">Label</span>
+                                </label>
+                                <input type="text"
+                                       id="id_label"
+                                       name="label"
+                                       class="input input-bordered w-full {% if form_errors.label %}input-error{% endif %}"
+                                       placeholder="e.g. round_1"
+                                       value="{{ form_values.label|default:'' }}"
+                                       maxlength="100"
+                                       required
+                                       aria-describedby="{% if form_errors.label %}label-error{% endif %}">
+                                {% if form_errors.label %}<p id="label-error" class="text-error text-xs mt-1">{{ form_errors.label }}</p>{% endif %}
+                            </div>
+                            <div>
+                                <label class="label" for="id_optimisation_target">
+                                    <span class="label-text">Optimisation Target</span>
+                                </label>
+                                <select id="id_optimisation_target"
+                                        name="optimisation_target"
+                                        class="select select-bordered w-full {% if form_errors.optimisation_target %}select-error{% endif %}"
+                                        aria-describedby="{% if form_errors.optimisation_target %}target-error{% endif %}">
+                                    {% for value, label in optimisation_targets.choices %}
+                                        <option value="{{ value }}"
+                                                {% if form_values.optimisation_target == value %}selected{% endif %}>
+                                            {{ label }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                {% if form_errors.optimisation_target %}
+                                    <p id="target-error" class="text-error text-xs mt-1">{{ form_errors.optimisation_target }}</p>
+                                {% endif %}
+                            </div>
+                            <div class="flex flex-col justify-end pb-1">
+                                <label class="label cursor-pointer gap-2 justify-start">
+                                    <input type="checkbox"
+                                           id="id_umap_enabled"
+                                           name="umap_enabled"
+                                           class="checkbox checkbox-sm"
+                                           {% if form_values.umap_enabled == "on" %}checked{% endif %}>
+                                    <span class="label-text">UMAP visualisation</span>
+                                </label>
+                            </div>
+                            <div class="flex items-end">
+                                <button type="submit" class="btn btn-primary w-full">Start Run</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-warning text-sm">
+                <span>Dataset is not yet completed — training runs can only be started against a completed dataset.</span>
+            </div>
+        {% endif %}
+        <!-- Runs table -->
+        {% if runs %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm overflow-x-auto">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th scope="col">Label</th>
+                            <th scope="col">Target</th>
+                            <th scope="col">Status</th>
+                            <th scope="col" class="text-right">
+                                <a href="?sort={% if sort_by == '-val_gini' %}val_gini{% else %}-val_gini{% endif %}"
+                                   class="link link-hover">Val Gini</a>
+                            </th>
+                            <th scope="col" class="text-right">
+                                <a href="?sort={% if sort_by == '-val_ks' %}val_ks{% else %}-val_ks{% endif %}"
+                                   class="link link-hover">Val KS</a>
+                            </th>
+                            <th scope="col" class="text-right">Val F1 Review</th>
+                            <th scope="col">UMAP</th>
+                            <th scope="col">Created</th>
+                            <th scope="col" class="sr-only">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for run in runs %}
+                            <tr>
+                                <td class="font-mono text-sm font-medium">{{ run.label }}</td>
+                                <td class="text-sm">{{ run.get_optimisation_target_display }}</td>
+                                <td>
+                                    {% if run.status == "COMPLETED" %}
+                                        <span class="badge badge-success badge-sm">Completed</span>
+                                    {% elif run.status == "RUNNING" %}
+                                        <span class="badge badge-warning badge-sm">Running…</span>
+                                    {% elif run.status == "FAILED" %}
+                                        <span class="badge badge-error badge-sm">Failed</span>
+                                    {% else %}
+                                        <span class="badge badge-ghost badge-sm">Pending</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-right font-mono text-sm">
+                                    {% if run.val_gini is not None %}
+                                        {{ run.val_gini|floatformat:4 }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="text-right font-mono text-sm">
+                                    {% if run.val_ks is not None %}
+                                        {{ run.val_ks|floatformat:4 }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="text-right font-mono text-sm">
+                                    {% if run.val_f1_review is not None %}
+                                        {{ run.val_f1_review|floatformat:4 }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="text-sm">
+                                    {% if run.umap_enabled %}
+                                        <span class="badge badge-outline badge-sm">Yes</span>
+                                    {% else %}
+                                        <span class="text-base-content/40">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-sm text-base-content/70">{{ run.created_at|date:"Y-m-d H:i" }}</td>
+                                <td>
+                                    <a href="{% url 'training:run_detail' run.pk %}"
+                                       class="btn btn-ghost btn-xs">View</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body text-center py-12">
+                    <p class="text-base-content/60">No training runs yet. Start one above.</p>
+                </div>
+            </div>
+        {% endif %}
+        <!-- Gini / KS trend chart -->
+        {% if runs %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">Gini &amp; KS Trend</h2>
+                    <p class="text-sm text-base-content/60 mt-1">Backtest Gini and KS across all completed rounds for this dataset.</p>
+                    <div id="chart-gini-trend"
+                         class="chart-container mt-3"
+                         data-chart-url="{% url 'training:chart_gini_trend' dataset.slug %}"
+                         aria-label="Gini and KS trend chart"
+                         role="img">{% include "training/partials/chart_skeleton.html" %}</div>
+                </div>
+            </div>
+            <!-- Multi-run comparison -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm"
+                 x-data="compareRuns()">
+                <div class="card-body">
+                    <div class="flex items-center justify-between gap-4">
+                        <div>
+                            <h2 class="card-title text-base">Compare Runs</h2>
+                            <p class="text-sm text-base-content/60 mt-1">
+                                Select 2–4 completed runs to compare Gini, KS, and F1 Review side-by-side.
+                            </p>
+                        </div>
+                        <button class="btn btn-outline btn-sm"
+                                :disabled="selected.length < 2 || selected.length > 4"
+                                @click="loadComparison">Compare</button>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        {% for run in runs %}
+                            {% if run.status == "COMPLETED" and run.backtest_result.status == "COMPLETED" %}
+                                <label class="flex items-center gap-2 cursor-pointer text-sm">
+                                    <input type="checkbox"
+                                           class="checkbox checkbox-sm"
+                                           value="{{ run.pk }}"
+                                           @change="toggle($event)">
+                                    <span class="font-mono">{{ run.label }}</span>
+                                </label>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div id="chart-compare"
+                         class="chart-container mt-4"
+                         aria-label="Run comparison chart"
+                         role="img"
+                         x-show="chartVisible"></div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock dashboard_content %}
+{% block extra_js %}
+    <script>
+    (function () {
+        var EMBED_OPTS = { actions: false, renderer: "svg" };
+
+        function showError(el, msg) {
+            el.innerHTML = '<p class="text-sm text-error p-4">' + (msg || "Chart unavailable") + "</p>";
+        }
+
+        function loadChart(container) {
+            var url = container.dataset.chartUrl;
+            if (!url) return;
+            if (!container.style.width) { container.style.width = "100%"; }
+            fetch(url, { credentials: "same-origin" })
+                .then(function (r) { return r.ok ? r.json() : Promise.reject("HTTP " + r.status); })
+                .then(function (spec) {
+                    if (spec && spec.error) { showError(container, spec.error); return; }
+                    vegaEmbed(container, spec, EMBED_OPTS).catch(function (e) { showError(container, e.message); });
+                })
+                .catch(function (e) { showError(container, String(e)); });
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll(".chart-container[data-chart-url]").forEach(loadChart);
+        });
+    }());
+
+    function compareRuns() {
+        return {
+            selected: [],
+            chartVisible: false,
+            toggle: function (e) {
+                var id = e.target.value;
+                if (e.target.checked) { this.selected.push(id); }
+                else { this.selected = this.selected.filter(function (x) { return x !== id; }); }
+                this.chartVisible = false;
+            },
+            loadComparison: function () {
+                var self = this;
+                var url = "{% url 'training:chart_compare_metrics' %}?run_ids=" + self.selected.join(",");
+                var container = document.getElementById("chart-compare");
+                container.innerHTML = '<div class="animate-pulse h-40 bg-base-200 rounded mt-2"></div>';
+                self.chartVisible = true;
+                fetch(url, { credentials: "same-origin" })
+                    .then(function (r) { return r.ok ? r.json() : Promise.reject("HTTP " + r.status); })
+                    .then(function (spec) {
+                        if (spec && spec.error) {
+                            container.innerHTML = '<p class="text-sm text-error p-4">' + spec.error + "</p>";
+                            return;
+                        }
+                        vegaEmbed(container, spec, { actions: false, renderer: "svg", theme: "ggplot2" })
+                            .catch(function (e) {
+                                container.innerHTML = '<p class="text-sm text-error p-4">' + e.message + "</p>";
+                            });
+                    })
+                    .catch(function (e) {
+                        container.innerHTML = '<p class="text-sm text-error p-4">' + String(e) + "</p>";
+                    });
+            },
+        };
+    }
+    </script>
+{% endblock extra_js %}

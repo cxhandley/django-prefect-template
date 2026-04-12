@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.flows",
     "apps.flags",
+    "apps.training",
 ]
 
 MIDDLEWARE = [
