@@ -376,7 +376,7 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 
 ---
 
-### BL-035 · Admin Visual Diagnostics — Altair Charts `M` `[ ]`
+### BL-035 · Admin Visual Diagnostics — Altair Charts `M` `[~]`
 
 **User story:** US-13.4
 **Value:** Numerical metrics alone are insufficient for model review — a chart can reveal score clustering, threshold placement issues, or unexpected class separation that a table of numbers hides. Altair charts rendered via Vega-Embed give admins interactive, shareable diagnostics without server-side image generation.
@@ -536,5 +536,5 @@ All items below are done and closed.
 | ~~BL-032~~ | ~~Synthetic training dataset generation~~ | ~~Not started~~ | M | BL-028 |
 | BL-033 | Model training run — weight & threshold optimisation | In progress | L | BL-032 |
 | BL-034 | Backtest engine — held-out evaluation | In progress | M | BL-033 |
-| BL-035 | Admin visual diagnostics — Altair charts | Not started | M | BL-033, BL-034 |
+| BL-035 | Admin visual diagnostics — Altair charts | In progress | M | BL-033, BL-034 |
 | BL-036 | Model promotion workflow | Not started | S | BL-033, BL-034, BL-035 |

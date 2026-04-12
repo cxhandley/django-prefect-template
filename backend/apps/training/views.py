@@ -17,6 +17,7 @@ from .models import (
     TrainingRunStatus,
 )
 from .services.analytics import TrainingAnalytics
+from .services.charts import TrainingCharts
 from .tasks import generate_training_dataset_task, run_model_backtest_task, run_model_training_task
 
 
@@ -358,3 +359,75 @@ def backtest_export(request, run_id):
     response = StreamingHttpResponse(csv_rows(), content_type="text/csv")
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
+
+
+# ── Chart endpoints — return Altair JSON specs ────────────────────────────────
+
+
+def _json_spec(spec: dict):
+    """Wrap an Altair spec (or error dict) as a JsonResponse."""
+    from django.http import JsonResponse
+
+    return JsonResponse(spec, safe=False)
+
+
+@staff_member_required
+def chart_umap(request, run_id):
+    run = get_object_or_404(ModelTrainingRun, pk=run_id)
+    with TrainingCharts() as charts:
+        spec = charts.umap_scatter(run)
+    return _json_spec(spec)
+
+
+@staff_member_required
+def chart_score_distribution(request, run_id):
+    run = get_object_or_404(ModelTrainingRun.objects.select_related("backtest_result"), pk=run_id)
+    backtest = getattr(run, "backtest_result", None)
+    with TrainingCharts() as charts:
+        spec = charts.score_distribution(run, backtest)
+    return _json_spec(spec)
+
+
+@staff_member_required
+def chart_confusion_matrix(request, run_id):
+    run = get_object_or_404(ModelTrainingRun.objects.select_related("backtest_result"), pk=run_id)
+    backtest = getattr(run, "backtest_result", None)
+    with TrainingCharts() as charts:
+        spec = charts.confusion_matrix_heatmap(backtest)
+    return _json_spec(spec)
+
+
+@staff_member_required
+def chart_class_metrics(request, run_id):
+    run = get_object_or_404(ModelTrainingRun.objects.select_related("backtest_result"), pk=run_id)
+    backtest = getattr(run, "backtest_result", None)
+    with TrainingCharts() as charts:
+        spec = charts.class_metrics_bar(backtest)
+    return _json_spec(spec)
+
+
+@staff_member_required
+def chart_gini_trend(request, slug):
+    dataset = get_object_or_404(TrainingDataset, slug=slug)
+    spec = TrainingCharts.gini_ks_trend(dataset)
+    return _json_spec(spec)
+
+
+@staff_member_required
+def chart_compare_metrics(request):
+    raw = request.GET.get("run_ids", "")
+    try:
+        run_ids = [int(x) for x in raw.split(",") if x.strip()][:4]
+    except ValueError:
+        return _json_spec({"error": "Invalid run_ids parameter"})
+
+    if len(run_ids) < 2:
+        return _json_spec({"error": "Select 2–4 runs to compare"})
+
+    runs = (
+        ModelTrainingRun.objects.filter(pk__in=run_ids)
+        .select_related("backtest_result")
+        .order_by("created_at")
+    )
+    spec = TrainingCharts.multi_run_comparison(runs)
+    return _json_spec(spec)

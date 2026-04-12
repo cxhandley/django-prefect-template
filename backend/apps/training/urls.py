@@ -20,4 +20,23 @@ urlpatterns = [
     path("runs/<int:run_id>/backtest/", views.trigger_backtest, name="trigger_backtest"),
     path("runs/<int:run_id>/backtest/section/", views.backtest_section, name="backtest_section"),
     path("runs/<int:run_id>/backtest/export/", views.backtest_export, name="backtest_export"),
+    # Charts — return Altair JSON specs
+    path("runs/compare/charts/metrics/", views.chart_compare_metrics, name="chart_compare_metrics"),
+    path("runs/<int:run_id>/charts/umap/", views.chart_umap, name="chart_umap"),
+    path(
+        "runs/<int:run_id>/charts/score-distribution/",
+        views.chart_score_distribution,
+        name="chart_score_distribution",
+    ),
+    path(
+        "runs/<int:run_id>/charts/confusion-matrix/",
+        views.chart_confusion_matrix,
+        name="chart_confusion_matrix",
+    ),
+    path(
+        "runs/<int:run_id>/charts/class-metrics/",
+        views.chart_class_metrics,
+        name="chart_class_metrics",
+    ),
+    path("<slug:slug>/charts/gini-trend/", views.chart_gini_trend, name="chart_gini_trend"),
 ]

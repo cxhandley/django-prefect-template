@@ -2,6 +2,14 @@
 {% block title %}
     Run {{ run.label }} — {{ dataset.slug }}
 {% endblock title %}
+{% block extra_head %}
+    {% if run.status == "COMPLETED" %}
+        <!-- Vega-Embed (CDN — loaded only on this page) -->
+        <script src="https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/vega-embed@6.26.0/build/vega-embed.min.js"></script>
+    {% endif %}
+{% endblock extra_head %}
 {% block breadcrumbs %}
     <div class="breadcrumbs text-sm px-4 pt-4">
         <ul>
@@ -136,6 +144,52 @@
                     </div>
                 </div>
             {% endif %}
+            <!-- Visual Diagnostics -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">Visual Diagnostics</h2>
+                    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mt-3">
+                        <!-- Score distribution -->
+                        <div>
+                            <h3 class="text-sm font-semibold mb-2 text-base-content/70">Score Distribution</h3>
+                            <div id="chart-score-distribution"
+                                 class="chart-container"
+                                 data-chart-url="{% url 'training:chart_score_distribution' run.pk %}"
+                                 aria-label="Score distribution chart"
+                                 role="img">{% include "training/partials/chart_skeleton.html" %}</div>
+                        </div>
+                        <!-- Confusion matrix -->
+                        <div>
+                            <h3 class="text-sm font-semibold mb-2 text-base-content/70">Confusion Matrix</h3>
+                            <div id="chart-confusion-matrix"
+                                 class="chart-container"
+                                 data-chart-url="{% url 'training:chart_confusion_matrix' run.pk %}"
+                                 aria-label="Confusion matrix chart"
+                                 role="img">{% include "training/partials/chart_skeleton.html" %}</div>
+                        </div>
+                        <!-- Per-class metrics -->
+                        <div>
+                            <h3 class="text-sm font-semibold mb-2 text-base-content/70">Per-Class Metrics</h3>
+                            <div id="chart-class-metrics"
+                                 class="chart-container"
+                                 data-chart-url="{% url 'training:chart_class_metrics' run.pk %}"
+                                 aria-label="Per-class metrics chart"
+                                 role="img">{% include "training/partials/chart_skeleton.html" %}</div>
+                        </div>
+                        <!-- UMAP scatter -->
+                        {% if run.umap_enabled %}
+                            <div>
+                                <h3 class="text-sm font-semibold mb-2 text-base-content/70">UMAP Embedding</h3>
+                                <div id="chart-umap"
+                                     class="chart-container"
+                                     data-chart-url="{% url 'training:chart_umap' run.pk %}"
+                                     aria-label="UMAP scatter chart"
+                                     role="img">{% include "training/partials/chart_skeleton.html" %}</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
             <!-- Backtest section -->
             {% include "training/partials/backtest_section.html" with run=run backtest=run.backtest_result %}
             <!-- Artefacts path -->
@@ -157,3 +211,45 @@
         {% endif %}
     </div>
 {% endblock dashboard_content %}
+{% block extra_js %}
+    {% if run.status == "COMPLETED" %}
+        <script>
+        (function () {
+            var EMBED_OPTS = { actions: false, renderer: "svg", theme: "ggplot2" };
+
+            function showError(el, msg) {
+                el.innerHTML =
+                    '<p class="text-sm text-error p-4">' +
+                    (msg || "Chart unavailable") +
+                    "</p>";
+            }
+
+            function loadChart(container) {
+                var url = container.dataset.chartUrl;
+                if (!url) return;
+                fetch(url, { credentials: "same-origin" })
+                    .then(function (r) {
+                        if (!r.ok) throw new Error("HTTP " + r.status);
+                        return r.json();
+                    })
+                    .then(function (spec) {
+                        if (spec && spec.error) {
+                            showError(container, spec.error);
+                            return;
+                        }
+                        vegaEmbed(container, spec, EMBED_OPTS).catch(function (err) {
+                            showError(container, "Render error: " + err.message);
+                        });
+                    })
+                    .catch(function (err) {
+                        showError(container, "Failed to load chart: " + err.message);
+                    });
+            }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                document.querySelectorAll(".chart-container[data-chart-url]").forEach(loadChart);
+            });
+        }());
+        </script>
+    {% endif %}
+{% endblock extra_js %}

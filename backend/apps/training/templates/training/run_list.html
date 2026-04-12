@@ -2,6 +2,12 @@
 {% block title %}
     Training Runs — {{ dataset.slug }}
 {% endblock title %}
+{% block extra_head %}
+    <!-- Vega-Embed (CDN — for Gini/KS trend and comparison charts) -->
+    <script src="https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6.26.0/build/vega-embed.min.js"></script>
+{% endblock extra_head %}
 {% block breadcrumbs %}
     <div class="breadcrumbs text-sm px-4 pt-4">
         <ul>
@@ -178,5 +184,116 @@
                 </div>
             </div>
         {% endif %}
+        <!-- Gini / KS trend chart -->
+        {% if runs %}
+            <div class="card bg-base-100 border border-base-200 shadow-sm">
+                <div class="card-body">
+                    <h2 class="card-title text-base">Gini &amp; KS Trend</h2>
+                    <p class="text-sm text-base-content/60 mt-1">Backtest Gini and KS across all completed rounds for this dataset.</p>
+                    <div id="chart-gini-trend"
+                         class="chart-container mt-3"
+                         data-chart-url="{% url 'training:chart_gini_trend' dataset.slug %}"
+                         aria-label="Gini and KS trend chart"
+                         role="img">{% include "training/partials/chart_skeleton.html" %}</div>
+                </div>
+            </div>
+            <!-- Multi-run comparison -->
+            <div class="card bg-base-100 border border-base-200 shadow-sm"
+                 x-data="compareRuns()">
+                <div class="card-body">
+                    <div class="flex items-center justify-between gap-4">
+                        <div>
+                            <h2 class="card-title text-base">Compare Runs</h2>
+                            <p class="text-sm text-base-content/60 mt-1">
+                                Select 2–4 completed runs to compare Gini, KS, and F1 Review side-by-side.
+                            </p>
+                        </div>
+                        <button class="btn btn-outline btn-sm"
+                                :disabled="selected.length < 2 || selected.length > 4"
+                                @click="loadComparison">Compare</button>
+                    </div>
+                    <div class="flex flex-wrap gap-2 mt-3">
+                        {% for run in runs %}
+                            {% if run.status == "COMPLETED" and run.backtest_result.status == "COMPLETED" %}
+                                <label class="flex items-center gap-2 cursor-pointer text-sm">
+                                    <input type="checkbox"
+                                           class="checkbox checkbox-sm"
+                                           value="{{ run.pk }}"
+                                           @change="toggle($event)">
+                                    <span class="font-mono">{{ run.label }}</span>
+                                </label>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <div id="chart-compare"
+                         class="chart-container mt-4"
+                         aria-label="Run comparison chart"
+                         role="img"
+                         x-show="chartVisible"></div>
+                </div>
+            </div>
+        {% endif %}
     </div>
 {% endblock dashboard_content %}
+{% block extra_js %}
+    <script>
+    (function () {
+        var EMBED_OPTS = { actions: false, renderer: "svg", theme: "ggplot2" };
+
+        function showError(el, msg) {
+            el.innerHTML = '<p class="text-sm text-error p-4">' + (msg || "Chart unavailable") + "</p>";
+        }
+
+        function loadChart(container) {
+            var url = container.dataset.chartUrl;
+            if (!url) return;
+            fetch(url, { credentials: "same-origin" })
+                .then(function (r) { return r.ok ? r.json() : Promise.reject("HTTP " + r.status); })
+                .then(function (spec) {
+                    if (spec && spec.error) { showError(container, spec.error); return; }
+                    vegaEmbed(container, spec, EMBED_OPTS).catch(function (e) { showError(container, e.message); });
+                })
+                .catch(function (e) { showError(container, String(e)); });
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll(".chart-container[data-chart-url]").forEach(loadChart);
+        });
+    }());
+
+    function compareRuns() {
+        return {
+            selected: [],
+            chartVisible: false,
+            toggle: function (e) {
+                var id = e.target.value;
+                if (e.target.checked) { this.selected.push(id); }
+                else { this.selected = this.selected.filter(function (x) { return x !== id; }); }
+                this.chartVisible = false;
+            },
+            loadComparison: function () {
+                var self = this;
+                var url = "{% url 'training:chart_compare_metrics' %}?run_ids=" + self.selected.join(",");
+                var container = document.getElementById("chart-compare");
+                container.innerHTML = '<div class="animate-pulse h-40 bg-base-200 rounded mt-2"></div>';
+                self.chartVisible = true;
+                fetch(url, { credentials: "same-origin" })
+                    .then(function (r) { return r.ok ? r.json() : Promise.reject("HTTP " + r.status); })
+                    .then(function (spec) {
+                        if (spec && spec.error) {
+                            container.innerHTML = '<p class="text-sm text-error p-4">' + spec.error + "</p>";
+                            return;
+                        }
+                        vegaEmbed(container, spec, { actions: false, renderer: "svg", theme: "ggplot2" })
+                            .catch(function (e) {
+                                container.innerHTML = '<p class="text-sm text-error p-4">' + e.message + "</p>";
+                            });
+                    })
+                    .catch(function (e) {
+                        container.innerHTML = '<p class="text-sm text-error p-4">' + String(e) + "</p>";
+                    });
+            },
+        };
+    }
+    </script>
+{% endblock extra_js %}

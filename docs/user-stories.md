@@ -581,7 +581,7 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [ ] All backtest metrics persisted to a `ModelBacktestResult` record linked to the training run
 - [ ] Admin can compare backtest metrics across multiple training runs in a summary table (DuckDB-backed)
 
-### US-13.4: Review Model Quality with Visual Diagnostics `[ ]`
+### US-13.4: Review Model Quality with Visual Diagnostics `[~]`
 **As an** admin
 **I want to** see graphical quality and risk summaries for a training run
 **So that** I can make an informed, evidence-based decision about whether to promote it
