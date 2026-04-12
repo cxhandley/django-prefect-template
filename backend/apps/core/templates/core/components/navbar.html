@@ -49,6 +49,20 @@
         </div>
         <!-- Navbar end: User menu & notifications -->
         <div class="navbar-end gap-2">
+            <!-- Pipeline backend health indicator -->
+            <div id="backend-health-indicator"
+                 hx-get="{% url 'flows:backend_health' %}"
+                 hx-trigger="load"
+                 hx-target="#backend-health-indicator"
+                 hx-swap="outerHTML"
+                 aria-live="polite"
+                 aria-label="Loading pipeline backend status"
+                 class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-base-200 text-xs font-medium select-none text-base-content/40">
+                <span class="relative flex h-2 w-2" aria-hidden="true">
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-base-content/20"></span>
+                </span>
+                <span>…</span>
+            </div>
             <!-- Notifications dropdown -->
             <div class="dropdown dropdown-end z-50">
                 <button type="button"

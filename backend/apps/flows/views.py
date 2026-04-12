@@ -1167,6 +1167,48 @@ def retry_execution(request, run_id):
     return redirect("flows:execution_detail", run_id=new_run_id)
 
 
+@require_http_methods(["GET"])
+def backend_health(request):
+    """
+    Return an HTML partial showing which pipeline backend is configured and
+    whether it is reachable.
+
+    For the doit backend there is no external service, so health is always
+    reported as OK.  For the Prefect backend a lightweight GET to the Prefect
+    API /health endpoint is made; the result is cached for 30 seconds so that
+    every navbar render does not add latency.
+    """
+    import urllib.error
+    import urllib.request
+
+    from django.core.cache import cache
+
+    backend_name = getattr(settings, "PIPELINE_BACKEND", "doit")
+
+    if backend_name == "prefect":
+        cache_key = "prefect_api_health"
+        healthy = cache.get(cache_key)
+        if healthy is None:
+            try:
+                api_url = getattr(settings, "PREFECT_API_URL", "").rstrip("/")
+                req = urllib.request.Request(f"{api_url}/health", method="GET")
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    healthy = resp.status == 200
+            except Exception:
+                healthy = False
+            cache.set(cache_key, healthy, 30)
+        detail = "Prefect API reachable" if healthy else "Prefect API unreachable"
+    else:
+        healthy = True
+        detail = "local subprocess"
+
+    return render(
+        request,
+        "flows/partials/backend_health_indicator.html",
+        {"backend_name": backend_name, "healthy": healthy, "detail": detail},
+    )
+
+
 @require_http_methods(["POST"])
 def internal_step_status(request):
     """

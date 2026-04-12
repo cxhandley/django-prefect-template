@@ -8,6 +8,7 @@ Covers:
   - PrefectBackend.cancel() calls _cancel_flow_run on external_run_id
   - PrefectBackend.cancel() is safe when external_run_id is absent
   - /internal/step-status/ endpoint: auth, missing fields, updates ExecutionStep
+  - GET /flows/backend-health/ endpoint: doit always healthy, Prefect checks API
 """
 
 import json
@@ -449,3 +450,101 @@ def test_step_status_disabled_when_secret_empty(settings, execution_with_step, d
         HTTP_AUTHORIZATION="Bearer ",
     )
     assert resp.status_code == 403
+
+
+# ─── GET /flows/backend-health/ ──────────────────────────────────────────────
+
+
+@pytest.fixture
+def anon_client():
+    return Client()
+
+
+@pytest.mark.django_db
+def test_backend_health_doit_always_healthy(anon_client, settings):
+    settings.PIPELINE_BACKEND = "doit"
+    resp = anon_client.get("/flows/backend-health/")
+    assert resp.status_code == 200
+    content = resp.content.decode()
+    assert "doit" in content
+    # Green dot: bg-success present, bg-error absent
+    assert "bg-success" in content
+    assert "bg-error" not in content
+
+
+@pytest.mark.django_db
+def test_backend_health_prefect_healthy(anon_client, settings, mocker):
+    settings.PIPELINE_BACKEND = "prefect"
+    settings.PREFECT_API_URL = "http://prefect-server:4200/api"
+
+    # Patch urlopen to simulate a reachable Prefect server
+    mock_resp = mocker.MagicMock()
+    mock_resp.status = 200
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = mocker.MagicMock(return_value=False)
+    mocker.patch("urllib.request.urlopen", return_value=mock_resp)
+
+    # Clear any cached value
+    from django.core.cache import cache
+
+    cache.delete("prefect_api_health")
+
+    resp = anon_client.get("/flows/backend-health/")
+    assert resp.status_code == 200
+    content = resp.content.decode()
+    assert "prefect" in content
+    assert "bg-success" in content
+    assert "bg-error" not in content
+
+
+@pytest.mark.django_db
+def test_backend_health_prefect_unhealthy(anon_client, settings, mocker):
+    settings.PIPELINE_BACKEND = "prefect"
+    settings.PREFECT_API_URL = "http://prefect-server:4200/api"
+
+    # Patch urlopen to simulate an unreachable Prefect server
+    mocker.patch("urllib.request.urlopen", side_effect=OSError("connection refused"))
+
+    from django.core.cache import cache
+
+    cache.delete("prefect_api_health")
+
+    resp = anon_client.get("/flows/backend-health/")
+    assert resp.status_code == 200
+    content = resp.content.decode()
+    assert "prefect" in content
+    assert "bg-error" in content
+    assert "bg-success" not in content
+
+
+@pytest.mark.django_db
+def test_backend_health_prefect_result_is_cached(anon_client, settings, mocker):
+    """Second request within 30 s must not call urlopen again."""
+    settings.PIPELINE_BACKEND = "prefect"
+    settings.PREFECT_API_URL = "http://prefect-server:4200/api"
+
+    from django.core.cache import cache
+
+    cache.delete("prefect_api_health")
+
+    mock_resp = mocker.MagicMock()
+    mock_resp.status = 200
+    mock_resp.__enter__ = lambda s: s
+    mock_resp.__exit__ = mocker.MagicMock(return_value=False)
+    mock_urlopen = mocker.patch("urllib.request.urlopen", return_value=mock_resp)
+
+    anon_client.get("/flows/backend-health/")
+    anon_client.get("/flows/backend-health/")
+
+    # urlopen called exactly once despite two requests
+    assert mock_urlopen.call_count == 1
+
+
+@pytest.mark.django_db
+def test_backend_health_indicator_polls_every_30s(anon_client, settings):
+    """Response HTML must carry the HTMX polling attributes."""
+    settings.PIPELINE_BACKEND = "doit"
+    resp = anon_client.get("/flows/backend-health/")
+    content = resp.content.decode()
+    assert 'hx-trigger="every 30s"' in content
+    assert "hx-get=" in content

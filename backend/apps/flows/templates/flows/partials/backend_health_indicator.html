@@ -1,0 +1,27 @@
+{% comment %}
+Backend health indicator — polled by HTMX every 30 s from navbar.html.
+Rendered by flows:backend_health.  No login required (navbar is public on
+authenticated pages, and the indicator simply reads a Django setting).
+{% endcomment %}
+<div id="backend-health-indicator"
+     hx-get="{% url 'flows:backend_health' %}"
+     hx-trigger="every 30s"
+     hx-target="#backend-health-indicator"
+     hx-swap="outerHTML"
+     class="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-base-200 text-xs font-medium select-none"
+     title="{{ detail }}"
+     aria-label="Pipeline backend: {{ backend_name }}{% if healthy %} — healthy{% else %} — unreachable{% endif %}">
+    {% if healthy %}
+        {# Green pulsing dot #}
+        <span class="relative flex h-2 w-2" aria-hidden="true">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
+        </span>
+    {% else %}
+        {# Solid red dot — no pulse when unreachable #}
+        <span class="relative flex h-2 w-2" aria-hidden="true">
+            <span class="relative inline-flex rounded-full h-2 w-2 bg-error"></span>
+        </span>
+    {% endif %}
+    <span class="text-base-content/70">{{ backend_name }}</span>
+</div>
