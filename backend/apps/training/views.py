@@ -2,8 +2,10 @@ import csv
 import io
 import random
 
+from apps.flows.models import ScoringModel
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import StreamingHttpResponse
+from django.db import transaction
+from django.http import HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
@@ -11,6 +13,7 @@ from .models import (
     BacktestStatus,
     DatasetStatus,
     ModelBacktestResult,
+    ModelPromotion,
     ModelTrainingRun,
     OptimisationTarget,
     TrainingDataset,
@@ -19,6 +22,19 @@ from .models import (
 from .services.analytics import TrainingAnalytics
 from .services.charts import TrainingCharts
 from .tasks import generate_training_dataset_task, run_model_backtest_task, run_model_training_task
+
+
+def _next_scoring_model_version(current_version: str | None) -> str:
+    """Return the next minor version string (e.g. '1.0' → '1.1')."""
+    if not current_version:
+        return "1.0"
+    parts = current_version.rsplit(".", 1)
+    if len(parts) == 2:
+        try:
+            return f"{parts[0]}.{int(parts[1]) + 1}"
+        except ValueError:
+            pass
+    return f"{current_version}.1"
 
 
 @staff_member_required
@@ -232,9 +248,17 @@ def start_run(request, slug):
 def run_detail(request, run_id):
     """Training run detail page."""
     run = get_object_or_404(
-        ModelTrainingRun.objects.select_related("dataset", "created_by", "backtest_result"),
+        ModelTrainingRun.objects.select_related(
+            "dataset",
+            "created_by",
+            "backtest_result",
+            "promotion",
+            "promotion__resulting_scoring_model",
+            "promotion__promoted_by",
+        ),
         pk=run_id,
     )
+    active_scoring_model = ScoringModel.get_active()
     return render(
         request,
         "training/run_detail.html",
@@ -242,6 +266,10 @@ def run_detail(request, run_id):
             "run": run,
             "dataset": run.dataset,
             "active_page": "training_datasets",
+            "active_scoring_model": active_scoring_model,
+            "next_version": _next_scoring_model_version(
+                active_scoring_model.version if active_scoring_model else None
+            ),
         },
     )
 
@@ -427,3 +455,94 @@ def chart_compare_metrics(request):
     )
     spec = TrainingCharts.multi_run_comparison(runs)
     return _json_spec(spec)
+
+
+# ── BL-036: Model Promotion ───────────────────────────────────────────────────
+
+
+@staff_member_required
+@require_http_methods(["POST"])
+def promote_run(request, run_id):
+    run = get_object_or_404(
+        ModelTrainingRun.objects.select_related("dataset", "created_by", "backtest_result"),
+        pk=run_id,
+    )
+    backtest = getattr(run, "backtest_result", None)
+
+    if not backtest or backtest.status != BacktestStatus.COMPLETED:
+        return HttpResponse(status=409)
+
+    def _promote_ctx(r, bt):
+        active = ScoringModel.get_active()
+        return {
+            "run": r,
+            "backtest": bt,
+            "active_scoring_model": active,
+            "next_version": _next_scoring_model_version(active.version if active else None),
+        }
+
+    # Already promoted — return current state.
+    if hasattr(run, "promotion"):
+        run.refresh_from_db()
+        return render(
+            request, "training/partials/promote_section.html", _promote_ctx(run, backtest)
+        )
+
+    notes = request.POST.get("notes", "").strip()
+
+    with transaction.atomic():
+        current_active = ScoringModel.get_active()
+        new_version = _next_scoring_model_version(
+            current_active.version if current_active else None
+        )
+        new_model = ScoringModel.objects.create(
+            version=new_version,
+            description=f"Promoted from training run '{run.label}' (dataset: {run.dataset.slug})",
+            weights=run.candidate_weights,
+            thresholds=run.candidate_thresholds,
+            is_active=True,
+            created_by=request.user,
+        )
+        ModelPromotion.objects.create(
+            training_run=run,
+            resulting_scoring_model=new_model,
+            promoted_by=request.user,
+            notes=notes,
+        )
+
+    run.refresh_from_db()
+    return render(request, "training/partials/promote_section.html", _promote_ctx(run, backtest))
+
+
+@staff_member_required
+def training_history(request):
+    """List all ModelTrainingRun records across all datasets, sortable by metric columns."""
+    valid_sorts = {
+        "created_at": "-created_at",
+        "-created_at": "created_at",
+        "gini": "-backtest_result__gini",
+        "-gini": "backtest_result__gini",
+        "ks": "-backtest_result__ks_statistic",
+        "-ks": "backtest_result__ks_statistic",
+        "f1": "-backtest_result__f1_review",
+        "-f1": "backtest_result__f1_review",
+    }
+    sort_param = request.GET.get("sort", "created_at")
+    db_sort = valid_sorts.get(sort_param, "-created_at")
+
+    runs = ModelTrainingRun.objects.select_related(
+        "dataset",
+        "created_by",
+        "backtest_result",
+        "promotion",
+        "promotion__resulting_scoring_model",
+    ).order_by(db_sort)
+    return render(
+        request,
+        "training/run_history.html",
+        {
+            "runs": runs,
+            "sort_by": sort_param,
+            "active_page": "training_history",
+        },
+    )

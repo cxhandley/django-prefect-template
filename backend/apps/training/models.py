@@ -226,3 +226,33 @@ class ModelBacktestResult(models.Model):
     @property
     def is_terminal(self) -> bool:
         return self.status in (BacktestStatus.COMPLETED, BacktestStatus.FAILED)
+
+
+class ModelPromotion(models.Model):
+    """Audit record created when a training run is promoted to the live scoring model."""
+
+    training_run = models.OneToOneField(
+        ModelTrainingRun,
+        on_delete=models.CASCADE,
+        related_name="promotion",
+    )
+    resulting_scoring_model = models.ForeignKey(
+        "flows.ScoringModel",
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="training_promotion",
+    )
+    promoted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="model_promotions",
+    )
+    promoted_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, help_text="Optional admin rationale for promotion.")
+
+    class Meta:
+        ordering = ["-promoted_at"]
+
+    def __str__(self):
+        return f"Promotion of '{self.training_run.label}' → ScoringModel v{self.resulting_scoring_model.version if self.resulting_scoring_model else '?'}"

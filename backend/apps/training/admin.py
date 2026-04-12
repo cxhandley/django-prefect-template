@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import ModelBacktestResult, ModelTrainingRun, TrainingDataset
+from .models import ModelBacktestResult, ModelPromotion, ModelTrainingRun, TrainingDataset
 
 
 @admin.register(TrainingDataset)
@@ -75,3 +75,10 @@ class ModelBacktestResultAdmin(admin.ModelAdmin):
         "error_message",
     )
     raw_id_fields = ("training_run",)
+
+
+@admin.register(ModelPromotion)
+class ModelPromotionAdmin(admin.ModelAdmin):
+    list_display = ("training_run", "resulting_scoring_model", "promoted_by", "promoted_at")
+    readonly_fields = ("promoted_at", "resulting_scoring_model")
+    raw_id_fields = ("training_run", "promoted_by")
