@@ -1,20 +1,27 @@
 """
 Altair chart spec builders for model training diagnostics.
 
-All S3-backed charts read data via DuckDB (no raw file bytes loaded into
-Django memory). DB-backed charts build specs purely from ORM data.
+S3-backed charts (score distribution, UMAP) read Parquet files via polars +
+s3fs — the same pattern used in Celery tasks — so no DuckDB httpfs extension
+is required in the web process.  DB-backed charts build specs purely from ORM
+data and are exposed as static methods (no class instantiation needed).
 
 Usage::
 
+    # S3-backed (needs credentials):
     with TrainingCharts() as charts:
         spec = charts.umap_scatter(run)
         return JsonResponse(spec)
+
+    # DB-backed (no context manager needed):
+    spec = TrainingCharts.confusion_matrix_heatmap(backtest)
+    return JsonResponse(spec)
 """
 
 import altair as alt
+import polars as pl
+import s3fs
 from django.conf import settings
-
-from .analytics import TrainingAnalytics
 
 # Outcome palette consistent with the UI badge colours.
 _LABEL_DOMAIN = ["Approved", "Review", "Declined"]
@@ -24,33 +31,50 @@ _LABEL_RANGE = ["#22c55e", "#f59e0b", "#ef4444"]
 alt.data_transformers.disable_max_rows()
 
 
-class TrainingCharts(TrainingAnalytics):
-    """
-    Extends TrainingAnalytics with Altair chart builders.
+def _make_fs() -> s3fs.S3FileSystem:
+    """Return an s3fs filesystem configured from Django settings."""
+    endpoint = getattr(settings, "AWS_S3_ENDPOINT_URL", None) or ""
+    return s3fs.S3FileSystem(
+        key=settings.AWS_ACCESS_KEY_ID,
+        secret=settings.AWS_SECRET_ACCESS_KEY,
+        endpoint_url=endpoint,
+        use_ssl=False,
+    )
 
-    Inherits the DuckDB connection that already has the S3 secret configured,
-    so all ``read_parquet('s3://...')`` calls work without extra setup.
+
+class TrainingCharts:
     """
+    Altair chart spec builders for training diagnostics.
+
+    S3 reads use polars + s3fs (no DuckDB httpfs extension required).
+    Static methods build specs from ORM data without any I/O.
+    """
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _s3(self, *parts: str) -> str:
-        """Return a fully-qualified s3:// path for DuckDB read_parquet."""
-        key = "/".join(p.strip("/") for p in parts)
-        return f"s3://{settings.DATA_LAKE_BUCKET}/{key}"
+    def _s3_key(self, *parts: str) -> str:
+        """Return the S3 key (without bucket prefix) for a path."""
+        return "/".join(p.strip("/") for p in parts)
 
-    def _parquet_to_records(self, s3_path: str, query: str = "SELECT * FROM src") -> list[dict]:
+    def _parquet_to_records(self, *path_parts: str) -> list[dict]:
         """
-        Read a Parquet file from S3 via DuckDB and return a list of dicts.
+        Read a Parquet file from S3 via polars + s3fs and return a list of dicts.
 
         Args:
-            s3_path: Full ``s3://…`` path.
-            query:   SQL that references the CTE alias ``src``.
+            path_parts: Path segments under the data-lake bucket.
         """
-        sql = f"WITH src AS (SELECT * FROM read_parquet('{s3_path}')) {query}"
-        rel = self.conn.execute(sql)
-        cols = [d[0] for d in rel.description]
-        return [dict(zip(cols, row, strict=True)) for row in rel.fetchall()]
+        key = self._s3_key(*path_parts)
+        full_path = f"{settings.DATA_LAKE_BUCKET}/{key}"
+        fs = _make_fs()
+        with fs.open(full_path, "rb") as fh:
+            df = pl.read_parquet(fh)
+        return df.to_dicts()
 
     # ── Chart 1: UMAP scatter ─────────────────────────────────────────────────
 
@@ -63,9 +87,8 @@ class TrainingCharts(TrainingAnalytics):
         if not run.umap_enabled or not run.artefacts_s3_path:
             return {"error": "UMAP not computed for this run"}
 
-        s3_path = self._s3(run.artefacts_s3_path, "umap.parquet")
         try:
-            records = self._parquet_to_records(s3_path)
+            records = self._parquet_to_records(run.artefacts_s3_path, "umap.parquet")
         except Exception as exc:
             return {"error": f"Could not load UMAP data: {exc}"}
 
@@ -104,9 +127,8 @@ class TrainingCharts(TrainingAnalytics):
         if not backtest or backtest.status != BacktestStatus.COMPLETED:
             return {"error": "Backtest not yet completed"}
 
-        s3_path = self._s3(backtest.artefacts_s3_path, "test_scores.parquet")
         try:
-            records = self._parquet_to_records(s3_path)
+            records = self._parquet_to_records(backtest.artefacts_s3_path, "test_scores.parquet")
         except Exception as exc:
             return {"error": f"Could not load score data: {exc}"}
 
@@ -166,7 +188,8 @@ class TrainingCharts(TrainingAnalytics):
 
     # ── Chart 3: Confusion matrix heatmap ────────────────────────────────────
 
-    def confusion_matrix_heatmap(self, backtest) -> dict:
+    @staticmethod
+    def confusion_matrix_heatmap(backtest) -> dict:
         """
         3×3 confusion matrix heatmap with cell count and row-normalised
         percentage text overlays.
@@ -247,7 +270,8 @@ class TrainingCharts(TrainingAnalytics):
 
     # ── Chart 4: Per-class precision / recall / F1 grouped bar ───────────────
 
-    def class_metrics_bar(self, backtest) -> dict:
+    @staticmethod
+    def class_metrics_bar(backtest) -> dict:
         """
         Grouped bar chart: x=class, colour=metric type, y=value [0–1].
 

@@ -215,7 +215,7 @@
     {% if run.status == "COMPLETED" %}
         <script>
         (function () {
-            var EMBED_OPTS = { actions: false, renderer: "svg", theme: "ggplot2" };
+            var EMBED_OPTS = { actions: false, renderer: "svg" };
 
             function showError(el, msg) {
                 el.innerHTML =
@@ -227,6 +227,9 @@
             function loadChart(container) {
                 var url = container.dataset.chartUrl;
                 if (!url) return;
+                // Ensure vegaEmbed can measure a non-zero container width
+                // before the grid has finished painting its first frame.
+                if (!container.style.width) { container.style.width = "100%"; }
                 fetch(url, { credentials: "same-origin" })
                     .then(function (r) {
                         if (!r.ok) throw new Error("HTTP " + r.status);

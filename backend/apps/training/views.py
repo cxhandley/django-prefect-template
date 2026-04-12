@@ -392,18 +392,14 @@ def chart_score_distribution(request, run_id):
 def chart_confusion_matrix(request, run_id):
     run = get_object_or_404(ModelTrainingRun.objects.select_related("backtest_result"), pk=run_id)
     backtest = getattr(run, "backtest_result", None)
-    with TrainingCharts() as charts:
-        spec = charts.confusion_matrix_heatmap(backtest)
-    return _json_spec(spec)
+    return _json_spec(TrainingCharts.confusion_matrix_heatmap(backtest))
 
 
 @staff_member_required
 def chart_class_metrics(request, run_id):
     run = get_object_or_404(ModelTrainingRun.objects.select_related("backtest_result"), pk=run_id)
     backtest = getattr(run, "backtest_result", None)
-    with TrainingCharts() as charts:
-        spec = charts.class_metrics_bar(backtest)
-    return _json_spec(spec)
+    return _json_spec(TrainingCharts.class_metrics_bar(backtest))
 
 
 @staff_member_required

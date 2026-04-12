@@ -238,7 +238,7 @@
 {% block extra_js %}
     <script>
     (function () {
-        var EMBED_OPTS = { actions: false, renderer: "svg", theme: "ggplot2" };
+        var EMBED_OPTS = { actions: false, renderer: "svg" };
 
         function showError(el, msg) {
             el.innerHTML = '<p class="text-sm text-error p-4">' + (msg || "Chart unavailable") + "</p>";
@@ -247,6 +247,7 @@
         function loadChart(container) {
             var url = container.dataset.chartUrl;
             if (!url) return;
+            if (!container.style.width) { container.style.width = "100%"; }
             fetch(url, { credentials: "same-origin" })
                 .then(function (r) { return r.ok ? r.json() : Promise.reject("HTTP " + r.status); })
                 .then(function (spec) {
