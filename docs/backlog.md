@@ -257,6 +257,84 @@ Security items are prioritised above features. Both should be resolved before ne
 
 ---
 
+### BL-037 · Pluggable Pipeline Backend — doit / Prefect `L` `[ ]`
+
+**User story:** US-16.1
+**Value:** `PipelineRunner` hardcodes the doit subprocess model. Prefect offers first-class flow/task concepts, a built-in UI, schedule triggers, and richer retry semantics — none of which require touching Django model code. Making the backend pluggable via a `PipelineBackend` protocol lets developers switch orchestrators via a single setting without complecting orchestration strategy with execution tracking.
+
+**Scope:**
+
+*`PipelineBackend` protocol — `backend/apps/flows/backends/`:*
+- `base.py` — `PipelineBackend` protocol (or ABC) with two methods: `run(execution: FlowExecution) -> None` and `cancel(execution: FlowExecution) -> None`
+- `doit.py` — `DoitBackend`: encapsulates the existing `PipelineRunner` subprocess logic unchanged; this is the default
+- `prefect.py` — `PrefectBackend`: maps each `FlowExecution` to a Prefect flow run (Prefect 3.x Python API); maps each Prefect task to an `ExecutionStep`; syncs step status back to Django via a Prefect state hook calling `POST /internal/step-status/` (authenticated by a shared secret, not exposed externally)
+- `PIPELINE_BACKEND` Django setting: `"doit"` (default) or `"prefect"`; `PipelineRunner` instantiates the configured backend — no changes to callers
+
+*Model change — one nullable field only:*
+- `FlowExecution.external_run_id` — `CharField(max_length=64, null=True, blank=True)` — null when using doit, Prefect flow run UUID when using Prefect
+- Migration is non-breaking (nullable, no default required)
+- Execution detail template: show a "View in Prefect" link when `external_run_id` is set (feature-flagged)
+
+*Docker:*
+- `docker-compose.yml` — add `prefect-server` (Prefect 3.x, ephemeral SQLite in dev) and `prefect-worker` services; both start only when `PIPELINE_BACKEND=prefect` is present in the env file
+- `docker-stack.yml` — Prefect server backed by PostgreSQL (separate schema); worker service with `deploy:` replicas key
+
+**Does not complect:**
+- `FlowExecution` and `ExecutionStep` remain authoritative regardless of backend — Prefect is an execution engine, not a source of truth
+- doit remains the default and is entirely unmodified
+- `PIPELINE_BACKEND` is orthogonal to `step_type` (BL-039) — either backend can dispatch Mojo steps
+
+**Docs required before starting:**
+- Flow control diagram: `docs/flow-control/pipeline_backend_dispatch.mmd`
+- Sequence diagram: `docs/sequences/prefect_backend.mmd`
+
+**Depends on:** BL-027 (`ExecutionStep` must exist — complete), BL-031 (live status polling — complete)
+
+---
+
+### BL-039 · Mojo Compute Container — High-Performance Pipeline Sub-tasks `L` `[ ]`
+
+**User story:** US-18.1
+**Value:** Python/Polars notebooks handle most transforms adequately, but SIMD-intensive sub-tasks (large-scale feature normalisation, custom aggregation kernels over millions of rows) are bottlenecked by the Python GIL. Mojo (by Modular) compiles to native SIMD code with Python-compatible syntax. Routing specific steps to an isolated Mojo container — reading input Parquet from S3 and writing output Parquet back — gives pipelines access to near-native performance without polluting the Python environment or changing execution tracking.
+
+**Scope:**
+
+*Model change — one TextChoices field:*
+- `ExecutionStep.step_type` — `TextChoices`: `NOTEBOOK` (default, backwards-compatible) / `MOJO`
+- Migration: `RunPython` to backfill `"notebook"` on all existing rows; nullable until backfill runs, then set `default="notebook"`
+
+*`mojo-compute` Docker service:*
+- Based on `modular/mojo` base image (pinned version tracked in `docker-compose.yml`)
+- Exposes lightweight HTTP API at `POST /execute`: accepts `{"run_id": "...", "script": "compute/<name>.mojo", "s3_input": "s3://...", "s3_output": "s3://..."}`
+- Returns `{"status": "ok", "row_count": N, "duration_ms": N}` on success; `{"status": "error", "message": "..."}` on failure
+- `GET /health` endpoint used by Docker health check
+- Mojo scripts live in `mojo/` at workspace root; mounted as a read-only volume into the container
+- AWS credentials injected via environment variables (same credential chain as notebooks — no explicit passing, no hardcoded values)
+- Added to `docker-compose.yml` (dev) and `docker-stack.yml` (production)
+
+*Pipeline step dispatch:*
+- `PipelineRunner` (and `PrefectBackend` if BL-037 is active) inspects `ExecutionStep.step_type` before dispatch: `NOTEBOOK` → existing papermill subprocess path; `MOJO` → HTTP POST to `mojo-compute`
+- `started_at`, `completed_at`, `output_s3_path`, `error_message`, and `status` written to `ExecutionStep` identically to notebook steps — no change to the tracking model or UI
+
+*Mojo script conventions (`mojo/`):*
+- Entry point: `fn main() raises` — reads `RUN_ID`, `S3_INPUT`, `S3_OUTPUT` from environment
+- Data I/O: input Parquet from S3 via a thin Python shim (until Mojo has native Parquet support); output Parquet + `result.json` to S3 following the BL-029 protocol
+- Initial candidate step: `normalise.mojo` (feature normalisation over large datasets) — identified at design time; not prescribed here
+
+**Does not complect:**
+- Mojo container has no database access — reads from S3, writes to S3 only
+- Step tracking, status, and result persistence remain entirely in Django/PostgreSQL
+- `step_type` and `PIPELINE_BACKEND` (BL-037) are orthogonal axes — either doit or Prefect can dispatch Mojo steps
+
+**Docs required before starting:**
+- Flow control diagram: `docs/flow-control/mojo_step_dispatch.mmd`
+- Sequence diagram: `docs/sequences/mojo_compute_step.mmd`
+
+**Depends on:** BL-027 (`ExecutionStep` must exist — complete), BL-029 (`result.json` protocol — complete)
+**Optional dependency:** BL-037 (Prefect backend — Mojo steps work with either backend)
+
+---
+
 ## Tier 3 — Scoring Model Training & Promotion (Admin Epic 13)
 
 These five items collectively deliver the end-to-end model-training workflow: synthetic data → optimisation → backtest → visual review → promotion. They must be sequenced in dependency order; parallelism is possible between BL-034 (backtest engine) and BL-035 (charts scaffold) once BL-033 is complete.
@@ -300,7 +378,7 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 
 ---
 
-### BL-033 · Model Training Run — Weight & Threshold Optimisation `L` `[~]`
+### ~~BL-033 · Model Training Run — Weight & Threshold Optimisation~~ `L` ✓ Complete
 
 **User story:** US-13.2
 **Value:** Currently the only way to change scoring weights is to edit a notebook manually. This item gives admins a reproducible, logged optimisation pipeline that searches the weight and threshold space, records every round, and stores artefacts in S3 — so experimentation is data-driven and auditable rather than ad hoc.
@@ -342,7 +420,7 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 
 ---
 
-### BL-034 · Backtest Engine — Held-Out Evaluation `M` `[~]`
+### ~~BL-034 · Backtest Engine — Held-Out Evaluation~~ `M` ✓ Complete
 
 **User story:** US-13.3
 **Value:** Validation metrics from the training fold can be optimistic due to overfit. An independent backtest on the held-out 20 % split provides the real generalisation estimate that determines whether a model is fit for promotion.
@@ -376,7 +454,7 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 
 ---
 
-### BL-035 · Admin Visual Diagnostics — Altair Charts `M` `[~]`
+### ~~BL-035 · Admin Visual Diagnostics — Altair Charts~~ `M` ✓ Complete
 
 **User story:** US-13.4
 **Value:** Numerical metrics alone are insufficient for model review — a chart can reveal score clustering, threshold placement issues, or unexpected class separation that a table of numbers hides. Altair charts rendered via Vega-Embed give admins interactive, shareable diagnostics without server-side image generation.
@@ -428,7 +506,7 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 
 ---
 
-### BL-036 · Model Promotion Workflow `S` `[ ]`
+### ~~BL-036 · Model Promotion Workflow ~~ `S` ✓ Complete
 
 **User story:** US-13.5, US-13.6
 **Value:** Without a formal promotion gate, the only way to update the live model is to edit `ScoringModel` in `/admin/` manually — bypassing the training audit trail entirely. This item wires the training pipeline to the live scoring model so that promotion is a deliberate, logged action with side-by-side evidence.
@@ -462,11 +540,73 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 
 ---
 
+## Tier 2 — Platform Extension
+
+---
+
+### BL-038 · fastMCP Conversational Dashboard Builder `XL` `[ ]`
+
+**User story:** US-17.1, US-17.2, US-17.3
+**Value:** Users currently have no way to build personalised views of their own data without writing code. A conversational dashboard builder backed by a fastMCP server lets users describe what they want in natural language, receive prefab UI components built on the existing design system, and own a persistent, iframe-sandboxed dashboard — without exposing arbitrary script execution or exhausting shared AI API capacity.
+
+> **This item must be decomposed into implementation-ready sub-items before any code is written.** The scope below defines the data structures and the concept boundary; decomposition is the gate.
+
+**Data structures (define these first — Torvalds lens):**
+
+*New models:*
+- `UserDashboard` — `id`, `owner FK → User` (unique, one active dashboard per user), `title`, `is_active BOOLEAN`, `created_at`, `updated_at`
+  - Uniqueness enforced via `unique_together = [("owner",)]` on `is_active=True` (partial unique index via migration)
+- `DashboardWidget` — `id`, `dashboard FK → UserDashboard`, `widget_type TextChoices` (`METRIC_CARD` / `LINE_CHART` / `BAR_CHART` / `TABLE` / `SCORE_DISTRIBUTION`), `title`, `config JSONField`, `position_x SMALLINT`, `position_y SMALLINT`, `width SMALLINT`, `height SMALLINT`, `created_at`
+  - `config` schema is validated per `widget_type` in `clean()` — no untyped blobs at the widget level; the allowed config keys are defined per type in a constants module
+  - Data source for each widget is scoped to `request.user`'s own `FlowExecution` / `PredictionResult` records — enforced at the API level, not via model FK (avoids complecting dashboard layout with execution ownership)
+- `McpSession` — `id`, `user FK → User`, `tokens_used INT`, `tokens_budget INT`, `started_at`, `ended_at (nullable)`
+  - Session-scoped; a new row per conversation. `tokens_budget` defaults to `MCP_SESSION_TOKEN_BUDGET` Django setting (configurable per-user via admin override on a `UserProfile` field)
+
+*fastMCP server — `mcp-server` Docker service:*
+- Python service using the `fastmcp` library; runs in its own container
+- Exposes MCP tools: `add_widget`, `update_widget`, `remove_widget`, `list_widgets`, `list_data_sources`, `preview_widget`
+- Each tool call validates against the allowed `widget_type` enum and the per-type config schema — no arbitrary HTML/CSS/JS injection is structurally possible
+- Persists dashboard state by calling the Django internal API (`POST /internal/dashboard/widgets/`) — same shared-secret auth pattern as the Prefect state hook (BL-037)
+- Added to `docker-compose.yml` as `mcp-server`; communicates over the Docker internal network only (not exposed externally)
+
+*Token budget enforcement:*
+- Before each AI dispatch, Django reads `McpSession.tokens_used` and compares against `tokens_budget`
+- Returns a structured `{"error": "budget_exhausted", "used": N, "budget": N}` response — not an exception — when budget is hit
+- Token usage reported in the chat panel as a visual indicator (e.g. `12 400 / 32 000 tokens used`)
+- Admin can adjust per-user budget via a `UserProfile.mcp_token_budget` override field (nullable; falls back to the global setting)
+
+*Sandboxed iframe rendering:*
+- Dashboard grid served at `GET /dashboard/render/<id>/` — minimal HTML with no nav, no forms, no HTMX outside the iframe
+- Host page embeds it as `<iframe sandbox="allow-scripts allow-same-origin" src="/dashboard/render/<id>/">` with CSP `frame-src 'self'`
+- Render endpoint sets its own strict CSP: `script-src 'self'`; no `unsafe-inline`; no external origins
+- Widget data served via scoped JSON endpoints (`GET /api/widgets/<id>/data/`) consumed by client-side Vega-Lite specs — no raw query strings exposed to the browser
+
+*Conversational interface:*
+- Chat panel at `GET /dashboard/` alongside the iframe; messages sent via HTMX POST to `POST /dashboard/chat/`
+- Django view checks token budget, forwards to the MCP server session, streams AI response back as SSE
+- Chat history is session-scoped only — not persisted to the database
+
+**Does not complect:**
+- `UserDashboard` / `DashboardWidget` are layout state owned by the user; they read from `FlowExecution` data but never write to it
+- `McpSession` token tracking is a separate concern from dashboard persistence — budget exhaustion does not affect the existing dashboard
+- The iframe sandbox boundary ensures user-defined layout cannot affect the host page DOM or execute scripts in the host context
+- The MCP server has no direct database access — all persistence flows through the Django internal API
+
+**Docs required before decomposition:**
+- Wireframe: `docs/wireframes/conversational_dashboard.excalidraw`
+- Sequence diagram: `docs/sequences/mcp_dashboard_chat.mmd` — covers chat POST → budget check → MCP dispatch → tool call → Django internal API → SSE response
+- Flow control diagram: `docs/flow-control/mcp_token_budget.mmd`
+- Threat model: `docs/security/mcp_sandbox_threat_model.md` — iframe CSP analysis, MCP tool injection risks, data-scoping guarantees
+
+**Depends on:** BL-035 (Altair chart infrastructure reused for chart widgets), BL-024 (DataTable component reused for table widgets)
+
+---
+
 ## Tier 4 — Developer Experience
 
 ---
 
-### BL-024 · Reusable Advanced DataTable Component `L` `[ ]`
+### ~~BL-024 · Reusable Advanced DataTable Component~~ `L` `[ ]`
 
 **User story:** US-6.1
 **Value:** Every list view (execution history, admin dashboard, notification list, user management) duplicates filter, sort, and pagination logic. A single reusable DataTable component eliminates that duplication and delivers consistent UX across all tables.

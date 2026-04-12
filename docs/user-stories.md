@@ -626,6 +626,84 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ---
 
+## Epic 16: Pluggable Pipeline Orchestration `[ ]`
+
+### US-16.1: Use Prefect as an Alternative Pipeline Backend `[ ]`
+**As a** developer
+**I want to** configure Prefect as a drop-in alternative to doit for pipeline execution
+**So that** I can use Prefect's native UI, scheduling, and retry semantics without changing any Django model or tracking logic
+
+**Acceptance Criteria:**
+- [ ] A `PIPELINE_BACKEND` Django setting switches between `"doit"` (default, unchanged behaviour) and `"prefect"` — no other code change required for the swap
+- [ ] `PipelineRunner` dispatches to a `PipelineBackend` protocol; `DoitBackend` encapsulates the existing subprocess logic; `PrefectBackend` implements the same interface using the Prefect Python API
+- [ ] Each `FlowExecution` maps to a Prefect flow run; the Prefect flow run UUID is stored on `FlowExecution.external_run_id` (nullable — null when using doit)
+- [ ] Each Prefect task maps to an `ExecutionStep`; step status (`RUNNING` / `COMPLETED` / `FAILED`) is written back to `ExecutionStep` via a Prefect state hook — identical fields to the doit path
+- [ ] A Prefect flow run can be cancelled via the existing `cancel` view; `PrefectBackend.cancel()` calls the Prefect API with the stored `external_run_id`
+- [ ] `docker-compose.yml` includes an optional `prefect-server` and `prefect-worker` service pair; both are no-ops unless `PIPELINE_BACKEND=prefect` is set
+- [ ] All `FlowExecution` / `ExecutionStep` fields remain identical regardless of backend — the abstraction is in the service layer only
+
+---
+
+## Epic 17: Conversational Dashboard Builder `[ ]`
+
+> Users own a personal dashboard they build conversationally. A fastMCP server exposes prefab UI tools to an AI; the result is rendered in a sandboxed iframe. Token limits protect shared API capacity. This epic will be decomposed into implementation-ready BL items once wireframes and threat model are approved.
+
+### US-17.1: Build a Personal Dashboard by Describing It `[ ]`
+**As a** user
+**I want to** describe the charts and metrics I care about in natural language
+**So that** I can build and own a custom dashboard view of my data without writing code or configuring anything technical
+
+**Acceptance Criteria:**
+- [ ] A "My Dashboard" page presents a chat panel alongside a live preview iframe
+- [ ] User messages are forwarded to an AI (via a fastMCP session); the AI calls prefab MCP tools (`add_widget`, `update_widget`, `remove_widget`) to build the dashboard
+- [ ] All available widgets are prefab (`METRIC_CARD`, `LINE_CHART`, `BAR_CHART`, `TABLE`, `SCORE_DISTRIBUTION`) — the AI cannot inject arbitrary HTML, CSS, or script content
+- [ ] Each widget's data source is drawn from the user's own `FlowExecution` and `PredictionResult` records — the AI cannot request data from other users
+- [ ] Dashboard state persists across sessions via a `UserDashboard` + `DashboardWidget` model; one active dashboard per user
+- [ ] User can reset their dashboard to empty from the settings page
+
+### US-17.2: Dashboard Rendered in a Sandboxed Iframe `[ ]`
+**As a** platform operator
+**I want** user-defined dashboards rendered in a sandboxed iframe with strict Content Security Policy
+**So that** no user-defined content can execute arbitrary scripts or affect the host page
+
+**Acceptance Criteria:**
+- [ ] Dashboard grid is served from a dedicated URL (`/dashboard/render/<id>/`) with no navigation, no forms, and no HTMX outside the iframe
+- [ ] The `<iframe>` carries `sandbox="allow-scripts allow-same-origin"` and the parent page sets `Content-Security-Policy: frame-src 'self'`
+- [ ] The render endpoint sets its own strict CSP: `script-src 'self'`; no `unsafe-inline`; no external origins
+- [ ] Widget data is consumed as JSON from scoped API endpoints — no raw DuckDB query strings are exposed to the client
+
+### US-17.3: Per-User Token Budget for MCP Sessions `[ ]`
+**As a** platform operator
+**I want** each user's conversational dashboard sessions to consume from a configurable token budget
+**So that** no single user can exhaust shared AI API capacity
+
+**Acceptance Criteria:**
+- [ ] A `McpSession` record tracks `tokens_used` and `tokens_budget` per user per session
+- [ ] Default budget is set via `MCP_SESSION_TOKEN_BUDGET` Django setting; admin can override per user
+- [ ] Before each AI dispatch, remaining budget is checked; a structured error is returned (not an exception) when budget is exhausted
+- [ ] Budget consumption is visible to the user as a usage indicator in the chat panel
+- [ ] Exhausted sessions can be reset by the user (starting a new session) or by an admin
+
+---
+
+## Epic 18: High-Performance Compute (Mojo) `[ ]`
+
+### US-18.1: Define Pipeline Steps That Execute Mojo Scripts `[ ]`
+**As a** developer
+**I want to** mark a pipeline step as a Mojo execution target
+**So that** I can use Mojo's SIMD and parallelism for compute-heavy transforms without changing how step status, results, or errors are tracked in Django
+
+**Acceptance Criteria:**
+- [ ] `ExecutionStep.step_type` TextChoices: `NOTEBOOK` (default, backwards-compatible) / `MOJO`
+- [ ] A `mojo-compute` Docker service runs a lightweight HTTP API accepting `{"run_id", "script", "s3_input", "s3_output"}`; Mojo scripts live in `mojo/` at workspace root
+- [ ] `PipelineRunner` dispatches to the Mojo container via HTTP when `step_type == MOJO`; all other steps use the existing papermill path — no change to callers
+- [ ] Mojo scripts follow the `result.json` protocol (BL-029): write `result.json` to the step's S3 output path on completion
+- [ ] `ExecutionStep` fields (`started_at`, `completed_at`, `output_s3_path`, `error_message`, `status`) are populated identically to notebook steps — no UI or admin changes required
+- [ ] The Mojo container has no database access; it reads from S3 and writes to S3 only
+- [ ] Migration adding `step_type` is non-breaking: existing rows default to `"notebook"`
+
+---
+
 ## MVP Scope Summary
 
 | Area | Status |
