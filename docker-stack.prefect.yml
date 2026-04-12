@@ -1,0 +1,91 @@
+# Swarm stack override — Prefect pipeline backend (production)
+#
+# Adds Prefect server and worker services to the base production stack.
+# Deploy alongside docker-stack.yml when PIPELINE_BACKEND=prefect:
+#
+#   docker stack deploy \
+#     -c docker-stack.yml \
+#     -c docker-stack.prefect.yml \
+#     app
+#
+# Prerequisites:
+#   - PREFECT_DB_URL in .env.production — connection string for the Prefect
+#     metadata schema on your PostgreSQL cluster, e.g.:
+#     postgresql+asyncpg://prefect:secret@db:5432/prefect
+#   - PREFECT_INTERNAL_SECRET in .env.production — shared bearer token used
+#     by the worker when calling POST /internal/step-status/ on Django
+#   - GHCR_REPO and IMAGE_TAG already set (reused from base stack)
+
+services:
+  # ─── Prefect Server (PostgreSQL-backed) ────────────────────────────────────
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    command: prefect server start --host 0.0.0.0
+    env_file:
+      - .env.production
+    environment:
+      PREFECT_SERVER_DATABASE_CONNECTION_URL: "${PREFECT_DB_URL}"
+      PREFECT_API_URL: http://prefect-server:4200/api
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  # ─── Prefect Worker ────────────────────────────────────────────────────────
+  prefect-worker:
+    image: ghcr.io/${GHCR_REPO}/app:${IMAGE_TAG:-latest}
+    command: >
+      sh -c "
+        prefect work-pool create django-process-pool --type process --overwrite 2>/dev/null || true &&
+        prefect worker start --pool django-process-pool
+      "
+    env_file:
+      - .env.production
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      PIPELINE_BACKEND: prefect
+      PREFECT_API_URL: http://prefect-server:4200/api
+      DJANGO_INTERNAL_URL: http://web:8000
+      PROJECT_ROOT: /project
+      NOTEBOOKS_DIR: /project/notebooks
+      NOTEBOOK_OUTPUT_DIR: /project/data/notebook_outputs
+    volumes:
+      - notebook_outputs:/project/data/notebook_outputs
+    networks:
+      - app-network
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  # ─── Extend web and celery-worker with Prefect env vars ───────────────────
+  web:
+    environment:
+      PIPELINE_BACKEND: prefect
+      PREFECT_API_URL: http://prefect-server:4200/api
+      DJANGO_INTERNAL_URL: http://web:8000
+
+  celery-worker:
+    environment:
+      PIPELINE_BACKEND: prefect
+      PREFECT_API_URL: http://prefect-server:4200/api
+      DJANGO_INTERNAL_URL: http://web:8000

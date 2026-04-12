@@ -628,19 +628,19 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 
 ## Epic 16: Pluggable Pipeline Orchestration `[ ]`
 
-### US-16.1: Use Prefect as an Alternative Pipeline Backend `[ ]`
+### US-16.1: Use Prefect as an Alternative Pipeline Backend `[~]`
 **As a** developer
 **I want to** configure Prefect as a drop-in alternative to doit for pipeline execution
 **So that** I can use Prefect's native UI, scheduling, and retry semantics without changing any Django model or tracking logic
 
 **Acceptance Criteria:**
-- [ ] A `PIPELINE_BACKEND` Django setting switches between `"doit"` (default, unchanged behaviour) and `"prefect"` — no other code change required for the swap
-- [ ] `PipelineRunner` dispatches to a `PipelineBackend` protocol; `DoitBackend` encapsulates the existing subprocess logic; `PrefectBackend` implements the same interface using the Prefect Python API
-- [ ] Each `FlowExecution` maps to a Prefect flow run; the Prefect flow run UUID is stored on `FlowExecution.external_run_id` (nullable — null when using doit)
-- [ ] Each Prefect task maps to an `ExecutionStep`; step status (`RUNNING` / `COMPLETED` / `FAILED`) is written back to `ExecutionStep` via a Prefect state hook — identical fields to the doit path
-- [ ] A Prefect flow run can be cancelled via the existing `cancel` view; `PrefectBackend.cancel()` calls the Prefect API with the stored `external_run_id`
-- [ ] `docker-compose.yml` includes an optional `prefect-server` and `prefect-worker` service pair; both are no-ops unless `PIPELINE_BACKEND=prefect` is set
-- [ ] All `FlowExecution` / `ExecutionStep` fields remain identical regardless of backend — the abstraction is in the service layer only
+- [x] A `PIPELINE_BACKEND` Django setting switches between `"doit"` (default, unchanged behaviour) and `"prefect"` — no other code change required for the swap
+- [x] `PipelineRunner` dispatches to a `PipelineBackend` protocol; `DoitBackend` encapsulates the existing subprocess logic; `PrefectBackend` implements the same interface using the Prefect Python API
+- [x] Each `FlowExecution` maps to a Prefect flow run; the Prefect flow run UUID is stored on `FlowExecution.external_run_id` (nullable — null when using doit)
+- [x] Each Prefect task maps to an `ExecutionStep`; step status (`RUNNING` / `COMPLETED` / `FAILED`) is written back to `ExecutionStep` via a Prefect state hook — identical fields to the doit path
+- [x] A Prefect flow run can be cancelled via the existing `cancel` view; `PrefectBackend.cancel()` calls the Prefect API with the stored `external_run_id`
+- [x] `docker-compose.yml` includes an optional `prefect-server` and `prefect-worker` service pair; both are no-ops unless `PIPELINE_BACKEND=prefect` is set
+- [x] All `FlowExecution` / `ExecutionStep` fields remain identical regardless of backend — the abstraction is in the service layer only
 
 ---
 

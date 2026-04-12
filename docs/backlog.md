@@ -257,7 +257,7 @@ Security items are prioritised above features. Both should be resolved before ne
 
 ---
 
-### BL-037 · Pluggable Pipeline Backend — doit / Prefect `L` `[ ]`
+### BL-037 · Pluggable Pipeline Backend — doit / Prefect `L` `[~]`
 
 **User story:** US-16.1
 **Value:** `PipelineRunner` hardcodes the doit subprocess model. Prefect offers first-class flow/task concepts, a built-in UI, schedule triggers, and richer retry semantics — none of which require touching Django model code. Making the backend pluggable via a `PipelineBackend` protocol lets developers switch orchestrators via a single setting without complecting orchestration strategy with execution tracking.
