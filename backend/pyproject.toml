@@ -48,6 +48,12 @@ dev = [
     "django-stubs==5.2.9",
 ]
 
+# Install when using the Prefect pipeline backend (PIPELINE_BACKEND=prefect)
+prefect = [
+    "prefect>=3.0,<4",
+    "httpx>=0.27",
+]
+
 test = [
     "pytest==8.4.2",
     "pytest-django==4.11.1",

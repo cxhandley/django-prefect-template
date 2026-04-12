@@ -207,6 +207,67 @@ services:
         delay: 5s
         max_attempts: 3
 
+  # ─── Prefect Server (optional — deploy only when PIPELINE_BACKEND=prefect) ──
+  # In production the Prefect server is backed by a dedicated PostgreSQL schema
+  # on the same DB cluster.  Set PREFECT_DB_URL in .env.production.
+  prefect-server:
+    image: prefecthq/prefect:3-latest
+    command: prefect server start --host 0.0.0.0
+    env_file:
+      - .env.production
+    environment:
+      # Use a dedicated schema on the existing PostgreSQL cluster
+      PREFECT_SERVER_DATABASE_CONNECTION_URL: "${PREFECT_DB_URL}"
+      PREFECT_API_URL: http://prefect-server:4200/api
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4200/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  prefect-worker:
+    image: ghcr.io/${GHCR_REPO}/app:${IMAGE_TAG:-latest}
+    command: >
+      sh -c "
+        prefect work-pool create django-process-pool --type process --overwrite 2>/dev/null || true &&
+        prefect worker start --pool django-process-pool
+      "
+    env_file:
+      - .env.production
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      PREFECT_API_URL: http://prefect-server:4200/api
+      DJANGO_INTERNAL_URL: http://web:8000
+      PROJECT_ROOT: /project
+      NOTEBOOKS_DIR: /project/notebooks
+      NOTEBOOK_OUTPUT_DIR: /project/data/notebook_outputs
+    volumes:
+      - notebook_outputs:/project/data/notebook_outputs
+    networks:
+      - app-network
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
   # ─── PostgreSQL backup (run-once service triggered by cron) ───────────────
   # Cron on the manager node:
   #   0 2 * * * docker service update --force app_pg-backup

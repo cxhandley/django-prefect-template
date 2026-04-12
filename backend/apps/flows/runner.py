@@ -1,6 +1,15 @@
 """
-PipelineRunner: invokes doit pipelines (which use papermill internally).
-Used by Celery tasks to execute notebook-based pipelines asynchronously.
+PipelineRunner: entry point for pipeline execution.
+
+Callers (Celery tasks, management commands) call run_pipeline() exactly as
+before.  Internally, run_pipeline() loads the FlowExecution from the database
+and delegates to the configured PipelineBackend:
+
+  - settings.PIPELINE_BACKEND == "doit"    → DoitBackend (default, unchanged)
+  - settings.PIPELINE_BACKEND == "prefect" → PrefectBackend
+
+The backend is responsible for running the pipeline to completion and returning
+a metadata dict.  FlowExecution.status updates remain the caller's responsibility.
 """
 
 import io
@@ -39,21 +48,26 @@ _RESULT_PATH_PATTERNS = {
     "predict_pipeline": "processed/flows/credit-prediction/{run_id}/result.json",
 }
 
+# Map FlowExecution.flow_name → doit task name
+_FLOW_NAME_TO_DOIT_TASK = {
+    "data-processing": "pipeline",
+    "credit-prediction": "predict_pipeline",
+}
+
 
 class PipelineRunner:
     """
-    Runs notebook pipelines via doit + papermill.
+    Runs notebook pipelines via the configured PipelineBackend.
 
-    doit manages task dependencies (ingest → validate → transform → aggregate).
-    Each doit task executes a parameterised notebook via papermill.
+    The public interface (run_pipeline) is unchanged for existing callers.
+    Internally, the backend is selected from settings.PIPELINE_BACKEND.
 
     Result contract: the final notebook step writes a result.json manifest to
-    a known S3 path. PipelineRunner reads this file after the subprocess exits.
+    a known S3 path. The backend reads this file after completion.
 
-    Step tracking: dodo.py writes step marker files to
-    NOTEBOOK_OUTPUT_DIR/{run_id}/steps/ as each notebook starts and finishes.
-    PipelineRunner reads these markers after the subprocess exits and updates
-    ExecutionStep records in the database.
+    Step tracking: backends are responsible for creating and updating
+    ExecutionStep records.  DoitBackend reads marker files written by dodo.py;
+    PrefectBackend receives callbacks via /internal/step-status/.
     """
 
     def run_pipeline(
@@ -64,19 +78,74 @@ class PipelineRunner:
         doit_task: str = "pipeline",
     ) -> dict[str, Any]:
         """
-        Execute the full data processing pipeline via doit.
+        Execute the full data processing pipeline via the configured backend.
 
         Args:
-            run_id: UUID for this execution (used to name output notebooks).
-            input_s3_path: S3 path to the input file.
+            run_id: UUID for this execution (must match a FlowExecution row).
+            input_s3_path: Full S3 URL to the input file (s3://bucket/key).
             extra_params: Additional parameters merged into PIPELINE_PARAMS.
-            doit_task: doit task name to run (default: "pipeline").
+            doit_task: Pipeline variant ("pipeline" or "predict_pipeline").
+                       Ignored by PrefectBackend, which derives the task from
+                       FlowExecution.flow_name.
 
         Returns:
             Metadata dict read from result.json in S3.
 
         Raises:
-            RuntimeError: if doit exits with a non-zero return code.
+            RuntimeError: if the pipeline fails.
+        """
+        from apps.flows.backends import get_backend
+        from apps.flows.models import FlowExecution
+
+        backend = get_backend()
+
+        # If using the doit backend and extra_params are supplied, handle the
+        # ScoringModel injection here (mirrors the original PipelineRunner path)
+        # so that DoitBackend._run_doit() receives a fully-populated param set.
+        if extra_params is None and doit_task == "predict_pipeline":
+            from apps.flows.models import ScoringModel
+
+            active = ScoringModel.get_active()
+            if active:
+                extra_params = {
+                    "scoring_weights": active.weights,
+                    "scoring_thresholds": active.thresholds,
+                }
+
+        # DoitBackend calls _run_doit() directly; PrefectBackend needs the
+        # FlowExecution.  Both paths resolve through get_backend().run().
+        # For the doit backend we skip the DB lookup and call _run_doit()
+        # directly to preserve the original behaviour exactly.
+        from apps.flows.backends.doit import DoitBackend
+
+        if isinstance(backend, DoitBackend):
+            return self._run_doit(
+                run_id=run_id,
+                input_s3_path=input_s3_path,
+                extra_params=extra_params,
+                doit_task=doit_task,
+            )
+
+        # Non-doit backend: load the FlowExecution and delegate
+        try:
+            execution = FlowExecution.objects.get(flow_run_id=run_id)
+        except FlowExecution.DoesNotExist as exc:
+            raise RuntimeError(f"FlowExecution with flow_run_id={run_id} not found") from exc
+
+        return backend.run(execution)
+
+    # ── doit subprocess path (used by DoitBackend) ───────────────────────────
+
+    def _run_doit(
+        self,
+        run_id: uuid.UUID,
+        input_s3_path: str,
+        extra_params: dict[str, Any] | None = None,
+        doit_task: str = "pipeline",
+    ) -> dict[str, Any]:
+        """
+        Execute the doit subprocess pipeline.  Called by DoitBackend.run()
+        and directly by run_pipeline() when the backend is doit.
         """
         output_dir = Path(settings.NOTEBOOK_OUTPUT_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -89,16 +158,6 @@ class PipelineRunner:
             "s3_endpoint": settings.AWS_S3_ENDPOINT_URL or "",
             "notebook_output_dir": str(output_dir),
         }
-
-        # Inject active ScoringModel into prediction pipelines so the notebook
-        # never needs hardcoded weights/thresholds.
-        if doit_task == "predict_pipeline":
-            from apps.flows.models import ScoringModel
-
-            active = ScoringModel.get_active()
-            if active:
-                params["scoring_weights"] = active.weights
-                params["scoring_thresholds"] = active.thresholds
 
         if extra_params:
             params.update(extra_params)
