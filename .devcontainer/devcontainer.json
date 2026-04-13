@@ -10,7 +10,8 @@
     5432,
     6379,
     9000,
-    5555
+    5555,
+    8080
   ],
   "portsAttributes": {
     "8000": {
@@ -27,6 +28,9 @@
     },
     "5555": {
       "label": "Flower (Celery)"
+    },
+    "8080": {
+      "label": "Mojo Compute"
     }
   },
   "mounts": [
@@ -45,7 +49,9 @@
         "duckdb.duckdb-vscode",
         "bradlc.vscode-tailwindcss",
         "formulahendry.auto-rename-tag",
-        "charliermarsh.ruff"
+        "charliermarsh.ruff",
+        "anthropic.claude-code",
+        "modular-mojotools.vscode-mojo"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/opt/venv/bin/python",
