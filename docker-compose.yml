@@ -210,6 +210,38 @@ services:
     networks:
       - app-network
 
+  # ─── Mojo compute container ─────────────────────────────────────────────────
+  # Runs MOJO-type pipeline steps; dispatched via HTTP POST /execute.
+  # AWS credentials flow through the environment — never passed as parameters.
+  mojo-compute:
+    build:
+      context: ./mojo-compute
+      dockerfile: Dockerfile
+    container_name: django-mojo-compute
+    environment:
+      SCRIPTS_DIR: /mojo
+      PORT: "8080"
+      # AWS credentials injected at runtime via the standard credential chain
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-rustfs}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-rustfs_secret}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      AWS_S3_ENDPOINT_URL: http://rustfs:9000
+    volumes:
+      - ./mojo:/mojo:ro
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    networks:
+      - app-network
+
   # ─── Mailhog (SMTP sink + web UI for dev email testing) ─────────────────────
   mailhog:
     image: mailhog/mailhog:latest

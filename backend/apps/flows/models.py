@@ -16,6 +16,11 @@ class ExecutionStatus(models.TextChoices):
     FAILED = "FAILED", "Failed"
 
 
+class StepType(models.TextChoices):
+    NOTEBOOK = "NOTEBOOK", "Notebook"
+    MOJO = "MOJO", "Mojo"
+
+
 _EXECUTION_STATUS_TRANSITIONS: dict = {
     ExecutionStatus.PENDING: {ExecutionStatus.RUNNING, ExecutionStatus.FAILED},
     ExecutionStatus.RUNNING: {ExecutionStatus.COMPLETED, ExecutionStatus.FAILED},
@@ -305,6 +310,11 @@ class ExecutionStep(models.Model):
     )
     step_name = models.CharField(max_length=100)
     step_index = models.SmallIntegerField()
+    step_type = models.CharField(
+        max_length=20,
+        choices=StepType.choices,
+        default=StepType.NOTEBOOK,
+    )
     status = models.CharField(
         max_length=50,
         choices=ExecutionStatus.choices,

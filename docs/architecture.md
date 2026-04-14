@@ -53,12 +53,32 @@ backend/apps/
 │   │           └── signup_form.html
 │   └── migrations/
 │
+├── flags/                         # Runtime feature toggles
+│   ├── models.py                 # FeatureFlag (rollout %, per-user overrides)
+│   ├── decorators.py             # @feature_flag_required
+│   ├── utils.py                  # is_active_for_user()
+│   ├── templatetags/
+│   │   └── feature_flags.py
+│   └── migrations/
+│
+├── training/                      # Model training runs & datasets
+│   ├── models.py                 # TrainingDataset, TrainingRun
+│   ├── views.py
+│   ├── urls.py
+│   ├── tasks.py                  # Celery: training jobs
+│   ├── services/
+│   └── migrations/
+│
 └── flows/                         # Pipeline & prediction execution
-    ├── models.py                 # FlowExecution
+    ├── models.py                 # FlowExecution, ExecutionStep, PredictionResult
     ├── views.py                  # All pipeline & prediction views
     ├── urls.py
     ├── tasks.py                  # Celery: run_pipeline_task, run_prediction_task
-    ├── runner.py                 # PipelineRunner — doit subprocess wrapper
+    ├── runner.py                 # Step definitions + PipelineRunner entry point
+    ├── backends/
+    │   ├── base.py               # PipelineBackend ABC
+    │   ├── doit.py               # DoitBackend — doit subprocess (default)
+    │   └── prefect.py            # PrefectBackend — Prefect server (optional)
     ├── admin.py
     ├── services/
     │   └── datalake.py           # DuckDB analytics over S3 Parquet
@@ -150,10 +170,13 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     # Third-party
     'storages',
+    'compressor',
     # Local
     'apps.core',
     'apps.accounts',
     'apps.flows',
+    'apps.flags',
+    'apps.training',
 ]
 ```
 
@@ -194,7 +217,9 @@ standalone and swapped into the page — they do **not** extend any base templat
 |-----|----------------|
 | **core** | Base layouts, navbar, sidebar, footer, shared UI components |
 | **accounts** | Login, signup, profile, settings, user-menu dropdown |
-| **flows** | Pipeline upload/execution, prediction form, history, results, Celery tasks, DuckDB analytics |
+| **flows** | Pipeline upload/execution, prediction form, history, results, Celery tasks, DuckDB analytics, pluggable execution backends |
+| **flags** | Runtime feature toggles with per-user and percentage-rollout resolution |
+| **training** | Model training dataset management and training run orchestration |
 
 ## Adding a New Page
 

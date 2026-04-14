@@ -19,25 +19,70 @@ import subprocess
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 import boto3
 from botocore.config import Config
 from django.conf import settings
 
-# Step definitions: (step_name, step_index, s3_output_path_pattern)
-# s3_output_path_pattern uses {run_id} as a placeholder.
-_PIPELINE_STEPS = [
-    ("01_ingest", 0, "processed/flows/data-processing/{run_id}/01_raw.parquet"),
-    ("02_validate", 1, "processed/flows/data-processing/{run_id}/02_validated.parquet"),
-    ("03_transform", 2, "processed/flows/data-processing/{run_id}/03_transformed.parquet"),
-    ("04_aggregate", 3, "processed/flows/data-processing/{run_id}/output.parquet"),
+
+class StepDefinition(NamedTuple):
+    """Immutable descriptor for a single pipeline step."""
+
+    step_name: str
+    step_index: int
+    s3_output_pattern: str  # uses {run_id} placeholder
+    step_type: str = "NOTEBOOK"  # "NOTEBOOK" or "MOJO"
+    doit_task_name: str = ""  # doit task name for individual dispatch (NOTEBOOK steps only)
+
+
+_PIPELINE_STEPS: list[StepDefinition] = [
+    StepDefinition(
+        "01_ingest",
+        0,
+        "processed/flows/data-processing/{run_id}/01_raw.parquet",
+        "NOTEBOOK",
+        "ingest",
+    ),
+    StepDefinition(
+        "02_validate",
+        1,
+        "processed/flows/data-processing/{run_id}/02_validated.parquet",
+        "NOTEBOOK",
+        "validate",
+    ),
+    StepDefinition(
+        "03_transform",
+        2,
+        "processed/flows/data-processing/{run_id}/03_transformed.parquet",
+        "NOTEBOOK",
+        "transform",
+    ),
+    StepDefinition(
+        "04_aggregate",
+        3,
+        "processed/flows/data-processing/{run_id}/output.parquet",
+        "NOTEBOOK",
+        "aggregate",
+    ),
 ]
-_PREDICT_STEPS = [
-    ("predict_01_ingest", 0, "processed/flows/credit-prediction/{run_id}/predict_01_raw.parquet"),
-    ("predict_02_score", 1, "processed/flows/credit-prediction/{run_id}/output.parquet"),
+_PREDICT_STEPS: list[StepDefinition] = [
+    StepDefinition(
+        "predict_01_ingest",
+        0,
+        "processed/flows/credit-prediction/{run_id}/predict_01_raw.parquet",
+        "NOTEBOOK",
+        "predict_ingest",
+    ),
+    StepDefinition(
+        "predict_02_score",
+        1,
+        "processed/flows/credit-prediction/{run_id}/output.parquet",
+        "NOTEBOOK",
+        "predict_score",
+    ),
 ]
-_STEPS_BY_TASK = {
+_STEPS_BY_TASK: dict[str, list[StepDefinition]] = {
     "pipeline": _PIPELINE_STEPS,
     "predict_pipeline": _PREDICT_STEPS,
 }
@@ -68,6 +113,12 @@ class PipelineRunner:
     Step tracking: backends are responsible for creating and updating
     ExecutionStep records.  DoitBackend reads marker files written by dodo.py;
     PrefectBackend receives callbacks via /internal/step-status/.
+
+    Step dispatch: each step carries a step_type ("NOTEBOOK" or "MOJO").
+    NOTEBOOK steps run via papermill/doit.  MOJO steps are dispatched via
+    HTTP POST to the mojo-compute container.  When any MOJO steps are present
+    in a pipeline, steps are dispatched individually in step_index order so
+    that ordering is preserved across mixed-type pipelines.
     """
 
     def run_pipeline(
@@ -146,6 +197,11 @@ class PipelineRunner:
         """
         Execute the doit subprocess pipeline.  Called by DoitBackend.run()
         and directly by run_pipeline() when the backend is doit.
+
+        If all steps are NOTEBOOK type, the existing batch doit dispatch is
+        used (unchanged behaviour).  If any step is MOJO type, steps are
+        dispatched individually in step_index order so that interleaved
+        NOTEBOOK and MOJO steps execute in the correct sequence.
         """
         output_dir = Path(settings.NOTEBOOK_OUTPUT_DIR)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -176,26 +232,137 @@ class PipelineRunner:
         # Create ExecutionStep records (PENDING) before the subprocess starts
         self._create_pending_steps(run_id, doit_task)
 
-        result = subprocess.run(
-            ["python", "-m", "doit", "-f", "dodo.py", "run", doit_task],
-            cwd=project_root,
-            env=env,
-            capture_output=True,
-            text=True,
-            timeout=600,  # 10 minute hard timeout
-        )
+        steps = _STEPS_BY_TASK.get(doit_task, [])
+        has_mojo = any(s.step_type == "MOJO" for s in steps)
 
-        # Read step markers and update ExecutionStep records regardless of outcome
-        self._sync_step_records(run_id, doit_task, output_dir)
-
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"doit pipeline failed (exit {result.returncode}):\n"
-                f"stdout: {result.stdout[-2000:]}\n"
-                f"stderr: {result.stderr[-2000:]}"
+        if not has_mojo:
+            # Fast path: all NOTEBOOK steps — run entire pipeline as one doit batch
+            result = subprocess.run(
+                ["python", "-m", "doit", "-f", "dodo.py", "run", doit_task],
+                cwd=project_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=600,
             )
 
+            # Read step markers and update ExecutionStep records regardless of outcome
+            self._sync_step_records(run_id, doit_task, output_dir)
+
+            if result.returncode != 0:
+                raise RuntimeError(
+                    f"doit pipeline failed (exit {result.returncode}):\n"
+                    f"stdout: {result.stdout[-2000:]}\n"
+                    f"stderr: {result.stderr[-2000:]}"
+                )
+        else:
+            # Mixed pipeline: dispatch each step individually in order
+            for step in steps:
+                if step.step_type == "MOJO":
+                    s3_input = input_s3_path
+                    s3_output = f"s3://{settings.DATA_LAKE_BUCKET}/{step.s3_output_pattern.format(run_id=str(run_id))}"
+                    self._dispatch_mojo_step(run_id, step, s3_input, s3_output)
+                else:
+                    # Run this single notebook step via doit
+                    result = subprocess.run(
+                        ["python", "-m", "doit", "-f", "dodo.py", "run", step.doit_task_name],
+                        cwd=project_root,
+                        env=env,
+                        capture_output=True,
+                        text=True,
+                        timeout=600,
+                    )
+                    self._sync_step_records(
+                        run_id, doit_task, output_dir, step_index=step.step_index
+                    )
+
+                    if result.returncode != 0:
+                        raise RuntimeError(
+                            f"doit step '{step.step_name}' failed (exit {result.returncode}):\n"
+                            f"stdout: {result.stdout[-2000:]}\n"
+                            f"stderr: {result.stderr[-2000:]}"
+                        )
+
         return self._read_result_json(run_id, doit_task)
+
+    # ── Mojo dispatch ─────────────────────────────────────────────────────────
+
+    def _dispatch_mojo_step(
+        self,
+        run_id: uuid.UUID,
+        step: StepDefinition,
+        s3_input: str,
+        s3_output: str,
+    ) -> None:
+        """
+        Dispatch a single MOJO step to the mojo-compute container via HTTP POST.
+
+        Updates ExecutionStep.status/started_at/completed_at/error_message
+        identically to notebook steps.  Raises RuntimeError on failure.
+        """
+        import urllib.error
+        import urllib.request
+
+        from apps.flows.models import ExecutionStep, FlowExecution
+        from django.utils import timezone
+
+        try:
+            execution = FlowExecution.objects.get(flow_run_id=run_id)
+        except FlowExecution.DoesNotExist as exc:
+            raise RuntimeError(f"FlowExecution with flow_run_id={run_id} not found") from exc
+
+        # Mark RUNNING
+        started_at = timezone.now()
+        ExecutionStep.objects.filter(execution=execution, step_index=step.step_index).update(
+            status="RUNNING",
+            started_at=started_at,
+        )
+
+        script_name = f"compute/{step.step_name}.mojo"
+        payload = json.dumps(
+            {
+                "run_id": str(run_id),
+                "script": script_name,
+                "s3_input": s3_input,
+                "s3_output": s3_output,
+            }
+        ).encode()
+
+        mojo_url = settings.MOJO_COMPUTE_URL.rstrip("/")
+        req = urllib.request.Request(
+            f"{mojo_url}/execute",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=600) as resp:
+                body = json.loads(resp.read())
+        except Exception as exc:
+            error_msg = f"mojo-compute unreachable: {exc}"[:2000]
+            ExecutionStep.objects.filter(execution=execution, step_index=step.step_index).update(
+                status="FAILED",
+                completed_at=timezone.now(),
+                error_message=error_msg,
+            )
+            raise RuntimeError(error_msg) from exc
+
+        completed_at = timezone.now()
+
+        if body.get("status") == "ok":
+            ExecutionStep.objects.filter(execution=execution, step_index=step.step_index).update(
+                status="COMPLETED",
+                completed_at=completed_at,
+            )
+        else:
+            error_msg = body.get("message", "Unknown mojo-compute error")[:2000]
+            ExecutionStep.objects.filter(execution=execution, step_index=step.step_index).update(
+                status="FAILED",
+                completed_at=completed_at,
+                error_message=error_msg,
+            )
+            raise RuntimeError(f"mojo-compute step '{step.step_name}' failed: {error_msg}")
 
     # ── Step tracking ─────────────────────────────────────────────────────────
 
@@ -212,21 +379,30 @@ class PipelineRunner:
         except FlowExecution.DoesNotExist:
             return
 
-        for step_name, step_index, s3_pattern in steps:
+        for step in steps:
             ExecutionStep.objects.get_or_create(
                 execution=execution,
-                step_index=step_index,
+                step_index=step.step_index,
                 defaults={
-                    "step_name": step_name,
+                    "step_name": step.step_name,
+                    "step_type": step.step_type,
                     "status": "PENDING",
-                    "output_s3_path": s3_pattern.format(run_id=str(run_id)),
+                    "output_s3_path": step.s3_output_pattern.format(run_id=str(run_id)),
                 },
             )
 
-    def _sync_step_records(self, run_id: uuid.UUID, doit_task: str, output_dir: Path) -> None:
+    def _sync_step_records(
+        self,
+        run_id: uuid.UUID,
+        doit_task: str,
+        output_dir: Path,
+        step_index: int | None = None,
+    ) -> None:
         """
         Read step marker files written by dodo.py and update ExecutionStep rows.
         Marker files live at: output_dir/{run_id}/steps/{index:02d}_{name}_{event}.json
+
+        If step_index is given, only sync that single step (used for individual dispatch).
         """
         from apps.flows.models import ExecutionStep, FlowExecution
 
@@ -243,8 +419,11 @@ class PipelineRunner:
         if not marker_dir.exists():
             return
 
-        for step_name, step_index, _ in steps:
-            prefix = f"{step_index:02d}_{step_name}"
+        for step in steps:
+            if step_index is not None and step.step_index != step_index:
+                continue
+
+            prefix = f"{step.step_index:02d}_{step.step_name}"
 
             started_at = self._read_marker_ts(marker_dir / f"{prefix}_started.json", "started_at")
             completed_file = marker_dir / f"{prefix}_completed.json"
@@ -252,7 +431,9 @@ class PipelineRunner:
 
             if completed_file.exists():
                 completed_at = self._read_marker_ts(completed_file, "completed_at")
-                ExecutionStep.objects.filter(execution=execution, step_index=step_index).update(
+                ExecutionStep.objects.filter(
+                    execution=execution, step_index=step.step_index
+                ).update(
                     status="COMPLETED",
                     started_at=started_at,
                     completed_at=completed_at,
@@ -260,7 +441,9 @@ class PipelineRunner:
             elif failed_file.exists():
                 data = self._read_marker(failed_file)
                 completed_at = self._parse_ts(data.get("completed_at"))
-                ExecutionStep.objects.filter(execution=execution, step_index=step_index).update(
+                ExecutionStep.objects.filter(
+                    execution=execution, step_index=step.step_index
+                ).update(
                     status="FAILED",
                     started_at=started_at,
                     completed_at=completed_at,
@@ -268,7 +451,9 @@ class PipelineRunner:
                 )
             elif started_at is not None:
                 # Started but no completion marker — interrupted mid-step
-                ExecutionStep.objects.filter(execution=execution, step_index=step_index).update(
+                ExecutionStep.objects.filter(
+                    execution=execution, step_index=step.step_index
+                ).update(
                     status="FAILED",
                     started_at=started_at,
                     error_message="Step was interrupted (no completion marker).",

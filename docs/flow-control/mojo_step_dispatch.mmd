@@ -1,0 +1,30 @@
+flowchart TD
+    A([PipelineRunner._run_doit called]) --> B{Any MOJO steps\nin pipeline?}
+
+    B -- No --> C[Batch doit dispatch\npython -m doit run pipeline]
+    C --> D[_sync_step_records\nread marker files]
+    D --> E([Return result.json])
+
+    B -- Yes --> F[Run steps individually\nin step_index order]
+
+    F --> G{step_type?}
+
+    G -- NOTEBOOK --> H[doit run single step\npython -m doit run task_name]
+    H --> I[_sync_step_records\nfor this step only]
+    I --> J{More steps?}
+
+    G -- MOJO --> K[_dispatch_mojo_step\nPOST /execute to mojo-compute]
+    K --> L{HTTP response\nstatus?}
+    L -- ok --> M[Update ExecutionStep\nstatus=COMPLETED\ncompleted_at=now]
+    M --> J
+    L -- error --> N[Update ExecutionStep\nstatus=FAILED\nerror_message from response]
+    N --> O([Raise RuntimeError])
+
+    J -- Yes --> G
+    J -- No --> P[_read_result_json\nfrom S3]
+    P --> E
+
+    style C fill:#d4edda
+    style H fill:#d4edda
+    style K fill:#cce5ff
+    style O fill:#f8d7da

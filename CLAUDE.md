@@ -91,6 +91,23 @@ Add tests before marking the user story complete:
 - `test_services.py` — service layer unit tests
 - Target ≥ 90% coverage on new code
 
+## just commands
+
+This project uses [`just`](https://github.com/casey/just) as a task runner. Always prefer `just` commands over invoking `python manage.py`, `pytest`, or `docker compose` directly.
+
+| Task | Command |
+|------|---------|
+| Run all migrations | `just migrate` |
+| Create migrations for an app | `just makemigrations flows` |
+| Run tests | `just test` |
+| Lint + format | `just fix` |
+| Start all services | `just docker-up` |
+| Django shell | `just shell` |
+
+See the full list with `just --list`.
+
+---
+
 ## Container restarts
 
 The `web` and `celery-worker` containers mount the workspace via a volume, so Python file edits are reflected immediately via Django's auto-reloader. However, some changes require an explicit restart because the auto-reloader does not catch them or stale bytecode (`__pycache__`) can mask the new code:
