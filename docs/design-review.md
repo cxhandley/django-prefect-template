@@ -32,70 +32,34 @@ The consequence: every query, every template, every view has to branch on `flow_
 
 ### 2. `parameters` is a schemaless blob serving two masters
 
-`parameters` (JSONField) currently stores:
+**Partially resolved.** Prediction inputs (`income`, `age`, `credit_score`, `employment_years`) have been migrated to typed fields directly on `FlowExecution`. `PredictionResult` now exists as a typed relation for results (score, classification, confidence). The `parameters` JSONField is kept for backwards compatibility only — it carries a comment "do not add new keys".
 
-- **Prediction inputs** at submission time: `{income, age, credit_score, employment_years}`
-- **Prediction results** after completion: `{..., score, classification, confidence}`
+**Remaining:** `FlowExecution.parameters` still exists and still contains legacy data for older records. New code should not read or write it. The end state (tracked in BL-028) is removing the field once all reads are migrated to `PredictionResult` and the typed input fields.
 
-These are logically separate — inputs are immutable after submission; results are written once on completion. But they are merged into one mutable blob via `.update(parameters={**execution.parameters, "score": ...})`.
+### 3. ~~Status is a string pretending to be a state machine~~ **Resolved**
 
-Consequences:
-- No schema enforcement — a typo in a key silently produces a `None` in the UI
-- No queryability — finding all "Declined" predictions requires `parameters__classification="Declined"` JSON field lookups, which don't use standard indexes
-- No audit trail — there is no record of what the inputs *were* at the time of scoring vs what was updated afterwards
-- The comparison view (`comparison.html`) must know the internal key names to extract values
-
-**Hickey:** inputs and outputs are different values at different points in time. They have been complected into one place.
-**Torvalds:** the right data structure makes the schema explicit and queryable. A `PredictionResult` row with typed columns (`score FLOAT`, `classification VARCHAR`, `confidence FLOAT`) makes every downstream query trivial.
-
-### 3. Status is a string pretending to be a state machine
+`ExecutionStatus` is now a `TextChoices` enum with an explicit transition graph:
 
 ```python
-status = models.CharField(max_length=50, default="PENDING")
+_EXECUTION_STATUS_TRANSITIONS = {
+    PENDING:   {RUNNING, FAILED},
+    RUNNING:   {COMPLETED, FAILED},
+    COMPLETED: set(),
+    FAILED:    set(),
+}
 ```
 
-There are no `choices`. The valid values (`PENDING`, `RUNNING`, `COMPLETED`, `FAILED`) and valid transitions are known only by reading `tasks.py`. Nothing at the data layer prevents:
-
-- Setting status to `"COMPLETED"` while `completed_at` is null
-- Transitioning from `FAILED` back to `RUNNING`
-- A typo producing `"COMPELTED"` that never matches any template branch
-
-The state machine is real — it governs the entire UI polling loop. But it is implicit, unencoded, and unguarded.
-
-**Torvalds:** the state machine is a data structure. Encode it as one.
+All status changes go through `FlowExecution.transition()`, which raises `ValueError` for illegal moves and auto-sets `completed_at`. The state machine is encoded as a data structure.
 
 ---
 
 ## The Missing Entities
 
-Reading the data model (`data-model.mmd`) reveals three entities that the domain clearly needs but that do not exist.
+Three entities were identified as missing. Two have since been added.
 
-### Missing: `ExecutionStep`
+### ~~Missing: `ExecutionStep`~~ **Resolved**
 
-A data processing pipeline has four discrete steps: ingest, validate, transform, aggregate. Currently:
-
-- A pipeline execution is either `PENDING`, `RUNNING`, `COMPLETED`, or `FAILED` — with no visibility into which step is running or which step failed
-- The step-level notebook output files exist in S3 (e.g. `{run_id}_01_ingest.ipynb`) but their status is never surfaced to the application
-- When a pipeline fails at step 3, the user sees "FAILED" with a 2000-character truncated error — they cannot tell that steps 1 and 2 succeeded
-
-The right data structure:
-
-```
-ExecutionStep {
-    execution_id FK → FlowExecution
-    step_name     VARCHAR    -- "ingest" | "validate" | "transform" | "aggregate"
-    step_index    SMALLINT   -- ordering
-    status        TextChoices
-    started_at    DATETIME
-    completed_at  DATETIME
-    output_s3_path VARCHAR   -- path to the step's output notebook
-    error_message TEXT
-}
-```
-
-This structure makes per-step progress trivially displayable, makes failure diagnosis accurate, and makes performance analytics possible ("how long does validation take on average across all runs?").
-
-**Torvalds:** the domain has steps. The data model should too. Without this entity, the complexity of tracking progress is pushed into: the notebook stdout protocol, the UI polling loop, and the truncated error message.
+`ExecutionStep` now exists with `status (TextChoices)`, `step_name`, `step_index`, `step_type (NOTEBOOK|MOJO)`, `started_at`, `completed_at`, `output_s3_path`, and `error_message`. Per-step progress is surfaced in the execution detail view.
 
 ### Missing: `ScoringModel`
 
@@ -128,15 +92,19 @@ ScoringModel {
 
 **Torvalds:** a model version is data. Make it a data structure.
 
-### Missing: `PredictionResult`
+### ~~Missing: `PredictionResult`~~ **Resolved**
 
-Prediction outputs are currently appended to `FlowExecution.parameters`. The right data structure separates them:
+`PredictionResult` now exists as a typed `OneToOne` relation on `FlowExecution` with `score (FLOAT)`, `classification (TextChoices)`, `confidence (FLOAT)`, and `scored_at`. The comparison view joins this relation rather than inspecting the parameters blob.
+
+The `scoring_model FK` is not yet implemented — see Missing: `ScoringModel` below.
+
+The original design:
 
 ```
 PredictionResult {
     id              PK
     execution_id    FK → FlowExecution (OneToOne)
-    scoring_model   FK → ScoringModel
+    scoring_model   FK → ScoringModel (not yet implemented)
     score           FLOAT
     classification  VARCHAR  -- "Approved" | "Review" | "Declined"
     confidence      FLOAT
@@ -152,29 +120,9 @@ With this structure:
 
 ---
 
-## The Notebook ↔ Application Interface
+## ~~The Notebook ↔ Application Interface~~ **Resolved**
 
-`PipelineRunner._extract_metadata()` in `runner.py`:
-
-```python
-for line in reversed(stdout.splitlines()):
-    line = line.strip()
-    if line.startswith("{"):
-        try:
-            return json.loads(line)
-        except json.JSONDecodeError:
-            continue
-return {}
-```
-
-The contract between the notebook and the application is: *print valid JSON as the last line of stdout*. This is fragile:
-- Any library that prints a dict-like string (e.g. a Polars schema repr) can silently produce the wrong metadata
-- The contract is invisible to future notebook authors — it is in a comment (`# IMPORTANT: ...`) not in an interface
-- The channel (stdout) carries both logging noise and structured data — separating them requires the backwards scan
-
-**Hickey:** computation (score the applicant) is complected with signalling (communicate the result to Django). These are separate concerns.
-
-A more robust alternative: notebooks write a `result.json` manifest to a known S3 path (`{run_id}/result.json`). Django reads that path after the subprocess exits. The contract is a file, not a parsing convention.
+The stdout-scraping approach has been replaced. Notebooks now write a `result.json` manifest to a known S3 path (`processed/flows/<pipeline>/{run_id}/result.json`). `PipelineRunner._read_result_json()` reads that file after the subprocess exits. The contract is a file at a predictable path, not a parsing convention over stdout.
 
 ---
 
