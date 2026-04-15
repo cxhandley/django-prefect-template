@@ -51,7 +51,8 @@
         "formulahendry.auto-rename-tag",
         "charliermarsh.ruff",
         "anthropic.claude-code",
-        "modular-mojotools.vscode-mojo"
+        "modular-mojotools.vscode-mojo",
+        "tomoyukim.vscode-mermaid-editor"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/opt/venv/bin/python",

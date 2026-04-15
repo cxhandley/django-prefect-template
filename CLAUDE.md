@@ -244,6 +244,20 @@ See [`docs/design-system.md`](docs/design-system.md) for the full Do/Don't refer
 
 ---
 
+## Mermaid diagrams
+
+Diagrams are rendered with **Mermaid 10.3.0**. Two rules prevent the most common parse errors:
+
+- **No `{` or `}` anywhere in node or label text** (both sequence and flowchart diagrams). In flowcharts `{...}` declares a diamond shape, so curly braces inside `[...]` node text or `-->|...|` edge labels confuse the parser. In sequence diagrams they break arrow label parsing. Rewrite with plain prose: `with token_delta` not `+ {token_delta}`, `is_error=true` not `{is_error: true}`.
+- **No `?` in node text** (flowcharts). Strip trailing question marks from diamond decision labels — the diamond shape already signals a question.
+- **No em dashes `—` in edge labels** (flowcharts). Use a comma or plain hyphen instead: `|Yes, exhausted|` not `|Yes — exhausted|`. Em dashes in edge labels cause the parser to stall and truncate the rest of the diagram.
+
+- **No trailing `/` at the end of a node label** (flowcharts). A slash immediately before the closing `]` breaks the parser. Use a slash mid-label freely (e.g. `/dashboard/chat/\n…` is fine) — only the final character position matters.
+
+Other special characters (`<`, `>`, `[`, `]`, `(`, `)`) are safe in arrow labels. Inline `"..."` inside an unquoted label is also unsafe — avoid embedded quotes.
+
+---
+
 ## Project structure
 
 - `backend/` — Django application (web server + Celery tasks)

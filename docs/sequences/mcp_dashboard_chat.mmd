@@ -1,0 +1,68 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Django as Django (web)
+    participant DB as PostgreSQL
+    participant McpServer as MCP Server (fastmcp)
+    participant ClaudeAPI as Claude API
+
+    User->>Browser: Type message in chat panel
+    Browser->>Django: HTMX POST /dashboard/chat/ with message and session_id
+
+    Django->>DB: SELECT McpSession WHERE user=request.user AND ended_at IS NULL
+    alt No active session
+        Django->>DB: INSERT McpSession with tokens_used=0\nand tokens_budget from UserProfile or MCP_SESSION_TOKEN_BUDGET
+    end
+
+    Django->>DB: READ McpSession.tokens_used and tokens_budget
+    alt tokens_used >= tokens_budget
+        Django-->>Browser: SSE event: budget_exhausted with used and budget counts
+        Browser-->>User: Chat panel shows budget-exhausted message\nwith session reset link
+    else Budget available
+        Django->>McpServer: Forward message and tool context via Docker internal network
+        Note over Django,McpServer: Shared-secret header MCP_INTERNAL_SECRET\nidentical auth pattern to /internal/step-status/ from BL-037
+
+        McpServer->>ClaudeAPI: messages.create with tools:\nadd_widget, update_widget, remove_widget,\nlist_widgets, list_data_sources, preview_widget
+
+        loop Tool call iterations 0..N
+            ClaudeAPI-->>McpServer: stop_reason tool_use with tool_name and tool_input
+            McpServer->>McpServer: Validate widget_type against TextChoices enum\nValidate config keys against per-type allow-list
+
+            alt Valid tool call
+                alt Mutating tool — add, update, or remove
+                    McpServer->>Django: POST /internal/dashboard/widgets/ with shared-secret header
+                    Django->>DB: DashboardWidget INSERT or UPDATE or DELETE
+                    Django-->>McpServer: 200 with widget_id
+                else Read-only tool — list or preview
+                    McpServer->>Django: GET /internal/dashboard/widgets/ with shared-secret header
+                    Django->>DB: SELECT DashboardWidget WHERE dashboard__owner=user
+                    Django-->>McpServer: 200 with widget_type, config, and position list
+                end
+                McpServer-->>ClaudeAPI: tool_result with success content
+            else Invalid widget_type or disallowed config key
+                McpServer-->>ClaudeAPI: tool_result with is_error=true
+                Note over McpServer: Injection blocked structurally — no HTML/JS path exists
+            end
+        end
+
+        ClaudeAPI-->>McpServer: stop_reason end_turn with final text and token usage
+        McpServer-->>Django: SSE stream with text chunks and token_delta
+
+        Django->>DB: McpSession.tokens_used += token_delta
+        Django-->>Browser: SSE stream with text chunks and updated tokens_used and tokens_budget
+        Browser-->>User: Append AI message to chat history\nUpdate token indicator with new usage count
+
+        Note over Browser: If dashboard was mutated, reload iframe:\nGET /dashboard/render/id/ triggered by HTMX
+        Browser->>Django: GET /dashboard/render/id/
+        Django->>DB: SELECT DashboardWidget WHERE dashboard__owner=request.user
+        Django-->>Browser: Minimal HTML grid with no nav and no HTMX outside iframe\nCSP: script-src self, no unsafe-inline
+        Browser-->>User: Updated dashboard visible in sandboxed iframe
+    end
+
+    opt User resets session
+        User->>Browser: Click Start new session
+        Browser->>Django: POST /dashboard/session/reset/
+        Django->>DB: McpSession.ended_at = now() and INSERT new McpSession with tokens_used=0
+        Django-->>Browser: 200 with new_session_id
+        Browser-->>User: Token indicator resets to 0 of budget tokens used
+    end

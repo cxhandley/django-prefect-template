@@ -559,8 +559,13 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 - `DashboardWidget` — `id`, `dashboard FK → UserDashboard`, `widget_type TextChoices` (`METRIC_CARD` / `LINE_CHART` / `BAR_CHART` / `TABLE` / `SCORE_DISTRIBUTION`), `title`, `config JSONField`, `position_x SMALLINT`, `position_y SMALLINT`, `width SMALLINT`, `height SMALLINT`, `created_at`
   - `config` schema is validated per `widget_type` in `clean()` — no untyped blobs at the widget level; the allowed config keys are defined per type in a constants module
   - Data source for each widget is scoped to `request.user`'s own `FlowExecution` / `PredictionResult` records — enforced at the API level, not via model FK (avoids complecting dashboard layout with execution ownership)
-- `McpSession` — `id`, `user FK → User`, `tokens_used INT`, `tokens_budget INT`, `started_at`, `ended_at (nullable)`
+- `McpSession` — `id`, `user FK → User`, `user_api_key FK → UserApiKey`, `tokens_used INT`, `tokens_budget INT`, `started_at`, `ended_at (nullable)`
   - Session-scoped; a new row per conversation. `tokens_budget` defaults to `MCP_SESSION_TOKEN_BUDGET` Django setting (configurable per-user via admin override on a `UserProfile` field)
+  - `user_api_key` FK records which key was active when the session started; deleting the key sets `ended_at` immediately
+- `UserApiKey` — `id`, `user FK → User`, `provider TextChoices` (`ANTHROPIC` / `LLAMA_OPENAI`), `encrypted_key TextField` (Fernet; write-only after save), `masked_suffix CharField(4)` (last 4 chars, plaintext, for display only), `base_url URLField (nullable)` (required for `LLAMA_OPENAI`; validated against RFC-1918 block-list in `clean()`), `label`, `is_active BOOLEAN`, `created_at`, `updated_at`
+  - `unique_together = [("user", "provider")]` — one key per provider per user
+  - No platform-level AI key exists anywhere in settings or environment; if no `UserApiKey` is present the MCP dispatch returns a structured `no_api_key` error
+  - Key is decrypted in memory only during dispatch; never logged, serialised to a response, or forwarded in a request body
 
 *fastMCP server — `mcp-server` Docker service:*
 - Python service using the `fastmcp` library; runs in its own container
@@ -592,11 +597,17 @@ These five items collectively deliver the end-to-end model-training workflow: sy
 - The iframe sandbox boundary ensures user-defined layout cannot affect the host page DOM or execute scripts in the host context
 - The MCP server has no direct database access — all persistence flows through the Django internal API
 
+**Does not complect (API key addition):**
+- `UserApiKey` is a credential store — separate lifecycle from `McpSession` (which is conversational state) and `UserDashboard` (which is layout state). They are related by FK but each has its own reason to change.
+- `base_url` is a non-secret configuration value for local providers; it lives on `UserApiKey` alongside the key, not on `McpSession` (which would complect session state with provider config).
+
 **Docs required before decomposition:**
 - Wireframe: `docs/wireframes/conversational_dashboard.excalidraw`
+- Wireframe: `docs/wireframes/api_key_management.excalidraw` — settings page key list, add/edit form, dashboard no-key and has-key states
 - Sequence diagram: `docs/sequences/mcp_dashboard_chat.mmd` — covers chat POST → budget check → MCP dispatch → tool call → Django internal API → SSE response
+- Sequence diagram: `docs/sequences/api_key_management.mmd` — add/replace/delete key, dashboard key-status check, dispatch with user key, auth-error handling
 - Flow control diagram: `docs/flow-control/mcp_token_budget.mmd`
-- Threat model: `docs/security/mcp_sandbox_threat_model.md` — iframe CSP analysis, MCP tool injection risks, data-scoping guarantees
+- Threat model: `docs/security/mcp_sandbox_threat_model.md` — iframe CSP analysis, MCP tool injection risks, data-scoping guarantees, API key encryption and leakage threats
 
 **Depends on:** BL-035 (Altair chart infrastructure reused for chart widgets), BL-024 (DataTable component reused for table widgets)
 

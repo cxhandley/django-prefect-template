@@ -77,6 +77,7 @@ erDiagram
         boolean notify_on_success "default false"
         boolean notify_in_app "default true"
         boolean notify_via_email "default true"
+        int mcp_token_budget "nullable; overrides MCP_SESSION_TOKEN_BUDGET setting"
     }
 
     INPUT_PRESET {
@@ -110,11 +111,24 @@ erDiagram
         int user_id FK
     }
 
+    USER_API_KEY {
+        int id PK
+        int user_id FK "references USER"
+        string provider "ANTHROPIC|LLAMA_OPENAI (TextChoices)"
+        text encrypted_key "Fernet-encrypted; write-only after save"
+        string base_url "nullable; required for LLAMA_OPENAI"
+        string label "user-defined name e.g. My Anthropic key"
+        boolean is_active "default true"
+        datetime created_at
+        datetime updated_at
+    }
+
     USER ||--o{ FLOW_EXECUTION : "triggers"
     USER ||--|| USER_PROFILE : "has"
     USER ||--o{ INPUT_PRESET : "owns"
     USER ||--o{ NOTIFICATION : "receives"
     USER ||--o{ SCORING_MODEL : "creates"
+    USER ||--o{ USER_API_KEY : "owns"
     FLOW_EXECUTION ||--o| PREDICTION_RESULT : "has result"
     FLOW_EXECUTION ||--o{ EXECUTION_STEP : "has steps"
     FLOW_EXECUTION |o--o{ NOTIFICATION : "referenced by"
@@ -128,6 +142,47 @@ erDiagram
 
     %% EXECUTION_COMPARISON — persist named comparisons (Epic 4)
     %% ADMIN_ACTION_LOG — audit trail for admin actions (Epic 5)
+
+    %% ============================================
+    %% EPIC 17 — Conversational Dashboard Builder (BL-038)
+    %% ============================================
+
+    USER_DASHBOARD {
+        int id PK
+        int owner_id FK "references USER"
+        string title
+        boolean is_active "partial unique: one active per user"
+        datetime created_at
+        datetime updated_at
+    }
+
+    DASHBOARD_WIDGET {
+        int id PK
+        int dashboard_id FK "references USER_DASHBOARD"
+        string widget_type "METRIC_CARD|LINE_CHART|BAR_CHART|TABLE|SCORE_DISTRIBUTION"
+        string title
+        json config "validated per widget_type via clean()"
+        smallint position_x
+        smallint position_y
+        smallint width
+        smallint height
+        datetime created_at
+    }
+
+    MCP_SESSION {
+        int id PK
+        int user_id FK "references USER"
+        int user_api_key_id FK "references USER_API_KEY"
+        int tokens_used "cumulative for this session"
+        int tokens_budget "from UserProfile override or MCP_SESSION_TOKEN_BUDGET"
+        datetime started_at
+        datetime ended_at "nullable; set on reset or budget exhaustion"
+    }
+
+    USER ||--o{ USER_DASHBOARD : "owns"
+    USER_DASHBOARD ||--o{ DASHBOARD_WIDGET : "contains"
+    USER ||--o{ MCP_SESSION : "starts"
+    USER_API_KEY ||--o{ MCP_SESSION : "used by"
 
     %% ============================================
     %% EPIC 13 — Scoring Model Training & Promotion

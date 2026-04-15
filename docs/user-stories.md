@@ -684,6 +684,31 @@ Status legend: `[x]` complete · `[~]` partial · `[ ]` not started
 - [ ] Budget consumption is visible to the user as a usage indicator in the chat panel
 - [ ] Exhausted sessions can be reset by the user (starting a new session) or by an admin
 
+### US-17.4: Manage Personal API Keys for AI Providers `[ ]`
+**As a** user
+**I want to** add, update, and remove my own API keys for supported AI providers
+**So that** I can use the conversational dashboard builder with my own account and no platform-level key is ever used on my behalf
+
+**Acceptance Criteria:**
+- [ ] A `UserApiKey` model stores one key per provider per user; providers are `ANTHROPIC` and `LLAMA_OPENAI` (OpenAI-compatible, self-hosted)
+- [ ] Keys are encrypted at rest using Fernet symmetric encryption; the encryption secret is read from `FIELD_ENCRYPTION_KEY` Django setting and never committed to source
+- [ ] The settings page (`/settings/api-keys/`) lists configured keys showing provider, label, masked key (`sk-ant-...****1234`), and creation date — the full key is never returned to the frontend after save
+- [ ] Users can add a key (provider, label, key value, optional base URL for `LLAMA_OPENAI`), edit the label or replace the key value, and delete a key
+- [ ] For `LLAMA_OPENAI`, a `base_url` field (e.g. `http://localhost:11434/v1`) is required; for `ANTHROPIC` it is absent from the form
+- [ ] Deleting a key that is currently in use by an active `McpSession` ends that session immediately
+- [ ] No platform-level AI API key exists in settings or environment; if no user key is configured the MCP dispatch returns a structured error
+
+### US-17.5: Dashboard Builder Indicates API Key Status `[ ]`
+**As a** user
+**I want** the My Dashboard page to clearly show whether an API key is configured
+**So that** I know immediately whether I can use the conversational builder or need to add a key first
+
+**Acceptance Criteria:**
+- [ ] If no active `UserApiKey` exists for the user, the chat panel is replaced by a prompt: "No API key configured — add one in Settings to use the dashboard builder" with a direct link to `/settings/api-keys/`
+- [ ] If a key is configured, a small status indicator (provider name + masked suffix) is shown in the chat panel header; the chat input is enabled
+- [ ] The indicator updates without a full page reload after a key is added or deleted (HTMX swap)
+- [ ] If a key is present but the provider API returns an authentication error, the chat panel shows a specific message: "API key rejected — check or replace your key in Settings" and does not consume token budget
+
 ---
 
 ## Epic 18: High-Performance Compute (Mojo) `[ ]`

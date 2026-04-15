@@ -1,0 +1,53 @@
+flowchart TD
+    A[POST /dashboard/chat/\nwith message and session_id] --> B{Active McpSession\nexists for user}
+
+    B -->|No| C[Create McpSession\ntokens_used = 0\ntokens_budget = UserProfile.mcp_token_budget\nor MCP_SESSION_TOKEN_BUDGET setting]
+    B -->|Yes| D[Load McpSession\ntokens_used, tokens_budget]
+    C --> D
+
+    D --> E{tokens_used\n>= tokens_budget}
+
+    E -->|Yes, exhausted| F[Return structured error response\nerror budget_exhausted, used N, budget M]
+    F --> G[SSE budget_exhausted event to browser]
+    G --> H[Chat panel shows exhaustion message\nwith Reset session link]
+
+    E -->|No, budget available| I[Forward message to MCP Server\nvia Docker internal network\nwith shared-secret header]
+
+    I --> J[MCP Server calls Claude API\nwith prefab tool definitions]
+
+    J --> K{Claude API\nstop_reason}
+
+    K -->|tool_use| L[Extract tool_name + tool_input]
+    L --> M{widget_type in\nTextChoices enum\nConfig keys in\nallowed set}
+
+    M -->|No, injection attempt| N[Return tool_result with is_error=true\nNo DB write occurs]
+    N --> K
+
+    M -->|Yes, valid call| O{Mutating tool\nadd / update / remove}
+
+    O -->|Yes| P[POST /internal/dashboard/widgets/\nDashboard DB write via Django]
+    O -->|No, read-only| Q[GET /internal/dashboard/widgets/\nRead-only DB query via Django]
+    P --> R[Tool result returned to Claude]
+    Q --> R
+    R --> K
+
+    K -->|end_turn| S[Receive final text response\nand token usage input_tokens + output_tokens]
+
+    S --> T[token_delta = input_tokens + output_tokens]
+    T --> U[DB McpSession.tokens_used += token_delta]
+
+    U --> V{New tokens_used\n>= tokens_budget}
+
+    V -->|Yes, now exhausted| W[Append budget warning to SSE stream\nToken indicator turns red in UI]
+    V -->|No, still within budget| X[SSE text chunks\nwith tokens_used and tokens_budget]
+    W --> X
+
+    X --> Y[Browser update chat history\nand token indicator]
+    Y --> Z{Dashboard\nmutated}
+
+    Z -->|Yes| AA[Reload iframe\nGET /dashboard/render/id]
+    Z -->|No| AB[Chat panel update only]
+    AA --> END([End])
+    AB --> END
+
+    H --> END

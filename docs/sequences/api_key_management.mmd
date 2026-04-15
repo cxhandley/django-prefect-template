@@ -1,0 +1,78 @@
+sequenceDiagram
+    actor User
+    participant Browser
+    participant Django as Django (web)
+    participant DB as PostgreSQL
+    participant McpServer as MCP Server (fastmcp)
+    participant ProviderAPI as Provider API (Anthropic or Llama)
+
+    Note over User,DB: Add or replace an API key
+
+    User->>Browser: Navigate to /settings/api-keys/
+    Browser->>Django: GET /settings/api-keys/
+    Django->>DB: SELECT UserApiKey WHERE user=request.user
+    Django-->>Browser: Render key list with masked suffixes only
+
+    User->>Browser: Click Add key or Edit
+    Browser->>Django: GET /settings/api-keys/form/ [HTMX]
+    Django-->>Browser: Render inline form partial
+
+    User->>Browser: Select provider, enter label and key value
+    Browser->>Django: POST /settings/api-keys/ with provider, label, key_value, base_url
+    Django->>Django: Fernet.encrypt(key_value) using FIELD_ENCRYPTION_KEY
+    Django->>DB: INSERT or UPDATE UserApiKey with encrypted_key and masked_suffix
+    Note over Django: masked_suffix = last 4 chars of key_value stored in plaintext for display
+    Django-->>Browser: HTMX swap: updated key list partial, form closed
+    Browser-->>User: Key list shows new row with masked suffix e.g. ****3f8a
+
+    Note over User,DB: Dashboard load — check key status
+
+    User->>Browser: Navigate to /dashboard/
+    Browser->>Django: GET /dashboard/
+    Django->>DB: SELECT UserApiKey WHERE user=request.user AND is_active=true
+    alt No active key found
+        Django-->>Browser: Render chat panel in no-key state with link to /settings/api-keys/
+        Browser-->>User: Yellow warning panel: No API key configured
+    else Active key found
+        Django-->>Browser: Render chat panel enabled with provider name and masked suffix in header
+        Browser-->>User: Chat input active, token indicator visible
+    end
+
+    Note over User,ProviderAPI: Chat dispatch using user key
+
+    User->>Browser: Send chat message
+    Browser->>Django: HTMX POST /dashboard/chat/ with message
+    Django->>DB: SELECT UserApiKey WHERE user=request.user AND is_active=true
+    alt No active key
+        Django-->>Browser: SSE error: no_api_key
+        Browser-->>User: Chat panel reverts to no-key state
+    else Key found
+        Django->>Django: Fernet.decrypt(encrypted_key) in memory only\nKey never written to log or forwarded as plaintext over network
+        Django->>McpServer: Forward message and decrypted key and base_url via Docker internal network
+        Note over Django,McpServer: Key passed in request header, not in body\nMCP server uses it for one call then discards it
+        McpServer->>ProviderAPI: API call with user-supplied key
+        alt Auth error from provider
+            ProviderAPI-->>McpServer: 401 Unauthorized
+            McpServer-->>Django: auth_error event
+            Django-->>Browser: SSE error: api_key_rejected
+            Browser-->>User: Chat panel shows: API key rejected — check or replace in Settings\nToken budget is not decremented
+        else Success
+            ProviderAPI-->>McpServer: Response with token usage
+            McpServer-->>Django: SSE stream with response and token_delta
+            Django->>DB: McpSession.tokens_used += token_delta
+            Django-->>Browser: SSE stream with text and updated token counts
+            Browser-->>User: AI response shown, token indicator updated
+        end
+    end
+
+    Note over User,DB: Delete a key
+
+    User->>Browser: Click Delete on a key row
+    Browser->>Django: POST /settings/api-keys/id/delete/ [HTMX]
+    Django->>DB: SELECT McpSession WHERE user_api_key_id=id AND ended_at IS NULL
+    opt Active session uses this key
+        Django->>DB: McpSession.ended_at = now()
+    end
+    Django->>DB: DELETE UserApiKey WHERE id=id AND user=request.user
+    Django-->>Browser: HTMX swap: updated key list with row removed
+    Browser-->>User: Key removed; if dashboard chat was open it refreshes to no-key state
