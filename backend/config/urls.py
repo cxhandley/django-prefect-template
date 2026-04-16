@@ -26,6 +26,8 @@ urlpatterns = [
     path("flows/", include("apps.flows.urls")),
     path("training/", include("apps.training.urls")),
     path("internal/", include("apps.flows.internal_urls")),
+    path("internal/mcp/", include("apps.dashboard.internal_urls")),
+    path("my-dashboard/", include("apps.dashboard.urls")),
     path("", include("apps.core.urls")),
 ]
 

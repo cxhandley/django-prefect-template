@@ -1,0 +1,227 @@
+{% extends "core/base_dashboard.html" %}
+{% block title %}
+    My Dashboard - Django Doit ML
+{% endblock title %}
+{% block extra_css %}
+    <style>
+    .dashboard-layout {
+        display: grid;
+        grid-template-columns: 1fr 360px;
+        gap: 1rem;
+        height: calc(100vh - 5rem);
+    }
+    .widget-frame {
+        border: none;
+        width: 100%;
+        height: 100%;
+        border-radius: 0.5rem;
+    }
+    .chat-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0.75rem;
+    }
+    @media (max-width: 1024px) {
+        .dashboard-layout {
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr auto;
+            height: auto;
+        }
+        .widget-frame-container {
+            height: 60vh;
+        }
+        .chat-panel {
+            height: 40vh;
+        }
+    }
+    </style>
+{% endblock extra_css %}
+{% block dashboard_content %}
+    <div class="dashboard-layout">
+        <!-- Widget iframe -->
+        <div class="widget-frame-container card bg-base-100 border border-base-200 shadow-sm overflow-hidden">
+            {% if dashboard %}
+                <iframe id="widget-iframe"
+                        src="{% url 'dashboard:render' dashboard.pk %}"
+                        class="widget-frame"
+                        title="Dashboard widgets"
+                        sandbox="allow-scripts allow-same-origin">
+                </iframe>
+            {% else %}
+                <div class="flex items-center justify-center h-full text-base-content/50 text-sm">No dashboard configured.</div>
+            {% endif %}
+        </div>
+        <!-- Chat panel -->
+        <div class="card bg-base-100 border border-base-200 shadow-sm overflow-hidden">
+            {% if api_key %}
+                {% include "dashboard/partials/chat_panel.html" %}
+            {% else %}
+                {% include "dashboard/partials/chat_panel_no_key.html" %}
+            {% endif %}
+        </div>
+    </div>
+{% endblock dashboard_content %}
+{% block extra_js %}
+    {% if api_key %}
+        <script>
+        (function () {
+            var form = document.getElementById('chat-form');
+            var input = document.getElementById('chat-input');
+            var messages = document.getElementById('chat-messages');
+            var sessionIdInput = document.getElementById('session-id');
+            var tokenBar = document.getElementById('token-progress');
+            var tokenLabel = document.getElementById('token-label');
+            var resetBtn = document.getElementById('btn-reset-session');
+            var sendBtn = document.getElementById('btn-send');
+
+            function scrollToBottom() {
+                messages.scrollTop = messages.scrollHeight;
+            }
+
+            function appendMessage(role, text) {
+                var div = document.createElement('div');
+                div.className = role === 'user'
+                    ? 'chat chat-end mb-2'
+                    : 'chat chat-start mb-2';
+                var bubble = document.createElement('div');
+                bubble.className = role === 'user'
+                    ? 'chat-bubble chat-bubble-primary text-sm'
+                    : 'chat-bubble text-sm';
+                bubble.textContent = text;
+                div.appendChild(bubble);
+                messages.appendChild(div);
+                scrollToBottom();
+                return bubble;
+            }
+
+            function setLoading(loading) {
+                sendBtn.disabled = loading;
+                input.disabled = loading;
+                if (loading) {
+                    sendBtn.innerHTML = '<span class="loading loading-spinner loading-xs"></span>';
+                } else {
+                    sendBtn.innerHTML = 'Send';
+                }
+            }
+
+            function updateTokenBar(used, budget) {
+                if (!tokenBar || !budget) return;
+                var pct = Math.min(100, Math.round(used / budget * 100));
+                tokenBar.value = pct;
+                tokenBar.setAttribute('aria-valuenow', pct);
+                if (tokenLabel) tokenLabel.textContent = used.toLocaleString() + ' / ' + budget.toLocaleString() + ' tokens';
+            }
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var msg = input.value.trim();
+                if (!msg) return;
+
+                input.value = '';
+                appendMessage('user', msg);
+                setLoading(true);
+
+                var assistantBubble = appendMessage('assistant', '');
+                var fullText = '';
+
+                var payload = {
+                    message: msg,
+                    session_id: sessionIdInput.value ? parseInt(sessionIdInput.value) : null,
+                };
+
+                fetch("{% url 'dashboard:chat' %}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    },
+                    body: JSON.stringify(payload),
+                }).then(function (resp) {
+                    if (!resp.ok) {
+                        resp.json().then(function (err) {
+                            assistantBubble.textContent = 'Error: ' + (err.error || resp.status);
+                        }).catch(function () {
+                            assistantBubble.textContent = 'Request failed (' + resp.status + ').';
+                        });
+                        setLoading(false);
+                        return;
+                    }
+
+                    var reader = resp.body.getReader();
+                    var decoder = new TextDecoder();
+                    var buffer = '';
+
+                    function read() {
+                        reader.read().then(function (result) {
+                            if (result.done) {
+                                setLoading(false);
+                                return;
+                            }
+                            buffer += decoder.decode(result.value, { stream: true });
+                            var lines = buffer.split('\n');
+                            buffer = lines.pop();
+
+                            lines.forEach(function (line) {
+                                if (!line.startsWith('data: ')) return;
+                                var raw = line.slice(6).trim();
+                                if (raw === '[DONE]') {
+                                    setLoading(false);
+                                    return;
+                                }
+                                try {
+                                    var event = JSON.parse(raw);
+                                    if (event.token) {
+                                        fullText += event.token;
+                                        assistantBubble.textContent = fullText;
+                                        scrollToBottom();
+                                    }
+                                    if (event.session_id) {
+                                        sessionIdInput.value = event.session_id;
+                                    }
+                                    if (event.tokens_used != null && event.tokens_budget != null) {
+                                        updateTokenBar(event.tokens_used, event.tokens_budget);
+                                    }
+                                    if (event.error) {
+                                        assistantBubble.textContent = 'Error: ' + event.error;
+                                        setLoading(false);
+                                    }
+                                    if (event.reload_widgets) {
+                                        var iframe = document.getElementById('widget-iframe');
+                                        if (iframe) iframe.contentWindow.location.reload();
+                                    }
+                                } catch (ignored) {}
+                            });
+
+                            read();
+                        });
+                    }
+                    read();
+                }).catch(function (err) {
+                    assistantBubble.textContent = 'Network error.';
+                    setLoading(false);
+                });
+            });
+
+            if (resetBtn) {
+                resetBtn.addEventListener('click', function () {
+                    fetch("{% url 'dashboard:session_reset' %}", {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                    }).then(function () {
+                        sessionIdInput.value = '';
+                        messages.innerHTML = '';
+                        if (tokenBar) { tokenBar.value = 0; }
+                        if (tokenLabel) tokenLabel.textContent = '0 tokens used';
+                    });
+                });
+            }
+        }());
+        </script>
+    {% endif %}
+{% endblock extra_js %}

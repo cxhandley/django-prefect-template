@@ -1,0 +1,62 @@
+{% if saved %}<div class="alert alert-success mb-4 py-2 text-sm" role="alert">Key saved successfully.</div>{% endif %}
+{% if keys %}
+    <table class="table table-sm w-full mb-4">
+        <thead>
+            <tr>
+                <th scope="col">Provider</th>
+                <th scope="col">Label</th>
+                <th scope="col">Key</th>
+                <th scope="col">Base URL</th>
+                <th scope="col">Status</th>
+                <th scope="col" class="sr-only">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for key in keys %}
+                <tr>
+                    <td>{{ key.get_provider_display }}</td>
+                    <td>{{ key.label }}</td>
+                    <td class="font-mono text-xs text-base-content/60">
+                        {% if key.masked_suffix %}
+                            ••••{{ key.masked_suffix }}
+                        {% else %}
+                            <span class="italic">not set</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-xs text-base-content/60 max-w-[12rem] truncate">{{ key.base_url|default:"—" }}</td>
+                    <td>
+                        {% if key.is_active %}
+                            <span class="badge badge-success badge-sm">Active</span>
+                        {% else %}
+                            <span class="badge badge-ghost badge-sm">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="flex gap-2 items-center">
+                        <button class="btn btn-ghost btn-xs"
+                                hx-get="{% url 'accounts:api_key_edit_form' key.pk %}"
+                                hx-target="#api-key-form-container"
+                                hx-swap="innerHTML"
+                                aria-label="Edit {{ key.label }}">Edit</button>
+                        <form hx-post="{% url 'accounts:api_key_delete' key.pk %}"
+                              hx-target="#api-key-section"
+                              hx-swap="innerHTML"
+                              hx-confirm="Delete this key? Any active AI sessions using it will end.">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="btn btn-ghost btn-xs text-error"
+                                    aria-label="Delete {{ key.label }}">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="text-sm text-base-content/60 mb-4">No API keys configured yet.</p>
+{% endif %}
+<div id="api-key-form-container">
+    <button class="btn btn-primary btn-sm"
+            hx-get="{% url 'accounts:api_key_form' %}"
+            hx-target="#api-key-form-container"
+            hx-swap="innerHTML">Add Key</button>
+</div>

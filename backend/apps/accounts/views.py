@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods
 
 from .forms import LoginForm, SignupForm
-from .models import Notification, UserProfile
+from .models import Notification, UserApiKey, UserProfile
 from .services import send_confirmation_email
 
 User = get_user_model()
@@ -328,3 +328,125 @@ def notification_badge(request):
         "accounts/partials/notification_badge.html",
         {"count": count},
     )
+
+
+# ── API Key management views ──────────────────────────────────────────────────
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_key_list(request):
+    """HTMX partial: list of the user's configured API keys."""
+    keys = UserApiKey.objects.filter(user=request.user)
+    return render(request, "accounts/partials/api_key_list.html", {"keys": keys})
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_key_form(request):
+    """HTMX partial: blank add-key form."""
+    return render(
+        request,
+        "accounts/partials/api_key_form.html",
+        {"providers": UserApiKey.Provider.choices, "key": None},
+    )
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_key_edit_form(request, pk):
+    """HTMX partial: pre-filled edit form for an existing key."""
+    key = get_object_or_404(UserApiKey, pk=pk, user=request.user)
+    return render(
+        request,
+        "accounts/partials/api_key_form.html",
+        {"providers": UserApiKey.Provider.choices, "key": key},
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_key_save(request):
+    """Create or replace a UserApiKey.  Accepts provider + label + api_key + base_url."""
+    provider = request.POST.get("provider", "").strip()
+    label = request.POST.get("label", "").strip()
+    api_key_value = request.POST.get("api_key", "").strip()
+    base_url = request.POST.get("base_url", "").strip()
+
+    errors = {}
+    if not provider or provider not in dict(UserApiKey.Provider.choices):
+        errors["provider"] = "Select a valid provider."
+    if not label:
+        errors["label"] = "Label is required."
+    if provider == UserApiKey.Provider.ANTHROPIC and not api_key_value:
+        errors["api_key"] = "API key is required for Anthropic."
+    if provider == UserApiKey.Provider.LLAMA_OPENAI and not base_url:
+        errors["base_url"] = "Base URL is required for Llama (local)."
+
+    if errors:
+        return render(
+            request,
+            "accounts/partials/api_key_form.html",
+            {
+                "providers": UserApiKey.Provider.choices,
+                "key": None,
+                "errors": errors,
+                "posted": request.POST,
+            },
+        )
+
+    obj, _ = UserApiKey.objects.get_or_create(user=request.user, provider=provider)
+    obj.label = label
+    obj.base_url = base_url
+    obj.is_active = True
+    if api_key_value:
+        obj.set_key(api_key_value)
+
+    try:
+        obj.full_clean()
+    except Exception as exc:
+        from django.core.exceptions import ValidationError
+
+        if isinstance(exc, ValidationError):
+            return render(
+                request,
+                "accounts/partials/api_key_form.html",
+                {
+                    "providers": UserApiKey.Provider.choices,
+                    "key": None,
+                    "errors": exc.message_dict,
+                    "posted": request.POST,
+                },
+            )
+        raise
+
+    obj.save()
+
+    # End any active MCP sessions using this key so the new key takes effect immediately
+    from apps.dashboard.models import McpSession
+    from django.utils import timezone
+
+    McpSession.objects.filter(user=request.user, user_api_key=obj, ended_at__isnull=True).update(
+        ended_at=timezone.now()
+    )
+
+    keys = UserApiKey.objects.filter(user=request.user)
+    return render(request, "accounts/partials/api_key_list.html", {"keys": keys, "saved": True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def api_key_delete(request, pk):
+    """Delete a UserApiKey and terminate any active MCP sessions using it."""
+    key = get_object_or_404(UserApiKey, pk=pk, user=request.user)
+
+    from apps.dashboard.models import McpSession
+    from django.utils import timezone
+
+    McpSession.objects.filter(user=request.user, user_api_key=key, ended_at__isnull=True).update(
+        ended_at=timezone.now()
+    )
+    key.delete()
+
+    keys = UserApiKey.objects.filter(user=request.user)
+    return render(request, "accounts/partials/api_key_list.html", {"keys": keys})

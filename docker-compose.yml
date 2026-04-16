@@ -113,6 +113,8 @@ services:
       OTEL_TRACES_SAMPLER: always_on
       OTEL_SDK_DISABLED: "false"
       DEBUG: "true"
+      MCP_SERVER_URL: http://mcp-server:8001
+      MCP_INTERNAL_SECRET: ${MCP_INTERNAL_SECRET:-change-me-in-env}
     volumes:
       - ./backend:/app
     ports:
@@ -239,6 +241,29 @@ services:
     depends_on:
       rustfs:
         condition: service_healthy
+    networks:
+      - app-network
+
+  # ─── MCP server (fastMCP conversational dashboard builder) ─────────────────
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    container_name: django-mcp-server
+    environment:
+      DJANGO_INTERNAL_URL: http://web:8000
+      MCP_INTERNAL_SECRET: ${MCP_INTERNAL_SECRET:-change-me-in-env}
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health/')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      web:
+        condition: service_started
     networks:
       - app-network
 

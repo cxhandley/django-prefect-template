@@ -31,6 +31,12 @@ urlpatterns = [
         name="email_confirmation_sent",
     ),
     path("confirm-email/<str:token>/", views.confirm_email, name="confirm_email"),
+    # API Key management (HTMX partials)
+    path("api/keys/", views.api_key_list, name="api_key_list"),
+    path("api/keys/form/", views.api_key_form, name="api_key_form"),
+    path("api/keys/<int:pk>/edit/", views.api_key_edit_form, name="api_key_edit_form"),
+    path("api/keys/save/", views.api_key_save, name="api_key_save"),
+    path("api/keys/<int:pk>/delete/", views.api_key_delete, name="api_key_delete"),
     # Superuser user management
     path("users/", views.user_list, name="user_list"),
     path("users/<int:user_id>/toggle-active/", views.user_toggle_active, name="user_toggle_active"),

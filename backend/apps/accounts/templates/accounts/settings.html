@@ -87,9 +87,18 @@
                 </div>
                 <!-- API Keys -->
                 <div class="border-t border-base-200 pt-8">
-                    <h2 class="text-lg font-semibold mb-4">API Keys</h2>
-                    <p class="text-sm text-base-content/60 mb-4">Manage your API keys for programmatic access.</p>
-                    <button class="btn btn-primary btn-sm">Generate New Key</button>
+                    <h2 class="text-lg font-semibold mb-1">AI Provider Keys</h2>
+                    <p class="text-sm text-base-content/60 mb-4">
+                        Keys are encrypted at rest. After saving, only the last 4 characters are shown.
+                    </p>
+                    <div id="api-key-section"
+                         aria-live="polite"
+                         hx-get="{% url 'accounts:api_key_list' %}"
+                         hx-trigger="load"
+                         hx-target="#api-key-section"
+                         hx-swap="innerHTML">
+                        <span class="loading loading-spinner loading-sm"></span>
+                    </div>
                 </div>
                 <!-- Saved Presets -->
                 <div class="border-t border-base-200 pt-8">

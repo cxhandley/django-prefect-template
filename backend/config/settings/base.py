@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "apps.flows",
     "apps.flags",
     "apps.training",
+    "apps.dashboard",
 ]
 
 MIDDLEWARE = [
@@ -224,6 +225,23 @@ PREFECT_UI_URL = env("PREFECT_UI_URL", default="http://localhost:4200")
 
 # Mojo compute container URL (only required when any ExecutionStep has step_type=MOJO)
 MOJO_COMPUTE_URL = env("MOJO_COMPUTE_URL", default="http://mojo-compute:8080")
+
+# ── Conversational Dashboard Builder (BL-038) ─────────────────────────────────
+
+# Fernet key for encrypting UserApiKey values at rest.
+# Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Store in .env as FIELD_ENCRYPTION_KEY=<generated-value>
+FIELD_ENCRYPTION_KEY = env("FIELD_ENCRYPTION_KEY", default="")
+
+# Default token budget per MCP session. Override per-user via UserProfile.mcp_token_budget.
+MCP_SESSION_TOKEN_BUDGET = env.int("MCP_SESSION_TOKEN_BUDGET", default=32_000)
+
+# Shared secret for Django ↔ MCP server internal API calls.
+# Must match MCP_INTERNAL_SECRET in the mcp-server container environment.
+MCP_INTERNAL_SECRET = env("MCP_INTERNAL_SECRET", default="")
+
+# URL of the fastMCP server container (Docker internal network only).
+MCP_SERVER_URL = env("MCP_SERVER_URL", default="http://mcp-server:8001")
 
 # Redis
 REDIS_URL = env("REDIS_URL")

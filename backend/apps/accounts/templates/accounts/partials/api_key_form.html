@@ -1,0 +1,107 @@
+<form hx-post="{% url 'accounts:api_key_save' %}"
+      hx-target="#api-key-section"
+      hx-swap="innerHTML"
+      class="mt-4 space-y-4 border border-base-200 rounded-lg p-4 max-w-lg">
+    {% csrf_token %}
+    <h3 class="font-semibold text-sm">
+        {% if key %}
+            Edit Key
+        {% else %}
+            Add Key
+        {% endif %}
+    </h3>
+    <!-- Provider -->
+    <div class="form-control">
+        <label class="label" for="id_provider">
+            <span class="label-text">Provider <span class="text-error">*</span></span>
+        </label>
+        <select id="id_provider"
+                name="provider"
+                class="select select-bordered select-sm{% if errors.provider %} select-error{% endif %}"
+                {% if key %}disabled{% endif %}
+                onchange="toggleBaseUrl(this.value)"
+                aria-describedby="{% if errors.provider %}err_provider{% endif %}">
+            <option value="">— select —</option>
+            {% for value, label in providers %}
+                <option value="{{ value }}"
+                        {% if key.provider == value or posted.provider == value %}selected{% endif %}>
+                    {{ label }}
+                </option>
+            {% endfor %}
+        </select>
+        {% if key %}<input type="hidden" name="provider" value="{{ key.provider }}">{% endif %}
+        {% if errors.provider %}
+            <span id="err_provider" class="text-error text-xs mt-1">{{ errors.provider }}</span>
+        {% endif %}
+    </div>
+    <!-- Label -->
+    <div class="form-control">
+        <label class="label" for="id_label">
+            <span class="label-text">Label <span class="text-error">*</span></span>
+        </label>
+        <input id="id_label"
+               type="text"
+               name="label"
+               value="{{ key.label|default:posted.label|default:'' }}"
+               placeholder="e.g. Personal Anthropic Key"
+               class="input input-bordered input-sm{% if errors.label %} input-error{% endif %}"
+               aria-describedby="{% if errors.label %}err_label{% endif %}">
+        {% if errors.label %}<span id="err_label" class="text-error text-xs mt-1">{{ errors.label }}</span>{% endif %}
+    </div>
+    <!-- API Key value -->
+    <div class="form-control">
+        <label class="label" for="id_api_key">
+            <span class="label-text">
+                API Key
+                {% if key and key.masked_suffix %}
+                    <span class="text-base-content/50 font-normal">(leave blank to keep ••••{{ key.masked_suffix }})</span>
+                {% endif %}
+            </span>
+        </label>
+        <input id="id_api_key"
+               type="password"
+               name="api_key"
+               placeholder="{% if key and key.masked_suffix %}unchanged{% else %}sk-…{% endif %}"
+               class="input input-bordered input-sm font-mono{% if errors.api_key %} input-error{% endif %}"
+               autocomplete="new-password"
+               aria-describedby="{% if errors.api_key %}err_api_key{% endif %}">
+        {% if errors.api_key %}<span id="err_api_key" class="text-error text-xs mt-1">{{ errors.api_key }}</span>{% endif %}
+    </div>
+    <!-- Base URL (Llama only) -->
+    <div id="base-url-row"
+         class="form-control"
+         style="display:{% if key.provider == 'LLAMA_OPENAI' or posted.provider == 'LLAMA_OPENAI' %}block{% else %}none{% endif %}">
+        <label class="label" for="id_base_url">
+            <span class="label-text">Base URL <span class="text-error">*</span></span>
+        </label>
+        <input id="id_base_url"
+               type="url"
+               name="base_url"
+               value="{{ key.base_url|default:posted.base_url|default:'' }}"
+               placeholder="http://localhost:11434/v1"
+               class="input input-bordered input-sm font-mono{% if errors.base_url %} input-error{% endif %}"
+               aria-describedby="base_url_hint {% if errors.base_url %}err_base_url{% endif %}">
+        <span id="base_url_hint" class="text-xs text-base-content/60 mt-1 block">
+            OpenAI-compatible endpoint (e.g. Ollama, LM Studio). Must be localhost or a private address.
+        </span>
+        {% if errors.base_url %}
+            <span id="err_base_url" class="text-error text-xs mt-1">{{ errors.base_url }}</span>
+        {% endif %}
+    </div>
+    <div class="flex gap-2 pt-2">
+        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+        <button type="button"
+                class="btn btn-ghost btn-sm"
+                hx-get="{% url 'accounts:api_key_list' %}"
+                hx-target="#api-key-section"
+                hx-swap="innerHTML">Cancel</button>
+    </div>
+</form>
+<script>
+function toggleBaseUrl(provider) {
+    var row = document.getElementById('base-url-row');
+    if (row) {
+        row.style.display = provider === 'LLAMA_OPENAI' ? 'block' : 'none';
+    }
+}
+</script>
