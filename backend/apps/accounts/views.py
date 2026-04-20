@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from django.contrib.auth import authenticate, get_user_model, login, logout
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm
@@ -348,7 +350,7 @@ def api_key_form(request):
     return render(
         request,
         "accounts/partials/api_key_form.html",
-        {"providers": UserApiKey.Provider.choices, "key": None},
+        {"providers": UserApiKey.Provider.choices, "key": None, "posted": defaultdict(str)},
     )
 
 
@@ -360,7 +362,7 @@ def api_key_edit_form(request, pk):
     return render(
         request,
         "accounts/partials/api_key_form.html",
-        {"providers": UserApiKey.Provider.choices, "key": key},
+        {"providers": UserApiKey.Provider.choices, "key": key, "posted": defaultdict(str)},
     )
 
 

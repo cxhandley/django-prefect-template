@@ -31,7 +31,12 @@ def _internal_get(path: str) -> dict:
 def _internal_post(path: str, body: dict) -> dict:
     url = f"{DJANGO_URL}/internal/mcp/{path}"
     resp = httpx.post(url, json=body, headers=_INTERNAL_HEADERS, timeout=10.0)
-    resp.raise_for_status()
+    if not resp.is_success:
+        try:
+            detail = resp.json()
+        except Exception:
+            detail = resp.text[:200]
+        raise RuntimeError(f"HTTP {resp.status_code}: {detail}")
     return resp.json()
 
 
@@ -211,98 +216,120 @@ def get_widget(dashboard_id: int, widget_id: int) -> dict:
 TOOL_SCHEMAS = [
     {
         "name": "add_metric_card",
-        "description": "Add a metric card widget showing a single aggregated value (count, sum, avg, min, max).",
+        "description": (
+            "Add a metric card widget showing a single aggregated value. "
+            "Use field='prediction_count' for predictions, 'execution_count' for runs, 'score' for scores. "
+            "Use aggregation='count' by default unless the user specifies sum/avg/min/max."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
-                "dashboard_id": {"type": "integer"},
-                "title": {"type": "string"},
-                "field": {"type": "string", "description": "Data field to aggregate"},
-                "aggregation": {"type": "string", "enum": ["count", "sum", "avg", "min", "max"]},
-                "label": {"type": "string"},
-                "unit": {"type": "string"},
-                "position_x": {"type": "integer"},
-                "position_y": {"type": "integer"},
+                "title": {
+                    "type": "string",
+                    "description": "Widget title, e.g. 'Total Predictions'",
+                },
+                "field": {
+                    "type": "string",
+                    "description": "Field to aggregate, e.g. 'prediction_count', 'execution_count', 'score'",
+                },
+                "aggregation": {
+                    "type": "string",
+                    "enum": ["count", "sum", "avg", "min", "max"],
+                    "description": "Default: count",
+                },
+                "label": {"type": "string", "description": "Optional display label"},
+                "unit": {"type": "string", "description": "Optional unit suffix, e.g. '%'"},
             },
-            "required": ["dashboard_id", "title", "field"],
+            "required": ["title", "field"],
         },
     },
     {
         "name": "add_line_chart",
-        "description": "Add a line chart widget.",
+        "description": (
+            "Add a line chart widget showing a trend over time. "
+            "Use x_field='date' for time-based charts. "
+            "Use y_field='prediction_count', 'execution_count', or 'score' based on what the user wants."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
-                "dashboard_id": {"type": "integer"},
-                "title": {"type": "string"},
-                "x_field": {"type": "string"},
-                "y_field": {"type": "string"},
-                "label": {"type": "string"},
-                "color": {"type": "string"},
-                "position_x": {"type": "integer"},
-                "position_y": {"type": "integer"},
-                "width": {"type": "integer"},
-                "height": {"type": "integer"},
+                "title": {
+                    "type": "string",
+                    "description": "Widget title, e.g. 'Predictions Over Time'",
+                },
+                "x_field": {"type": "string", "description": "X-axis field, typically 'date'"},
+                "y_field": {
+                    "type": "string",
+                    "description": "Y-axis field, e.g. 'prediction_count', 'score'",
+                },
+                "label": {"type": "string", "description": "Optional series label"},
+                "color": {"type": "string", "description": "Hex color, default '#4f46e5'"},
             },
-            "required": ["dashboard_id", "title", "x_field", "y_field"],
+            "required": ["title", "x_field", "y_field"],
         },
     },
     {
         "name": "add_bar_chart",
-        "description": "Add a bar chart widget.",
+        "description": (
+            "Add a bar chart widget. "
+            "Use x_field='date' for charts grouped by day. "
+            "Use y_field='prediction_count', 'execution_count', or 'score' based on what the user wants."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
-                "dashboard_id": {"type": "integer"},
-                "title": {"type": "string"},
-                "x_field": {"type": "string"},
-                "y_field": {"type": "string"},
-                "label": {"type": "string"},
-                "color": {"type": "string"},
-                "position_x": {"type": "integer"},
-                "position_y": {"type": "integer"},
-                "width": {"type": "integer"},
-                "height": {"type": "integer"},
+                "title": {
+                    "type": "string",
+                    "description": "Widget title, e.g. 'Predictions by Day'",
+                },
+                "x_field": {"type": "string", "description": "X-axis field, e.g. 'date'"},
+                "y_field": {
+                    "type": "string",
+                    "description": "Y-axis field, e.g. 'prediction_count'",
+                },
+                "label": {"type": "string", "description": "Optional series label"},
+                "color": {"type": "string", "description": "Hex color, default '#4f46e5'"},
             },
-            "required": ["dashboard_id", "title", "x_field", "y_field"],
+            "required": ["title", "x_field", "y_field"],
         },
     },
     {
         "name": "add_table",
-        "description": "Add a data table widget.",
+        "description": "Add a data table widget showing rows of data.",
         "parameters": {
             "type": "object",
             "properties": {
-                "dashboard_id": {"type": "integer"},
-                "title": {"type": "string"},
-                "fields": {"type": "array", "items": {"type": "string"}},
-                "limit": {"type": "integer"},
-                "order_by": {"type": "string"},
-                "order_dir": {"type": "string", "enum": ["asc", "desc"]},
-                "position_x": {"type": "integer"},
-                "position_y": {"type": "integer"},
-                "width": {"type": "integer"},
-                "height": {"type": "integer"},
+                "title": {"type": "string", "description": "Widget title"},
+                "fields": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of field names to display, e.g. ['date', 'prediction_count', 'score']",
+                },
+                "limit": {"type": "integer", "description": "Max rows to show, default 10"},
+                "order_by": {"type": "string", "description": "Field to sort by"},
+                "order_dir": {
+                    "type": "string",
+                    "enum": ["asc", "desc"],
+                    "description": "Sort direction, default 'desc'",
+                },
             },
-            "required": ["dashboard_id", "title", "fields"],
+            "required": ["title", "fields"],
         },
     },
     {
         "name": "add_score_distribution",
-        "description": "Add a score distribution histogram widget.",
+        "description": "Add a histogram showing the distribution of scores.",
         "parameters": {
             "type": "object",
             "properties": {
-                "dashboard_id": {"type": "integer"},
-                "title": {"type": "string"},
-                "bins": {"type": "integer"},
-                "label": {"type": "string"},
-                "position_x": {"type": "integer"},
-                "position_y": {"type": "integer"},
-                "width": {"type": "integer"},
-                "height": {"type": "integer"},
+                "title": {
+                    "type": "string",
+                    "description": "Widget title, e.g. 'Score Distribution'",
+                },
+                "bins": {"type": "integer", "description": "Number of histogram bins, default 10"},
+                "label": {"type": "string", "description": "Optional label"},
             },
-            "required": ["dashboard_id", "title"],
+            "required": ["title"],
         },
     },
     {
@@ -311,8 +338,7 @@ TOOL_SCHEMAS = [
         "parameters": {
             "type": "object",
             "properties": {
-                "dashboard_id": {"type": "integer"},
-                "widget_id": {"type": "integer"},
+                "widget_id": {"type": "integer", "description": "ID of the widget to update"},
                 "title": {"type": "string"},
                 "config": {"type": "object"},
                 "position_x": {"type": "integer"},
@@ -320,19 +346,18 @@ TOOL_SCHEMAS = [
                 "width": {"type": "integer"},
                 "height": {"type": "integer"},
             },
-            "required": ["dashboard_id", "widget_id"],
+            "required": ["widget_id"],
         },
     },
     {
         "name": "get_widget",
-        "description": "Get the current config of a widget.",
+        "description": "Get the current config of a widget by its ID.",
         "parameters": {
             "type": "object",
             "properties": {
-                "dashboard_id": {"type": "integer"},
-                "widget_id": {"type": "integer"},
+                "widget_id": {"type": "integer", "description": "ID of the widget to retrieve"},
             },
-            "required": ["dashboard_id", "widget_id"],
+            "required": ["widget_id"],
         },
     },
 ]

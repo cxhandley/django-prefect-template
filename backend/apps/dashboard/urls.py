@@ -6,7 +6,7 @@ app_name = "dashboard"
 
 urlpatterns = [
     path("", views.dashboard, name="dashboard"),
-    path("render/<int:dashboard_id>/", views.dashboard_render, name="render"),
+    path("widgets/", views.widget_grid, name="widget_grid"),
     path("chat/", views.dashboard_chat, name="chat"),
     path("session/reset/", views.session_reset, name="session_reset"),
 ]

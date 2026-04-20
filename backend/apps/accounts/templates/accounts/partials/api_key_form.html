@@ -61,6 +61,7 @@
         <input id="id_api_key"
                type="password"
                name="api_key"
+               data-1p-ignore
                placeholder="{% if key and key.masked_suffix %}unchanged{% else %}sk-…{% endif %}"
                class="input input-bordered input-sm font-mono{% if errors.api_key %} input-error{% endif %}"
                autocomplete="new-password"

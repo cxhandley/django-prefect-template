@@ -25,15 +25,27 @@ app = FastAPI(title="MCP Dashboard Builder", version="1.0.0")
 DJANGO_URL = os.environ.get("DJANGO_INTERNAL_URL", "http://web:8000")
 MCP_INTERNAL_SECRET = os.environ.get("MCP_INTERNAL_SECRET", "")
 
-SYSTEM_PROMPT = """You are a dashboard builder assistant.
-The user can ask you to add or update widgets on their dashboard.
-Available widget types: Metric Card, Line Chart, Bar Chart, Table, Score Distribution.
+SYSTEM_PROMPT = """You are a dashboard widget builder. Call the tools immediately when asked. Never ask for clarification.
 
-When the user asks you to add or modify a widget, use the available tools to do so.
-After each tool call, confirm what was done and describe what the widget will show.
-Always use the dashboard_id provided in the request context.
+RULES:
+1. Call a tool right away. Do not ask questions first.
+2. Use these field name defaults:
+   - date/time/day → x_field="date"
+   - predictions/count → y_field="prediction_count"
+   - executions/runs → y_field="execution_count"
+   - score/accuracy → y_field="score"
+3. After the tool succeeds, reply with one short sentence confirming what was added.
+4. If the tool fails, say so in one sentence.
 
-Keep your responses concise and helpful. Do not invent data — widgets display real data from the system."""
+EXAMPLES:
+User: "add a bar chart of predictions by day"
+→ Call add_bar_chart(title="Predictions by Day", x_field="date", y_field="prediction_count")
+
+User: "show total executions"
+→ Call add_metric_card(title="Total Executions", field="execution_count", aggregation="count")
+
+User: "line chart of scores over time"
+→ Call add_line_chart(title="Scores Over Time", x_field="date", y_field="score")"""
 
 
 class ChatRequest(BaseModel):
@@ -73,83 +85,87 @@ async def _stream_anthropic(
     client = anthropic.Anthropic(api_key=api_key)
     total_tokens = 0
 
-    while True:
-        tool_results = []
-        assistant_text = ""
+    try:
+        while True:
+            tool_results = []
+            assistant_text = ""
 
-        with client.messages.stream(
-            model="claude-sonnet-4-6",
-            max_tokens=1024,
-            system=SYSTEM_PROMPT,
-            messages=messages,
-            tools=TOOL_SCHEMAS,  # type: ignore[arg-type]
-        ) as stream:
-            for event in stream:
-                event_type = type(event).__name__
+            with client.messages.stream(
+                model="claude-sonnet-4-6",
+                max_tokens=1024,
+                system=SYSTEM_PROMPT,
+                messages=messages,
+                tools=TOOL_SCHEMAS,  # type: ignore[arg-type]
+            ) as stream:
+                for event in stream:
+                    event_type = type(event).__name__
 
-                if event_type == "RawContentBlockDeltaEvent":
-                    delta = event.delta
-                    if hasattr(delta, "text"):
-                        assistant_text += delta.text
-                        yield f"data: {json.dumps({'token': delta.text})}\n\n"
+                    if event_type == "RawContentBlockDeltaEvent":
+                        delta = event.delta
+                        if hasattr(delta, "text"):
+                            assistant_text += delta.text
+                            yield f"data: {json.dumps({'token': delta.text})}\n\n"
 
-                elif event_type == "RawMessageStopEvent":
-                    pass
+                    elif event_type == "RawMessageStopEvent":
+                        pass
 
-            final = stream.get_final_message()
-            total_tokens = final.usage.input_tokens + final.usage.output_tokens
-            yield f"data: {json.dumps({'tokens_used': total_tokens, 'session_id': session_id})}\n\n"
+                final = stream.get_final_message()
+                total_tokens = final.usage.input_tokens + final.usage.output_tokens
+                yield f"data: {json.dumps({'tokens_used': total_tokens, 'session_id': session_id})}\n\n"
 
-            # Process tool use blocks
-            for block in final.content:
-                if block.type == "tool_use":
-                    tool_name = block.name
-                    tool_input = block.input
+                # Process tool use blocks
+                for block in final.content:
+                    if block.type == "tool_use":
+                        tool_name = block.name
+                        tool_input = block.input
 
-                    if dashboard_id:
-                        tool_input["dashboard_id"] = dashboard_id
+                        if dashboard_id:
+                            tool_input["dashboard_id"] = dashboard_id
 
-                    handler = TOOL_HANDLERS.get(tool_name)
-                    if handler:
-                        try:
-                            result = handler(**tool_input)
+                        handler = TOOL_HANDLERS.get(tool_name)
+                        if handler:
+                            try:
+                                result = handler(**tool_input)
+                                tool_results.append(
+                                    {
+                                        "type": "tool_result",
+                                        "tool_use_id": block.id,
+                                        "content": json.dumps(result),
+                                    }
+                                )
+                                # Signal the browser to reload the widget iframe
+                                yield f"data: {json.dumps({'reload_widgets': True})}\n\n"
+                            except Exception as exc:
+                                tool_results.append(
+                                    {
+                                        "type": "tool_result",
+                                        "tool_use_id": block.id,
+                                        "content": f"Error: {exc}",
+                                        "is_error": True,
+                                    }
+                                )
+                        else:
                             tool_results.append(
                                 {
                                     "type": "tool_result",
                                     "tool_use_id": block.id,
-                                    "content": json.dumps(result),
-                                }
-                            )
-                            # Signal the browser to reload the widget iframe
-                            yield f"data: {json.dumps({'reload_widgets': True})}\n\n"
-                        except Exception as exc:
-                            tool_results.append(
-                                {
-                                    "type": "tool_result",
-                                    "tool_use_id": block.id,
-                                    "content": f"Error: {exc}",
+                                    "content": "Unknown tool",
                                     "is_error": True,
                                 }
                             )
-                    else:
-                        tool_results.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": "Unknown tool",
-                                "is_error": True,
-                            }
-                        )
 
-            if final.stop_reason == "tool_use":
-                messages = messages + [
-                    {"role": "assistant", "content": final.content},
-                    {"role": "user", "content": tool_results},
-                ]
-            else:
-                break
-
-    _update_session_tokens(session_id, total_tokens)
+                if final.stop_reason == "tool_use":
+                    messages = messages + [
+                        {"role": "assistant", "content": final.content},
+                        {"role": "user", "content": tool_results},
+                    ]
+                else:
+                    break
+    except Exception:
+        logger.exception("Error in _stream_anthropic for session %s", session_id)
+        yield f"data: {json.dumps({'error': 'stream_error'})}\n\n"
+    finally:
+        _update_session_tokens(session_id, total_tokens)
 
 
 async def _stream_openai(
@@ -180,74 +196,111 @@ async def _stream_openai(
 
     openai_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
 
-    while True:
-        tool_calls_pending = []
+    # Discover the loaded model — LM Studio requires the real identifier
+    try:
+        models_response = await client.models.list()
+        model_id = models_response.data[0].id if models_response.data else "local-model"
+    except Exception:
+        model_id = "local-model"
 
-        async with await client.chat.completions.create(
-            model="local-model",
-            messages=openai_messages,
-            tools=openai_tools,
-            stream=True,
-        ) as stream:
-            async for chunk in stream:
-                choice = chunk.choices[0] if chunk.choices else None
-                if choice is None:
-                    continue
+    try:
+        while True:
+            tool_calls_pending = []
+            # Reconstruct the full assistant message so it can be appended to
+            # history before tool results — OpenAI format requires this ordering.
+            assistant_tool_calls = []
+            assistant_content = ""
 
-                delta = choice.delta
-                if delta.content:
-                    yield f"data: {json.dumps({'token': delta.content})}\n\n"
+            async with await client.chat.completions.create(
+                model=model_id,
+                messages=openai_messages,
+                tools=openai_tools,
+                stream=True,
+            ) as stream:
+                async for chunk in stream:
+                    choice = chunk.choices[0] if chunk.choices else None
+                    if choice is None:
+                        continue
 
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        while len(tool_calls_pending) <= tc.index:
-                            tool_calls_pending.append({"id": "", "name": "", "arguments": ""})
-                        if tc.id:
-                            tool_calls_pending[tc.index]["id"] = tc.id
-                        if tc.function.name:
-                            tool_calls_pending[tc.index]["name"] = tc.function.name
-                        if tc.function.arguments:
-                            tool_calls_pending[tc.index]["arguments"] += tc.function.arguments
+                    delta = choice.delta
+                    if delta.content:
+                        assistant_content += delta.content
+                        yield f"data: {json.dumps({'token': delta.content})}\n\n"
 
-                if chunk.usage:
-                    total_tokens = chunk.usage.total_tokens
-                    yield f"data: {json.dumps({'tokens_used': total_tokens, 'session_id': session_id})}\n\n"
+                    if delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            while len(tool_calls_pending) <= tc.index:
+                                tool_calls_pending.append({"id": "", "name": "", "arguments": ""})
+                                assistant_tool_calls.append(
+                                    {
+                                        "id": "",
+                                        "type": "function",
+                                        "function": {"name": "", "arguments": ""},
+                                    }
+                                )
+                            if tc.id:
+                                tool_calls_pending[tc.index]["id"] = tc.id
+                                assistant_tool_calls[tc.index]["id"] = tc.id
+                            if tc.function and tc.function.name:
+                                tool_calls_pending[tc.index]["name"] = tc.function.name
+                                assistant_tool_calls[tc.index]["function"]["name"] = (
+                                    tc.function.name
+                                )
+                            if tc.function and tc.function.arguments:
+                                tool_calls_pending[tc.index]["arguments"] += tc.function.arguments
+                                assistant_tool_calls[tc.index]["function"]["arguments"] += (
+                                    tc.function.arguments
+                                )
 
-                if choice.finish_reason == "stop":
-                    break
+                    if chunk.usage:
+                        total_tokens = chunk.usage.total_tokens
+                        yield f"data: {json.dumps({'tokens_used': total_tokens, 'session_id': session_id})}\n\n"
 
-        if tool_calls_pending:
-            tool_result_messages = []
-            for tc in tool_calls_pending:
-                tool_name = tc["name"]
-                try:
-                    tool_input = json.loads(tc["arguments"])
-                except json.JSONDecodeError:
-                    tool_input = {}
+                    if choice.finish_reason == "stop":
+                        break
 
-                if dashboard_id:
-                    tool_input["dashboard_id"] = dashboard_id
+            if tool_calls_pending:
+                # Build the assistant message that produced these tool calls
+                assistant_msg: dict = {"role": "assistant"}
+                if assistant_content:
+                    assistant_msg["content"] = assistant_content
+                if assistant_tool_calls:
+                    assistant_msg["tool_calls"] = assistant_tool_calls
 
-                handler = TOOL_HANDLERS.get(tool_name)
-                if handler:
+                tool_result_messages = [assistant_msg]
+                for tc in tool_calls_pending:
+                    tool_name = tc["name"]
                     try:
-                        result = handler(**tool_input)
-                        content = json.dumps(result)
-                        yield f"data: {json.dumps({'reload_widgets': True})}\n\n"
-                    except Exception as exc:
-                        content = f"Error: {exc}"
-                else:
-                    content = "Unknown tool"
+                        tool_input = json.loads(tc["arguments"])
+                    except json.JSONDecodeError:
+                        tool_input = {}
 
-                tool_result_messages.append(
-                    {"role": "tool", "tool_call_id": tc["id"], "content": content}
-                )
+                    if dashboard_id:
+                        tool_input["dashboard_id"] = dashboard_id
 
-            openai_messages = openai_messages + tool_result_messages
-        else:
-            break
+                    handler = TOOL_HANDLERS.get(tool_name)
+                    if handler:
+                        try:
+                            result = handler(**tool_input)
+                            content = json.dumps(result)
+                            yield f"data: {json.dumps({'reload_widgets': True})}\n\n"
+                        except Exception as exc:
+                            content = f"Error: {exc}"
+                    else:
+                        content = "Unknown tool"
 
-    _update_session_tokens(session_id, total_tokens)
+                    tool_result_messages.append(
+                        {"role": "tool", "tool_call_id": tc["id"], "content": content}
+                    )
+
+                openai_messages = openai_messages + tool_result_messages
+            else:
+                break
+    except Exception:
+        logger.exception("Error in _stream_openai for session %s", session_id)
+        yield f"data: {json.dumps({'error': 'stream_error'})}\n\n"
+    finally:
+        _update_session_tokens(session_id, total_tokens)
 
 
 @app.post("/chat/")

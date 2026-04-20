@@ -1,10 +1,14 @@
 import json
 import logging
 
+import altair as alt
 import httpx
+import polars as pl
 from apps.accounts.models import UserApiKey
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db.models import Avg, Count
+from django.db.models.functions import TruncDate
 from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
@@ -64,32 +68,127 @@ def dashboard(request):
     return render(request, "dashboard/dashboard.html", context)
 
 
+def _build_altair_spec(widget: DashboardWidget) -> dict | None:
+    """
+    Build an Altair Vega-Lite spec dict for a widget.
+    Returns None when the widget type doesn't produce a chart or has no data.
+    """
+    from apps.flows.models import FlowExecution, PredictionResult
+
+    config = widget.config
+    wtype = widget.widget_type
+    color = config.get("color", "#4f46e5")
+
+    # ── time-series bar / line ────────────────────────────────────────────────
+    if wtype in ("LINE_CHART", "BAR_CHART"):
+        y_field = config.get("y_field", "execution_count")
+        y_label = config.get("label") or y_field.replace("_", " ").title()
+
+        if y_field in ("execution_count", "count"):
+            rows = list(
+                FlowExecution.objects.annotate(date=TruncDate("created_at"))
+                .values("date")
+                .annotate(value=Count("id"))
+                .order_by("date")[:60]
+            )
+        elif y_field == "prediction_count":
+            rows = list(
+                PredictionResult.objects.annotate(date=TruncDate("scored_at"))
+                .values("date")
+                .annotate(value=Count("id"))
+                .order_by("date")[:60]
+            )
+        elif y_field == "score":
+            rows = list(
+                PredictionResult.objects.annotate(date=TruncDate("scored_at"))
+                .values("date")
+                .annotate(value=Avg("score"))
+                .order_by("date")[:60]
+            )
+        else:
+            rows = []
+
+        if not rows:
+            return None
+
+        df = pl.DataFrame(
+            {
+                "date": [str(r["date"]) for r in rows],
+                "value": [float(r["value"]) if r["value"] is not None else 0.0 for r in rows],
+            }
+        )
+
+        base = alt.Chart(df).encode(
+            x=alt.X("date:T", axis=alt.Axis(labelAngle=-30, format="%b %d"), title=None),
+            y=alt.Y("value:Q", title=y_label),
+        )
+        if wtype == "BAR_CHART":
+            chart = base.mark_bar(color=color)
+        else:
+            chart = base.mark_line(color=color, point=alt.OverlayMarkDef(color=color, size=30))
+
+        return chart.properties(width=360, height=160).to_dict()
+
+    # ── metric card ───────────────────────────────────────────────────────────
+    if wtype == "METRIC_CARD":
+        field = config.get("field", "execution_count")
+
+        if field in ("execution_count", "count"):
+            result = FlowExecution.objects.aggregate(v=Count("id"))
+        elif field == "prediction_count":
+            result = PredictionResult.objects.aggregate(v=Count("id"))
+        elif field == "score":
+            result = PredictionResult.objects.aggregate(v=Avg("score"))
+        else:
+            result = {"v": 0}
+
+        raw = result["v"]
+        value = round(float(raw), 2) if raw is not None else 0
+        # Metric cards don't use Altair — return a plain dict the template reads directly.
+        return {"_metric": True, "value": value}
+
+    # ── score distribution ────────────────────────────────────────────────────
+    if wtype == "SCORE_DISTRIBUTION":
+        scores = list(PredictionResult.objects.values_list("score", flat=True)[:2000])
+        if not scores:
+            return None
+
+        df = pl.DataFrame({"score": [float(s) for s in scores]})
+        chart = (
+            alt.Chart(df)
+            .mark_bar(color=color)
+            .encode(
+                x=alt.X("score:Q", bin=alt.Bin(maxbins=config.get("bins", 10)), title="Score"),
+                y=alt.Y("count():Q", title="Count"),
+            )
+            .properties(width=360, height=160)
+        )
+        return chart.to_dict()
+
+    return None
+
+
 @login_required
 @require_http_methods(["GET"])
-def dashboard_render(request, dashboard_id):
-    """
-    Iframe-embedded widget grid.  Rendered with a tight Content-Security-Policy
-    so injected widget content cannot reach parent context.
-    """
-    user_dashboard = get_object_or_404(UserDashboard, pk=dashboard_id, owner=request.user)
-    widgets = user_dashboard.widgets.all()
-
-    response = render(
+def widget_grid(request):
+    """HTMX partial: the user's active widget grid."""
+    user_dashboard = UserDashboard.objects.filter(owner=request.user, is_active=True).first()
+    widgets = []
+    for w in user_dashboard.widgets.all() if user_dashboard else []:
+        data = _build_altair_spec(w)
+        widgets.append(
+            {
+                "widget": w,
+                # Metric cards carry _metric flag; chart widgets carry a Vega-Lite spec.
+                "metric_value": data.get("value") if data and data.get("_metric") else None,
+                "vega_spec": json.dumps(data) if data and not data.get("_metric") else None,
+            }
+        )
+    return render(
         request,
-        "dashboard/render.html",
+        "dashboard/partials/widget_grid.html",
         {"dashboard": user_dashboard, "widgets": widgets},
     )
-    # Sandbox iframe: no scripts from inline, only allow same-origin fetches for data.
-    response["Content-Security-Policy"] = (
-        "default-src 'none'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "script-src 'self'; "
-        "connect-src 'self'; "
-        "img-src 'self' data:; "
-        "frame-ancestors 'self';"
-    )
-    response["X-Frame-Options"] = "SAMEORIGIN"
-    return response
 
 
 # ── chat SSE endpoint ─────────────────────────────────────────────────────────
@@ -170,6 +269,8 @@ def dashboard_chat(request):
         "Content-Type": "application/json",
     }
 
+    token_budget = session.tokens_budget
+
     def _sse_generator():
         try:
             with httpx.stream(
@@ -183,10 +284,24 @@ def dashboard_chat(request):
                     yield f"data: {json.dumps({'error': 'mcp_error', 'status': resp.status_code})}\n\n"
                     return
                 for line in resp.iter_lines():
-                    if line:
-                        yield f"{line}\n\n"
+                    if not line:
+                        continue
+                    # Augment token events with the budget so the browser can render the bar
+                    if line.startswith("data: ") and '"tokens_used"' in line:
+                        try:
+                            event_data = json.loads(line[6:])
+                            if "tokens_used" in event_data and "tokens_budget" not in event_data:
+                                event_data["tokens_budget"] = token_budget
+                                yield f"data: {json.dumps(event_data)}\n\n"
+                                continue
+                        except (json.JSONDecodeError, ValueError):
+                            pass
+                    yield f"{line}\n\n"
         except httpx.ConnectError:
             yield f"data: {json.dumps({'error': 'mcp_unavailable'})}\n\n"
+        except httpx.RemoteProtocolError:
+            logger.warning("MCP server closed connection mid-stream for session %s", session.pk)
+            yield f"data: {json.dumps({'error': 'stream_error'})}\n\n"
         except Exception:
             logger.exception("SSE proxy error for session %s", session.pk)
             yield f"data: {json.dumps({'error': 'proxy_error'})}\n\n"
